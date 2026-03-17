@@ -1,17 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { router } from "expo-router"; // Dùng để chuyển trang
+import { jwtDecode } from "jwt-decode";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // ⚠️ THAY CÁI NÀY BẰNG IPV4 CỦA MÁY TÍNH BẠN
@@ -44,10 +45,24 @@ export default function LoginScreen() {
         // 1. Lưu token vào bộ nhớ điện thoại
         await AsyncStorage.setItem("cosmate_token", token);
 
-        Alert.alert("Thành công", "Đăng nhập thành công!");
+        // 2. GIẢI MÃ TOKEN ĐỂ CHECK ROLE
+        const decoded: any = jwtDecode(token);
+        const roles = decoded.roles || []; // Lấy mảng roles từ token ra
 
-        // 2. Chuyển hướng thẳng vào màn hình Tabs (và không cho back lại trang Login)
-        router.replace("/(tabs)");
+        // 3. RẼ NHÁNH CHUYỂN TRANG THEO ROLE ĐÍCH DANH
+        if (roles.includes("PROVIDER_RENTAL")) {
+          // Nếu là Chủ shop -> Đá sang thư mục Quản lý Item
+          router.replace("/(provider)/items");
+        } else if (roles.includes("COSPLAYER")) {
+          // Nếu là Khách đi thuê -> Đá sang màn hình Track đơn hàng
+          router.replace("/(tabs)");
+        } else {
+          // Lưới an toàn: Bắt lỗi nếu tài khoản bị mất Role ở database
+          Alert.alert(
+            "Lỗi phân quyền",
+            "Tài khoản của bạn chưa được cấp quyền hợp lệ!",
+          );
+        }
       } else {
         // API trả về lỗi (sai pass, user không tồn tại...)
         Alert.alert(
@@ -57,20 +72,20 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       setIsLoading(false); // Tắt vòng xoay loading
-      
+
       if (error.response) {
         // Server ĐÃ NHẬN được request nhưng trả về lỗi (400, 401, 403, 500...)
         console.log("Chi tiết lỗi từ Spring Boot:", error.response.data);
         Alert.alert(
-          'Sai thông tin (Lỗi 400)', 
-          `Server báo: ${JSON.stringify(error.response.data)}`
+          "Sai thông tin (Lỗi 400)",
+          `Server báo: ${JSON.stringify(error.response.data)}`,
         );
       } else if (error.request) {
         // Bấm gửi nhưng Server không thèm trả lời (Tắt server, sai IP)
-        Alert.alert('Lỗi mạng', 'Không thể kết nối đến máy chủ.');
+        Alert.alert("Lỗi mạng", "Không thể kết nối đến máy chủ.");
       } else {
         // Lỗi do code React Native của mình
-        Alert.alert('Lỗi App', error.message);
+        Alert.alert("Lỗi App", error.message);
       }
     } finally {
       setIsLoading(false);
@@ -121,9 +136,7 @@ export default function LoginScreen() {
   );
 }
 
-// ... Giữ nguyên phần StyleSheet ở dưới như cũ nhé!
 const styles = StyleSheet.create({
-  // (Giữ nguyên các style bạn đang có ở file trước)
   container: { flex: 1, backgroundColor: "#F8F9FA", justifyContent: "center" },
   formContainer: { paddingHorizontal: 30 },
   title: {
