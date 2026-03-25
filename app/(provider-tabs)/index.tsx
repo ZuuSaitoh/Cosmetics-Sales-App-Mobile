@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from "jwt-decode";
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker'; // IMPORT THƯ VIỆN ẢNH
+import * as ImagePicker from 'expo-image-picker';
 
 const RENTAL_STATUSES = [
   { key: 'ALL', label: 'Tất cả' },
@@ -20,9 +20,7 @@ const RENTAL_STATUSES = [
 const BASE_URL = 'http://192.168.101.107:8080/api';
 
 export default function OrderManagementScreen() {
-  const [orderType, setOrderType] = useState<'RENTAL' | 'SERVICE'>('RENTAL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
-  
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -30,11 +28,11 @@ export default function OrderManagementScreen() {
   const [isShipModalVisible, setIsShipModalVisible] = useState(false);
   const [shipOrderId, setShipOrderId] = useState<number | null>(null);
   const [trackingCode, setTrackingCode] = useState('');
-  const [shipImage, setShipImage] = useState<any>(null); // State lưu ảnh bằng chứng
+  const [shipImage, setShipImage] = useState<any>(null);
 
   useEffect(() => {
     fetchOrders();
-  }, [orderType]);
+  }, []);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -49,11 +47,8 @@ export default function OrderManagementScreen() {
       });
       const providerId = providerRes.data.result.id;
 
-      let apiUrl = orderType === 'RENTAL' 
-        ? `${BASE_URL}/orders/provider/${providerId}` 
-        : `${BASE_URL}/service-orders/provider`; 
-
-      const response = await axios.get(apiUrl, {
+      // API dành riêng cho Rental Provider
+      const response = await axios.get(`${BASE_URL}/orders/provider/${providerId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -78,7 +73,7 @@ export default function OrderManagementScreen() {
   });
 
   // ==========================================
-  // HÀM CHUYỂN TRẠNG THÁI: PREPARE & COMPLETE
+  // CÁC HÀM XỬ LÝ API (Giữ nguyên logic cũ)
   // ==========================================
   const handlePrepareOrder = (orderId: number) => {
     Alert.alert("Xác nhận đơn", `Chuẩn bị đồ cho đơn #${orderId}?`, [
@@ -87,10 +82,7 @@ export default function OrderManagementScreen() {
           try {
             const token = await AsyncStorage.getItem('cosmate_token');
             const res = await axios.post(`${BASE_URL}/orders/${orderId}/prepare`, {}, { headers: { Authorization: `Bearer ${token}` } });
-            if (res.data.code === 0) {
-              Alert.alert("Thành công", "Đã chuyển sang trạng thái Đang chuẩn bị!");
-              fetchOrders(); 
-            } else Alert.alert("Lỗi", res.data.message);
+            if (res.data.code === 0) { fetchOrders(); }
           } catch (error) { Alert.alert("Lỗi mạng"); }
         }
       }
@@ -104,115 +96,70 @@ export default function OrderManagementScreen() {
           try {
             const token = await AsyncStorage.getItem('cosmate_token');
             const res = await axios.post(`${BASE_URL}/orders/${orderId}/complete`, {}, { headers: { Authorization: `Bearer ${token}` } });
-            if (res.data.code === 0) {
-              Alert.alert("Hoàn tất", "Đã chốt đơn và hoàn cọc!");
-              fetchOrders(); 
-            } else Alert.alert("Lỗi", res.data.message);
+            if (res.data.code === 0) { fetchOrders(); }
           } catch (error) { Alert.alert("Lỗi mạng"); }
         }
       }
     ]);
   };
 
-  // ==========================================
-  // HÀM GIAO HÀNG (MỞ MODAL & CHỌN ẢNH)
-  // ==========================================
   const openShipModal = (orderId: number) => {
     setShipOrderId(orderId);
     setTrackingCode('');
-    setShipImage(null); // Xóa ảnh cũ
+    setShipImage(null);
     setIsShipModalVisible(true);
   };
 
-  // Hàm mở thư viện ảnh
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      // SỬA DÒNG NÀY (Dùng mảng chữ thay vì object kiểu cũ)
-      mediaTypes: ['images'], 
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
     });
-
-    if (!result.canceled) {
-      setShipImage(result.assets[0]);
-    }
+    if (!result.canceled) { setShipImage(result.assets[0]); }
   };
 
   const submitShipOrder = async () => {
-    if (!trackingCode.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập mã vận đơn!");
-      return;
-    }
-
+    if (!trackingCode.trim()) { Alert.alert("Lỗi", "Vui lòng nhập mã vận đơn!"); return; }
     try {
       const token = await AsyncStorage.getItem('cosmate_token');
       const formData = new FormData();
-
-      // Nếu chủ shop có chọn ảnh bằng chứng thì đẩy vào mảng 'images'
       if (shipImage) {
         const localUri = shipImage.uri;
         const filename = localUri.split('/').pop() || 'image.jpg';
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : `image/jpeg`;
-        
         formData.append('images', { uri: localUri, name: filename, type } as any);
       }
-
-      // Nối mã vận đơn vào URL theo đúng chuẩn API Swagger của bạn
       const url = `${BASE_URL}/orders/${shipOrderId}/ship?trackingCode=${encodeURIComponent(trackingCode)}`;
-
       const res = await axios.post(url, formData, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
       });
-
-      if (res.data.code === 0) {
-        Alert.alert("Giao hàng thành công", "Mã vận đơn và hình ảnh đã được lưu lại!");
-        setIsShipModalVisible(false);
-        fetchOrders(); 
-      } else {
-        Alert.alert("Lỗi", res.data.message);
-      }
-    } catch (error) { 
-      console.error(error); 
-      Alert.alert("Lỗi hệ thống", "Không thể upload dữ liệu giao hàng."); 
-    }
+      if (res.data.code === 0) { setIsShipModalVisible(false); fetchOrders(); }
+    } catch (error) { Alert.alert("Lỗi hệ thống"); }
   };
 
-  // -------------------------------------------------------------
   const renderDynamicButton = (item: any) => {
-    if (orderType === 'RENTAL') {
-      if (item.status === 'PENDING' || item.status === 'PAID') {
-        return (
-          <TouchableOpacity style={styles.actionBtn} onPress={() => handlePrepareOrder(item.id)}>
-            <Text style={styles.actionBtnText}>Xác nhận & Chuẩn bị</Text>
-          </TouchableOpacity>
-        );
-      }
-      if (item.status === 'PREPARING') {
-        return (
-          // Thay vì gọi API liền, giờ mình mở cái Modal lên
-          <TouchableOpacity style={styles.actionBtn} onPress={() => openShipModal(item.id)}>
-            <Text style={styles.actionBtnText}>Giao cho vận chuyển</Text>
-          </TouchableOpacity>
-        );
-      }
-      if (item.status === 'RETURNING') {
-        return (
-          <TouchableOpacity style={styles.actionBtn} onPress={() => handleCompleteOrder(item.id)}>
-            <Text style={styles.actionBtnText}>Xác nhận nhận đồ</Text>
-          </TouchableOpacity>
-        );
-      }
-      if (item.status === 'COMPLETED') {
-        return (
-          <TouchableOpacity style={[styles.defaultBtn, { opacity: 0.5 }]} disabled>
-            <Text style={styles.defaultBtnText}>Đã hoàn thành</Text>
-          </TouchableOpacity>
-        );
-      }
+    if (item.status === 'PENDING' || item.status === 'PAID') {
+      return (
+        <TouchableOpacity style={styles.actionBtn} onPress={() => handlePrepareOrder(item.id)}>
+          <Text style={styles.actionBtnText}>Xác nhận & Chuẩn bị</Text>
+        </TouchableOpacity>
+      );
+    }
+    if (item.status === 'PREPARING') {
+      return (
+        <TouchableOpacity style={styles.actionBtn} onPress={() => openShipModal(item.id)}>
+          <Text style={styles.actionBtnText}>Giao cho vận chuyển</Text>
+        </TouchableOpacity>
+      );
+    }
+    if (item.status === 'SHIPPING_BACK' || item.status === 'RETURNING') {
+      return (
+        <TouchableOpacity style={styles.actionBtn} onPress={() => handleCompleteOrder(item.id)}>
+          <Text style={styles.actionBtnText}>Xác nhận nhận đồ</Text>
+        </TouchableOpacity>
+      );
     }
     return (
       <TouchableOpacity style={styles.defaultBtn} onPress={() => router.push({ pathname: '/(screens)/order-detail', params: { id: item.id } })}>
@@ -221,69 +168,68 @@ export default function OrderManagementScreen() {
     );
   };
 
-  const renderOrderItem = ({ item }: { item: any }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.customerInfo}>
-          <View style={styles.avatarPlaceholder}><Ionicons name="person" size={16} color="#fff" /></View>
-          <Text style={styles.customerName}>Khách ID: {item.cosplayerId || 'Ẩn danh'}</Text>
-        </View>
-        <Text style={[styles.statusBadge, { color: item.status === 'COMPLETED' ? '#28A745' : '#FF9900' }]}>{item.status}</Text>
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.orderId}>Mã đơn: #{item.id}</Text>
-        {orderType === 'RENTAL' ? (
-          <Text style={styles.orderDesc} numberOfLines={2}>Gồm {item.details?.length || 0} món đồ (Cọc: {formatPrice(item.totalDepositAmount)})</Text>
-        ) : (
-          <Text style={styles.orderDesc}>Đơn dịch vụ Make-up / Chụp ảnh</Text>
-        )}
-        <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>Tổng tiền:</Text>
-          <Text style={styles.priceValue}>{formatPrice(item.totalAmount)}</Text>
-        </View>
-      </View>
-      <View style={styles.cardFooter}>
-        <TouchableOpacity style={styles.btnOutline} onPress={() => router.push({ pathname: '/(screens)/order-detail', params: { id: item.id } })}>
-          <Text style={styles.btnOutlineText}>Chi tiết</Text>
-        </TouchableOpacity>
-        {renderDynamicButton(item)}
-      </View>
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.container}>
+      {/* 1. HEADER TINH GỌN (Bỏ thanh gạt) */}
       <View style={styles.header}>
-        <Text style={styles.mainTitle}>Quản lý Đơn hàng</Text>
-        <View style={styles.segmentContainer}>
-          <TouchableOpacity style={[styles.segmentBtn, orderType === 'RENTAL' && styles.segmentActive]} onPress={() => setOrderType('RENTAL')}>
-            <Text style={[styles.segmentText, orderType === 'RENTAL' && styles.segmentTextActive]}>👕 Thuê Đồ</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.segmentBtn, orderType === 'SERVICE' && styles.segmentActive]} onPress={() => setOrderType('SERVICE')}>
-            <Text style={[styles.segmentText, orderType === 'SERVICE' && styles.segmentTextActive]}>💄 Dịch Vụ</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.mainTitle}>Quản lý Đơn thuê đồ</Text>
       </View>
 
+      {/* 2. THANH LỌC TRẠNG THÁI */}
       <View style={styles.filterWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContainer}>
           {RENTAL_STATUSES.map((status) => (
-            <TouchableOpacity key={status.key} style={[styles.filterChip, selectedStatus === status.key && styles.filterChipActive]} onPress={() => setSelectedStatus(status.key)}>
-              <Text style={[styles.filterChipText, selectedStatus === status.key && styles.filterChipTextActive]}>{status.label}</Text>
+            <TouchableOpacity 
+              key={status.key} 
+              style={[styles.filterChip, selectedStatus === status.key && styles.filterChipActive]}
+              onPress={() => setSelectedStatus(status.key)}
+            >
+              <Text style={[styles.filterChipText, selectedStatus === status.key && styles.filterChipTextActive]}>
+                {status.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
+      {/* 3. DANH SÁCH ĐƠN HÀNG */}
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#B59DFF" /></View>
       ) : (
-        <FlatList data={filteredOrders} keyExtractor={(item: any) => item.id.toString()} renderItem={renderOrderItem} contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false} ListEmptyComponent={<Text style={styles.emptyText}>Chưa có đơn hàng nào.</Text>} />
+        <FlatList 
+          data={filteredOrders} 
+          keyExtractor={(item: any) => item.id.toString()} 
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.customerInfo}>
+                  <View style={styles.avatarPlaceholder}><Ionicons name="person" size={16} color="#fff" /></View>
+                  <Text style={styles.customerName}>Khách ID: {item.cosplayerId || 'Ẩn danh'}</Text>
+                </View>
+                <Text style={[styles.statusBadge, { color: item.status === 'COMPLETED' ? '#28A745' : '#FF9900' }]}>{item.status}</Text>
+              </View>
+              <View style={styles.cardBody}>
+                <Text style={styles.orderId}>Mã đơn: #{item.id}</Text>
+                <Text style={styles.orderDesc} numberOfLines={2}>Gồm {item.details?.length || 0} món đồ (Cọc: {formatPrice(item.totalDepositAmount)})</Text>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Tổng tiền:</Text>
+                  <Text style={styles.priceValue}>{formatPrice(item.totalAmount)}</Text>
+                </View>
+              </View>
+              <View style={styles.cardFooter}>
+                <TouchableOpacity style={styles.btnOutline} onPress={() => router.push({ pathname: '/(screens)/order-detail', params: { id: item.id } })}>
+                  <Text style={styles.btnOutlineText}>Chi tiết</Text>
+                </TouchableOpacity>
+                {renderDynamicButton(item)}
+              </View>
+            </View>
+          )} 
+          contentContainerStyle={styles.listContainer} 
+          ListEmptyComponent={<Text style={styles.emptyText}>Chưa có đơn hàng nào.</Text>} 
+        />
       )}
 
-      {/* ========================================================= */}
-      {/* POPUP NHẬP MÃ VẬN ĐƠN VÀ CHỌN ẢNH BẰNG CHỨNG                */}
-      {/* ========================================================= */}
+      {/* MODAL GIAO HÀNG (Giữ nguyên) */}
       <Modal animationType="fade" transparent={true} visible={isShipModalVisible} onRequestClose={() => setIsShipModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -291,27 +237,10 @@ export default function OrderManagementScreen() {
               <Text style={styles.modalTitle}>Giao cho vận chuyển</Text>
               <TouchableOpacity onPress={() => setIsShipModalVisible(false)}><Ionicons name="close" size={24} color="#666" /></TouchableOpacity>
             </View>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Nhập mã vận đơn (VD: GHTK123...)"
-              value={trackingCode}
-              onChangeText={setTrackingCode}
-              autoCapitalize="characters"
-            />
-
-            {/* Khu vực up ảnh bằng chứng */}
+            <TextInput style={styles.modalInput} placeholder="Mã vận đơn..." value={trackingCode} onChangeText={setTrackingCode} autoCapitalize="characters" />
             <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
-              {shipImage ? (
-                <Image source={{ uri: shipImage.uri }} style={styles.previewImage} />
-              ) : (
-                <>
-                  <Ionicons name="camera-outline" size={30} color="#A090C5" />
-                  <Text style={styles.uploadText}>Tải lên ảnh tình trạng đồ (Tùy chọn)</Text>
-                </>
-              )}
+              {shipImage ? <Image source={{ uri: shipImage.uri }} style={styles.previewImage} /> : <><Ionicons name="camera-outline" size={30} color="#A090C5" /><Text style={styles.uploadText}>Tải ảnh bằng chứng</Text></>}
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.modalSubmitBtn} onPress={submitShipOrder}>
               <Text style={styles.modalSubmitText}>Xác nhận Giao Hàng</Text>
             </TouchableOpacity>
@@ -325,13 +254,8 @@ export default function OrderManagementScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F5F7' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { backgroundColor: '#fff', padding: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
-  mainTitle: { fontSize: 22, fontWeight: '900', color: '#4A3B6B', marginBottom: 15 },
-  segmentContainer: { flexDirection: 'row', backgroundColor: '#F4F5F7', borderRadius: 10, padding: 4 },
-  segmentBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  segmentActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 2 },
-  segmentText: { fontSize: 14, fontWeight: '600', color: '#888' },
-  segmentTextActive: { color: '#B59DFF' },
+  header: { backgroundColor: '#fff', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  mainTitle: { fontSize: 22, fontWeight: '900', color: '#4A3B6B' },
   filterWrapper: { backgroundColor: '#fff', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   filterContainer: { paddingHorizontal: 15 },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F4F5F7', marginRight: 10, borderWidth: 1, borderColor: 'transparent' },
@@ -359,8 +283,6 @@ const styles = StyleSheet.create({
   defaultBtn: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 6, backgroundColor: '#F4F5F7' },
   defaultBtnText: { color: '#666', fontSize: 13, fontWeight: '600' },
   emptyText: { textAlign: 'center', color: '#999', marginTop: 50, fontStyle: 'italic' },
-
-  // --- STYLE CHO MODAL ---
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContainer: { width: '100%', backgroundColor: '#fff', borderRadius: 16, padding: 20, elevation: 5 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },

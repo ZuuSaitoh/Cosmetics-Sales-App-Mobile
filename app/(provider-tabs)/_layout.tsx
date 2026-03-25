@@ -1,64 +1,76 @@
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons'; // Thư viện icon có sẵn của Expo
+import { Ionicons } from '@expo/vector-icons';
+import { Platform, View } from 'react-native';
 
-export default function TabsLayout() {
+export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false, // Ẩn cái header chữ to mặc định đi cho thoáng
-        tabBarShowLabel: true, // Hiện chữ dưới icon
-        tabBarActiveTintColor: '#B59DFF', // Màu tím đậm khi tab đang được chọn
-        tabBarInactiveTintColor: '#C4B9DF', // Màu tím xỉn khi tab không được chọn
+        headerShown: false,
+        tabBarActiveTintColor: '#B59DFF',
+        tabBarInactiveTintColor: '#999',
         
-        // --- BẮT ĐẦU MA THUẬT LÀM ĐẸP CHỖ NÀY ---
+        // --- CẤU HÌNH ĐỂ ĐẨY ICON LÊN CAO ---
         tabBarStyle: {
-          position: 'absolute', // Bắt nó nổi lên khỏi đáy màn hình
-          bottom: 20,          // Cách đáy 20px
-          left: 20,            // Cách trái 20px
-          right: 20,           // Cách phải 20px
-          backgroundColor: '#FFFFFF',
-          borderRadius: 25,    // Bo tròn mạnh tay cho giống iOS
-          height: 65,
-          paddingBottom: 8,
-          paddingTop: 8,
-          borderTopWidth: 0,   // Xóa cái đường gạch ngang xấu xí
+          backgroundColor: '#ffffff',
+          borderTopWidth: 1,
+          borderTopColor: '#F2F2F2',
           
-          // Hiệu ứng đổ bóng mờ ảo (màu tím luôn cho tone-sur-tone)
-          shadowColor: '#B59DFF',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 10,
-          elevation: 8,        // Dành cho Android
+          // Tăng chiều cao tổng thể của thanh Tab lên hẳn 100 (cho iOS) hoặc 80 (cho Android)
+          height: Platform.OS === 'ios' ? 100 : 80, 
+          
+          // Đây là "chìa khóa": Tăng padding bottom thật lớn để đẩy icon và chữ lên trên
+          paddingBottom: Platform.OS === 'ios' ? 40 : 25, 
+          
+          paddingTop: 12, // Khoảng cách từ đỉnh thanh Tab xuống icon
+          
+          // Giúp thanh Tab trông phẳng và chắc chắn
+          elevation: 0,
+          shadowOpacity: 0,
         },
+        
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: 'bold',
+          fontWeight: '600',
+          marginTop: 4, // Khoảng cách giữa Icon và Chữ
+        },
+
+        tabBarIconStyle: {
+          marginBottom: 0, // Đảm bảo icon không bị dính sát chữ
         }
       }}
     >
-      {/* NÚT SỐ 1: DANH SÁCH ĐƠN HÀNG (Trỏ vào file index.tsx) */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Đơn hàng',
-          tabBarIcon: ({ color }) => (
-            // Dùng icon hóa đơn
-            <Ionicons name="receipt" size={24} color={color} />
-          ),
-        }}
-      />
+     
 
-      {/* NÚT SỐ 2: TÀI KHOẢN / CÁ NHÂN (Trỏ vào file profile.tsx) */}
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Cá nhân',
-          tabBarIcon: ({ color }) => (
-            // Dùng icon hình người
-            <Ionicons name="person" size={24} color={color} />
-          ),
-        }}
-      />
+  {/* TAB 2: QUẢN LÝ KHO ĐỒ (ITEMS) */}
+  <Tabs.Screen
+    name="items"
+    options={{
+      title: 'Kho đồ', // Trả lại tên cũ
+      tabBarIcon: ({ color, focused }) => (
+        <Ionicons 
+          name={focused ? "shirt" : "shirt-outline"} 
+          size={24} 
+          color={color} 
+        />
+      ),
+    }}
+  />
+
+   {/* TAB 1: QUẢN LÝ ĐƠN HÀNG */}
+  <Tabs.Screen
+    name="index"
+    options={{
+      title: 'Đơn hàng', // Trả lại tên cũ
+      tabBarIcon: ({ color, focused }) => (
+        <Ionicons 
+          name={focused ? "receipt" : "receipt-outline"} 
+          size={24} 
+          color={color} 
+        />
+      ),
+    }}
+  />
     </Tabs>
   );
 }
