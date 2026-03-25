@@ -52,7 +52,7 @@ export default function LoginScreen() {
         // 3. RẼ NHÁNH CHUYỂN TRANG THEO ROLE ĐÍCH DANH
         if (roles.includes("PROVIDER_RENTAL")) {
           // Nếu là Chủ shop -> Đá sang thư mục Quản lý Item
-          router.replace("/(provider)/items");
+          router.replace("/(provider-tabs)/items");
         } else if (roles.includes("COSPLAYER")) {
           // Nếu là Khách đi thuê -> Đá sang màn hình Track đơn hàng
           router.replace("/(tabs)");

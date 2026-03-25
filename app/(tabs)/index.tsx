@@ -120,41 +120,19 @@ export default function OrdersScreen() {
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity 
-   style={styles.btnSecondary}
-   onPress={() => router.push({ 
+  {/* NÚT 1: XEM CHI TIẾT (Trắng viền tím) */}
+  <TouchableOpacity 
+    style={styles.btnOutline}
+    onPress={() => router.push({ 
       pathname: '/(screens)/order-detail', 
       params: { id: item.id } 
-   })}
->
-   <Text style={styles.btnSecondaryText}>Xem chi tiết</Text>
-</TouchableOpacity>
+    })}
+  >
+    <Text style={styles.btnOutlineText}>Xem chi tiết</Text>
+  </TouchableOpacity>
 
-          {/* Tạo một biến kiểm tra xem đơn hàng đã COMPLETED chưa */}
-{/* 💡 Mẹo: Ở thực tế, khách đang giữ đồ (RENTING) thì mới cần bấm nút Trả. 
-    Nếu bạn muốn gộp cả 2 trạng thái thì dùng: item.status === 'COMPLETED' || item.status === 'RENTING' nhé! */}
-{(() => {
-  const isReadyToReturn = item.status === 'COMPLETED'; 
 
-  return (
-    <TouchableOpacity 
-      style={[
-        styles.btnPrimary, 
-        !isReadyToReturn && styles.btnDisabled // Nếu chưa hoàn thành thì nhét thêm style màu xám vào
-      ]}
-      disabled={!isReadyToReturn} // Khóa luôn không cho bấm
-      onPress={() => console.log('Chuyển sang trang Trả đồ!')}
-    >
-      <Text style={[
-        styles.btnPrimaryText, 
-        !isReadyToReturn && styles.btnDisabledText // Làm mờ chữ đi
-      ]}>
-        Trả hàng / Báo cáo
-      </Text>
-    </TouchableOpacity>
-  );
-})()}
-        </View>
+</View>
       </View>
     );
   };
@@ -220,7 +198,7 @@ const styles = StyleSheet.create({
   productDetails: { flex: 1, justifyContent: "center" },
   itemName: { fontSize: 15, color: "#333", marginBottom: 5 },
   price: { fontSize: 16, fontWeight: "bold", color: "#B59DFF" },
-  actionRow: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
+  actionRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 15, gap: 10 },
   btnSecondary: {
     paddingVertical: 8,
     paddingHorizontal: 15,
@@ -244,5 +222,8 @@ const styles = StyleSheet.create({
   },
   btnDisabledText: {
     color: '#A0A0A0', // Chữ màu xám nhạt
-  }
+  },
+  // Style cho nút Xem chi tiết
+  btnOutline: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: '#B59DFF', backgroundColor: '#fff' },
+  btnOutlineText: { color: '#B59DFF', fontWeight: 'bold' },
 });
