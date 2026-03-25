@@ -120,16 +120,40 @@ export default function OrdersScreen() {
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.btnSecondary}>
-            <Text style={styles.btnSecondaryText}>Xem chi tiết</Text>
-          </TouchableOpacity>
+          <TouchableOpacity 
+   style={styles.btnSecondary}
+   onPress={() => router.push({ 
+      pathname: '/(screens)/order-detail', 
+      params: { id: item.id } 
+   })}
+>
+   <Text style={styles.btnSecondaryText}>Xem chi tiết</Text>
+</TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.btnPrimary}
-            onPress={() => handleReturnItem(item.id)}
-          >
-            <Text style={styles.btnPrimaryText}>Trả hàng / Báo cáo</Text>
-          </TouchableOpacity>
+          {/* Tạo một biến kiểm tra xem đơn hàng đã COMPLETED chưa */}
+{/* 💡 Mẹo: Ở thực tế, khách đang giữ đồ (RENTING) thì mới cần bấm nút Trả. 
+    Nếu bạn muốn gộp cả 2 trạng thái thì dùng: item.status === 'COMPLETED' || item.status === 'RENTING' nhé! */}
+{(() => {
+  const isReadyToReturn = item.status === 'COMPLETED'; 
+
+  return (
+    <TouchableOpacity 
+      style={[
+        styles.btnPrimary, 
+        !isReadyToReturn && styles.btnDisabled // Nếu chưa hoàn thành thì nhét thêm style màu xám vào
+      ]}
+      disabled={!isReadyToReturn} // Khóa luôn không cho bấm
+      onPress={() => console.log('Chuyển sang trang Trả đồ!')}
+    >
+      <Text style={[
+        styles.btnPrimaryText, 
+        !isReadyToReturn && styles.btnDisabledText // Làm mờ chữ đi
+      ]}>
+        Trả hàng / Báo cáo
+      </Text>
+    </TouchableOpacity>
+  );
+})()}
         </View>
       </View>
     );
@@ -212,4 +236,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   btnPrimaryText: { color: "white", fontWeight: "600" },
+  btnDisabled: {
+    backgroundColor: '#E0E0E0', // Nền xám mờ
+    borderWidth: 0, // Bỏ viền cho chìm luôn
+    elevation: 0, // Xóa bóng (đối với Android)
+    shadowOpacity: 0, // Xóa bóng (đối với iOS)
+  },
+  btnDisabledText: {
+    color: '#A0A0A0', // Chữ màu xám nhạt
+  }
 });
