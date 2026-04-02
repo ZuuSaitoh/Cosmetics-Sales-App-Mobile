@@ -9,11 +9,13 @@ import * as ImagePicker from 'expo-image-picker';
 // 1. Import axiosClient thay cho axios mặc định
 import axiosClient from '../api/axiosClient'; 
 
+// ĐÃ CẬP NHẬT: Thêm trạng thái DELIVERING_OUT vào bộ lọc
 const RENTAL_STATUSES = [
   { key: 'ALL', label: 'Tất cả' },
   { key: 'PENDING', label: 'Chờ xác nhận' },
   { key: 'PREPARING', label: 'Đang chuẩn bị' },
-  { key: 'SHIPPING_OUT', label: 'Đang giao' }, 
+  { key: 'SHIPPING_OUT', label: 'Đã gửi ĐVVC' }, 
+  { key: 'DELIVERING_OUT', label: 'Đang giao khách' }, 
   { key: 'IN_USE', label: 'Đang thuê' },        
   { key: 'SHIPPING_BACK', label: 'Chờ trả đồ' }, 
   { key: 'COMPLETED', label: 'Hoàn thành' },
@@ -36,13 +38,11 @@ export default function OrderManagementScreen() {
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      // Vẫn cần token ở đây CHỈ để lấy userId (vì bạn đang dùng jwtDecode)
       const token = await AsyncStorage.getItem('cosmate_token');
       if (!token) return;
       const decoded: any = jwtDecode(token);
       const userId = decoded.sub;
 
-      // 2. Dùng axiosClient: Không cần headers, không cần BASE_URL
       const providerRes = await axiosClient.get(`/providers/user/${userId}`);
       const providerId = providerRes.data.result.id;
 
@@ -69,14 +69,13 @@ export default function OrderManagementScreen() {
   });
 
   // ==========================================
-  // CÁC HÀM XỬ LÝ API (Cực kỳ gọn nhẹ)
+  // CÁC HÀM XỬ LÝ API 
   // ==========================================
   const handlePrepareOrder = (orderId: number) => {
     Alert.alert("Xác nhận đơn", `Chuẩn bị đồ cho đơn #${orderId}?`, [
       { text: "Hủy", style: "cancel" },
       { text: "Xác nhận", onPress: async () => {
           try {
-            // Chỉ cần gọi API cái rẹt, Token đã có interceptor lo
             const res = await axiosClient.post(`/orders/${orderId}/prepare`);
             if (res.data.code === 0) { fetchOrders(); }
           } catch (error) { Alert.alert("Lỗi", "Không thể chuẩn bị đơn."); }
@@ -93,6 +92,30 @@ export default function OrderManagementScreen() {
             const res = await axiosClient.post(`/orders/${orderId}/complete`);
             if (res.data.code === 0) { fetchOrders(); }
           } catch (error) { Alert.alert("Lỗi", "Không thể hoàn tất đơn."); }
+        }
+      }
+    ]);
+  };
+
+  // ĐÃ CẬP NHẬT: Hàm mô phỏng đẩy đơn cho shipper đi giao (DELIVERING_OUT)
+  const handleDeliverOut = (orderId: number) => {
+    Alert.alert("Mô phỏng ĐVVC", `Chuyển đơn #${orderId} sang trạng thái Đang giao đến khách (DELIVERING_OUT)?`, [
+      { text: "Hủy", style: "cancel" },
+      { 
+        text: "Xác nhận", 
+        onPress: async () => {
+          try {
+            const res = await axiosClient.post(`/orders/${orderId}/deliver-out`);
+            if (res.data.code === 0) {
+              Alert.alert("Thành công", "Đơn hàng đã được shipper cầm đi giao!");
+              fetchOrders(); 
+            } else {
+              Alert.alert("Lỗi", res.data.message);
+            }
+          } catch (error) {
+            console.error("Lỗi test deliver out:", error);
+            Alert.alert("Lỗi", "Không thể đẩy trạng thái giao hàng.");
+          }
         }
       }
     ]);
@@ -126,7 +149,6 @@ export default function OrderManagementScreen() {
         formData.append('images', { uri: localUri, name: filename, type } as any);
       }
 
-      // Gửi request với FormData qua axiosClient
       const res = await axiosClient.post(
         `/orders/${shipOrderId}/ship?trackingCode=${encodeURIComponent(trackingCode)}`, 
         formData,
@@ -155,6 +177,17 @@ export default function OrderManagementScreen() {
         </TouchableOpacity>
       );
     }
+    // ĐÃ CẬP NHẬT: Nút Test Đang giao khách xuất hiện khi ở SHIPPING_OUT
+    if (item.status === 'SHIPPING_OUT') {
+      return (
+        <TouchableOpacity 
+          style={[styles.actionBtn, { backgroundColor: '#FF9900' }]} 
+          onPress={() => handleDeliverOut(item.id)}
+        >
+          <Text style={styles.actionBtnText}>Test: Đang giao khách</Text>
+        </TouchableOpacity>
+      );
+    }
     if (item.status === 'SHIPPING_BACK' || item.status === 'RETURNING') {
       return (
         <TouchableOpacity style={styles.actionBtn} onPress={() => handleCompleteOrder(item.id)}>
@@ -163,7 +196,10 @@ export default function OrderManagementScreen() {
       );
     }
     return (
-      <TouchableOpacity style={styles.defaultBtn} onPress={() => router.push({ pathname: '/(screens)/order-detail', params: { id: item.id } })}>
+      <TouchableOpacity 
+        style={styles.defaultBtn} 
+        onPress={() => router.push({ pathname: '/(screens)/order-detail' as any, params: { id: item.id } })}
+      >
         <Text style={styles.defaultBtnText}>Xem chi tiết</Text>
       </TouchableOpacity>
     );
@@ -171,12 +207,10 @@ export default function OrderManagementScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 1. HEADER TINH GỌN (Bỏ thanh gạt) */}
       <View style={styles.header}>
         <Text style={styles.mainTitle}>Quản lý Đơn thuê đồ</Text>
       </View>
 
-      {/* 2. THANH LỌC TRẠNG THÁI */}
       <View style={styles.filterWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContainer}>
           {RENTAL_STATUSES.map((status) => (
@@ -193,7 +227,6 @@ export default function OrderManagementScreen() {
         </ScrollView>
       </View>
 
-      {/* 3. DANH SÁCH ĐƠN HÀNG */}
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#B59DFF" /></View>
       ) : (
@@ -218,7 +251,7 @@ export default function OrderManagementScreen() {
                 </View>
               </View>
               <View style={styles.cardFooter}>
-                <TouchableOpacity style={styles.btnOutline} onPress={() => router.push({ pathname: '/(screens)/order-detail', params: { id: item.id } })}>
+                <TouchableOpacity style={styles.btnOutline} onPress={() => router.push({ pathname: '/(screens)/order-detail' as any, params: { id: item.id } })}>
                   <Text style={styles.btnOutlineText}>Chi tiết</Text>
                 </TouchableOpacity>
                 {renderDynamicButton(item)}
@@ -230,7 +263,6 @@ export default function OrderManagementScreen() {
         />
       )}
 
-      {/* MODAL GIAO HÀNG (Giữ nguyên) */}
       <Modal animationType="fade" transparent={true} visible={isShipModalVisible} onRequestClose={() => setIsShipModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
