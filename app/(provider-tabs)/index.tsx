@@ -1,30 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, ScrollView, Alert, Modal, TextInput, Image } from 'react-native';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from "jwt-decode";
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
+// 1. Import axiosClient thay cho axios mặc định
+import axiosClient from '../api/axiosClient'; 
+
 const RENTAL_STATUSES = [
   { key: 'ALL', label: 'Tất cả' },
   { key: 'PENDING', label: 'Chờ xác nhận' },
   { key: 'PREPARING', label: 'Đang chuẩn bị' },
-  { key: 'DELIVERED', label: 'Đang giao' },
-  { key: 'RENTING', label: 'Đang thuê' },
-  { key: 'RETURNING', label: 'Chờ trả đồ' },
+  { key: 'SHIPPING_OUT', label: 'Đang giao' }, 
+  { key: 'IN_USE', label: 'Đang thuê' },        
+  { key: 'SHIPPING_BACK', label: 'Chờ trả đồ' }, 
   { key: 'COMPLETED', label: 'Hoàn thành' },
 ];
-
-const BASE_URL = 'http://192.168.101.107:8080/api';
 
 export default function OrderManagementScreen() {
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- STATE CHO MODAL GIAO HÀNG ---
   const [isShipModalVisible, setIsShipModalVisible] = useState(false);
   const [shipOrderId, setShipOrderId] = useState<number | null>(null);
   const [trackingCode, setTrackingCode] = useState('');
@@ -37,20 +36,17 @@ export default function OrderManagementScreen() {
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
+      // Vẫn cần token ở đây CHỈ để lấy userId (vì bạn đang dùng jwtDecode)
       const token = await AsyncStorage.getItem('cosmate_token');
       if (!token) return;
       const decoded: any = jwtDecode(token);
       const userId = decoded.sub;
 
-      const providerRes = await axios.get(`${BASE_URL}/providers/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // 2. Dùng axiosClient: Không cần headers, không cần BASE_URL
+      const providerRes = await axiosClient.get(`/providers/user/${userId}`);
       const providerId = providerRes.data.result.id;
 
-      // API dành riêng cho Rental Provider
-      const response = await axios.get(`${BASE_URL}/orders/provider/${providerId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axiosClient.get(`/orders/provider/${providerId}`);
 
       if (response.data.code === 0) {
         setOrders(response.data.result);
@@ -73,17 +69,17 @@ export default function OrderManagementScreen() {
   });
 
   // ==========================================
-  // CÁC HÀM XỬ LÝ API (Giữ nguyên logic cũ)
+  // CÁC HÀM XỬ LÝ API (Cực kỳ gọn nhẹ)
   // ==========================================
   const handlePrepareOrder = (orderId: number) => {
     Alert.alert("Xác nhận đơn", `Chuẩn bị đồ cho đơn #${orderId}?`, [
       { text: "Hủy", style: "cancel" },
       { text: "Xác nhận", onPress: async () => {
           try {
-            const token = await AsyncStorage.getItem('cosmate_token');
-            const res = await axios.post(`${BASE_URL}/orders/${orderId}/prepare`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            // Chỉ cần gọi API cái rẹt, Token đã có interceptor lo
+            const res = await axiosClient.post(`/orders/${orderId}/prepare`);
             if (res.data.code === 0) { fetchOrders(); }
-          } catch (error) { Alert.alert("Lỗi mạng"); }
+          } catch (error) { Alert.alert("Lỗi", "Không thể chuẩn bị đơn."); }
         }
       }
     ]);
@@ -94,10 +90,9 @@ export default function OrderManagementScreen() {
       { text: "Hủy", style: "cancel" },
       { text: "Chốt đơn", onPress: async () => {
           try {
-            const token = await AsyncStorage.getItem('cosmate_token');
-            const res = await axios.post(`${BASE_URL}/orders/${orderId}/complete`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await axiosClient.post(`/orders/${orderId}/complete`);
             if (res.data.code === 0) { fetchOrders(); }
-          } catch (error) { Alert.alert("Lỗi mạng"); }
+          } catch (error) { Alert.alert("Lỗi", "Không thể hoàn tất đơn."); }
         }
       }
     ]);
@@ -122,7 +117,6 @@ export default function OrderManagementScreen() {
   const submitShipOrder = async () => {
     if (!trackingCode.trim()) { Alert.alert("Lỗi", "Vui lòng nhập mã vận đơn!"); return; }
     try {
-      const token = await AsyncStorage.getItem('cosmate_token');
       const formData = new FormData();
       if (shipImage) {
         const localUri = shipImage.uri;
@@ -131,12 +125,19 @@ export default function OrderManagementScreen() {
         const type = match ? `image/${match[1]}` : `image/jpeg`;
         formData.append('images', { uri: localUri, name: filename, type } as any);
       }
-      const url = `${BASE_URL}/orders/${shipOrderId}/ship?trackingCode=${encodeURIComponent(trackingCode)}`;
-      const res = await axios.post(url, formData, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
-      });
-      if (res.data.code === 0) { setIsShipModalVisible(false); fetchOrders(); }
-    } catch (error) { Alert.alert("Lỗi hệ thống"); }
+
+      // Gửi request với FormData qua axiosClient
+      const res = await axiosClient.post(
+        `/orders/${shipOrderId}/ship?trackingCode=${encodeURIComponent(trackingCode)}`, 
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      if (res.data.code === 0) { 
+        setIsShipModalVisible(false); 
+        fetchOrders(); 
+      }
+    } catch (error) { Alert.alert("Lỗi", "Giao hàng thất bại."); }
   };
 
   const renderDynamicButton = (item: any) => {

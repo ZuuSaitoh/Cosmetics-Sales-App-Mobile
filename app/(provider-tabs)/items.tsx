@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from "jwt-decode";
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import axiosClient from '../api/axiosClient'; 
 
 export default function ProviderItemsScreen() {
   const [costumes, setCostumes] = useState([]);
-  const [shopInfo, setShopInfo] = useState<any>(null); // Lưu thông tin Shop (ID, Tên, Avatar)
+  const [shopInfo, setShopInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Gọi API ngay khi vào màn hình
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      // 1. Lấy token & giải mã lấy userId
       const token = await AsyncStorage.getItem('cosmate_token');
       if (!token) {
         Alert.alert('Lỗi', 'Phiên đăng nhập hết hạn.');
@@ -25,13 +25,7 @@ export default function ProviderItemsScreen() {
       const decoded: any = jwtDecode(token);
       const userId = decoded.sub; 
 
-      // ---------------------------------------------------------
-      // NHỊP 1: LẤY THÔNG TIN SHOP BẰNG USER_ID
-      // ---------------------------------------------------------
-      const PROVIDER_API_URL = `http://192.168.101.107:8080/api/providers/user/${userId}`;
-      const providerResponse = await axios.get(PROVIDER_API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const providerResponse = await axiosClient.get(`/providers/user/${userId}`);
 
       if (providerResponse.data.code !== 0 || !providerResponse.data.result) {
         Alert.alert('Thông báo', 'Bạn chưa thiết lập hồ sơ Shop!');
@@ -39,18 +33,10 @@ export default function ProviderItemsScreen() {
       }
 
       const myShop = providerResponse.data.result;
-      setShopInfo(myShop); // Lưu vào State để in lên màn hình
-      const actualProviderId = myShop.id; // ĐÂY MỚI LÀ CHÌA KHÓA CHUẨN NÈ!
+      setShopInfo(myShop);
+      const actualProviderId = myShop.id;
 
-      console.log("=== ĐÃ TÌM THẤY SHOP ===", myShop.shopName, "- Provider ID:", actualProviderId);
-
-      // ---------------------------------------------------------
-      // NHỊP 2: DÙNG PROVIDER_ID LẤY DANH SÁCH TRANG PHỤC
-      // ---------------------------------------------------------
-      const COSTUMES_API_URL = `http://192.168.101.107:8080/api/costumes/provider/${actualProviderId}`;
-      const costumesResponse = await axios.get(COSTUMES_API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const costumesResponse = await axiosClient.get(`/costumes/provider/${actualProviderId}`);
 
       if (costumesResponse.data.code === 0) {
         setCostumes(costumesResponse.data.result);
@@ -59,15 +45,15 @@ export default function ProviderItemsScreen() {
       }
 
     } catch (error: any) {
-      console.error(error);
-      Alert.alert('Lỗi mạng', 'Không thể kết nối đến máy chủ để tải dữ liệu.');
+      console.error("Lỗi fetchData:", error);
+      Alert.alert('Lỗi', 'Không thể tải dữ liệu kho đồ.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
   };
 
   const renderCostumeItem = ({ item }: { item: any }) => {
@@ -94,7 +80,15 @@ export default function ProviderItemsScreen() {
             ]}>
               {item.status || 'Đang cập nhật'}
             </Text>
-            <TouchableOpacity style={styles.btnEdit}>
+            
+            {/* ĐÃ FIX: Trỏ đúng sang edit-costume và item ở đây là HỢP LỆ */}
+            <TouchableOpacity 
+              style={styles.btnEdit}
+              onPress={() => router.push({ 
+                pathname: "/(screens)/edit-costume" as any, 
+                params: { id: item.id } 
+              })}
+            >
               <Text style={styles.btnEditText}>Chỉnh sửa</Text>
             </TouchableOpacity>
           </View>
@@ -105,15 +99,14 @@ export default function ProviderItemsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#B59DFF" />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER XỊN XÒ CÓ TÊN SHOP VÀ ID */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image 
@@ -126,7 +119,11 @@ export default function ProviderItemsScreen() {
           </View>
         </View>
         
-        <TouchableOpacity style={styles.btnAdd} onPress={() => Alert.alert('Tính năng', 'Sắp tới mình code trang tạo đồ nè!')}>
+        {/* ĐÃ FIX: Đăng đồ mới thì không cần truyền id của món nào hết */}
+        <TouchableOpacity 
+          style={styles.btnAdd} 
+          onPress={() => router.push("/(screens)/add-costume" as any)}
+        >
           <Text style={styles.btnAddText}>+ Đăng đồ</Text>
         </TouchableOpacity>
       </View>
@@ -135,9 +132,14 @@ export default function ProviderItemsScreen() {
         data={costumes}
         keyExtractor={(item: any) => item.id.toString()}
         renderItem={renderCostumeItem}
-        contentContainerStyle={{ padding: 15, paddingBottom: 30 }}
+        contentContainerStyle={{ padding: 15, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 50, color: '#8E7AB5' }}>Shop chưa đăng trang phục nào lên hệ thống.</Text>}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="shirt-outline" size={50} color="#C4B9DF" />
+            <Text style={styles.emptyText}>Shop chưa có món đồ nào.</Text>
+          </View>
+        }
       />
     </SafeAreaView>
   );
@@ -145,27 +147,25 @@ export default function ProviderItemsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F5F7' },
-  // Cập nhật Header để chứa Avatar
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E0D7FF' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
-  shopAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10, backgroundColor: '#eee' },
+  shopAvatar: { width: 45, height: 45, borderRadius: 23, marginRight: 12, backgroundColor: '#F4F1FF', borderWidth: 1, borderColor: '#E0D7FF' },
   title: { fontSize: 18, fontWeight: '900', color: '#4A3B6B' },
   providerIdText: { fontSize: 12, color: '#8E7AB5', marginTop: 2 },
-  
-  btnAdd: { backgroundColor: '#B59DFF', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8 },
+  btnAdd: { backgroundColor: '#B59DFF', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 10 },
   btnAddText: { color: '#fff', fontWeight: 'bold' },
-  
-  card: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, marginBottom: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  image: { width: 100, height: 120, borderRadius: 8, marginRight: 15, backgroundColor: '#eee' },
+  card: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 15, padding: 12, marginBottom: 15, shadowColor: '#B59DFF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
+  image: { width: 100, height: 130, borderRadius: 10, marginRight: 15 },
   info: { flex: 1, justifyContent: 'space-between' },
-  name: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 4 },
-  details: { fontSize: 13, color: '#666', marginBottom: 8 },
-  priceContainer: { backgroundColor: '#F8F9FA', padding: 8, borderRadius: 6, marginBottom: 10 },
-  priceText: { fontSize: 12, color: '#555' },
-  priceValue: { fontWeight: 'bold', color: '#B59DFF', fontSize: 13 },
-  
+  name: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+  details: { fontSize: 13, color: '#666' },
+  priceContainer: { backgroundColor: '#F8F7FF', padding: 10, borderRadius: 8 },
+  priceText: { fontSize: 12, color: '#777' },
+  priceValue: { fontWeight: 'bold', color: '#B59DFF', fontSize: 14 },
   actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  status: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
-  btnEdit: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: '#E0D7FF' },
-  btnEditText: { color: '#4A3B6B', fontSize: 12, fontWeight: '600' }
+  status: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  btnEdit: { paddingVertical: 6, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: '#E0D7FF', backgroundColor: '#fff' },
+  btnEditText: { color: '#4A3B6B', fontSize: 12, fontWeight: '700' },
+  emptyContainer: { alignItems: 'center', marginTop: 80 },
+  emptyText: { marginTop: 10, color: '#8E7AB5', fontSize: 15, fontStyle: 'italic' }
 });

@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import { router } from "expo-router"; // Dùng để chuyển trang
+// 1. Dùng axiosClient thay vì axios mặc định
+import axiosClient from '../api/axiosClient'; 
+import { router } from "expo-router"; 
 import { jwtDecode } from "jwt-decode";
 import React, { useState } from "react";
 import {
@@ -15,15 +16,11 @@ import {
   View,
 } from "react-native";
 
-// ⚠️ THAY CÁI NÀY BẰNG IPV4 CỦA MÁY TÍNH BẠN
-const API_URL = "http://192.168.101.107:8080/api/auth/login";
-
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false); // Trạng thái đang gọi API
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Hàm xử lý Đăng nhập
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Lỗi", "Vui lòng nhập đầy đủ Email và Mật khẩu!");
@@ -33,59 +30,41 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(API_URL, {
-        usernameOrEmail: email, // Khớp với JSON bạn đưa
+      // 2. GỌI API QUA axiosClient (Chỉ cần viết cái "đuôi" /auth/login)
+      const response = await axiosClient.post("/auth/login", {
+        usernameOrEmail: email,
         password: password,
       });
 
-      // Kiểm tra schema JSON trả về (code: 0 là thành công)
       if (response.data.code === 0) {
         const token = response.data.result.token;
 
-        // 1. Lưu token vào bộ nhớ điện thoại
+        // Lưu token vào máy
         await AsyncStorage.setItem("cosmate_token", token);
 
-        // 2. GIẢI MÃ TOKEN ĐỂ CHECK ROLE
+        // Giải mã check Role
         const decoded: any = jwtDecode(token);
-        const roles = decoded.roles || []; // Lấy mảng roles từ token ra
+        const roles = decoded.roles || []; 
 
-        // 3. RẼ NHÁNH CHUYỂN TRANG THEO ROLE ĐÍCH DANH
         if (roles.includes("PROVIDER_RENTAL")) {
-          // Nếu là Chủ shop -> Đá sang thư mục Quản lý Item
+          // Chủ shop -> Vào thẳng Kho đồ (Items) nằm bên trái
           router.replace("/(provider-tabs)/items");
         } else if (roles.includes("COSPLAYER")) {
-          // Nếu là Khách đi thuê -> Đá sang màn hình Track đơn hàng
+          // Khách hàng -> Vào tab Đơn hàng
           router.replace("/(tabs)");
         } else {
-          // Lưới an toàn: Bắt lỗi nếu tài khoản bị mất Role ở database
-          Alert.alert(
-            "Lỗi phân quyền",
-            "Tài khoản của bạn chưa được cấp quyền hợp lệ!",
-          );
+          Alert.alert("Lỗi phân quyền", "Tài khoản không hợp lệ!");
         }
       } else {
-        // API trả về lỗi (sai pass, user không tồn tại...)
-        Alert.alert(
-          "Đăng nhập thất bại",
-          response.data.message || "Sai thông tin.",
-        );
+        Alert.alert("Đăng nhập thất bại", response.data.message || "Sai thông tin.");
       }
     } catch (error: any) {
-      setIsLoading(false); // Tắt vòng xoay loading
-
+      // Vì dùng axiosClient nên cấu trúc error vẫn giữ nguyên của axios
       if (error.response) {
-        // Server ĐÃ NHẬN được request nhưng trả về lỗi (400, 401, 403, 500...)
-        console.log("Chi tiết lỗi từ Spring Boot:", error.response.data);
-        Alert.alert(
-          "Sai thông tin (Lỗi 400)",
-          `Server báo: ${JSON.stringify(error.response.data)}`,
-        );
-      } else if (error.request) {
-        // Bấm gửi nhưng Server không thèm trả lời (Tắt server, sai IP)
-        Alert.alert("Lỗi mạng", "Không thể kết nối đến máy chủ.");
+        console.log("Lỗi từ Spring Boot:", error.response.data);
+        Alert.alert("Lỗi", error.response.data.message || "Sai tài khoản hoặc mật khẩu.");
       } else {
-        // Lỗi do code React Native của mình
-        Alert.alert("Lỗi App", error.message);
+        Alert.alert("Lỗi kết nối", "Không thể kết nối đến máy chủ. Kiểm tra lại IP trong axiosClient nhé!");
       }
     } finally {
       setIsLoading(false);
@@ -119,7 +98,6 @@ export default function LoginScreen() {
           secureTextEntry
         />
 
-        {/* Nút Đăng nhập có trạng thái Loading */}
         <TouchableOpacity
           style={styles.loginButton}
           onPress={handleLogin}
@@ -139,19 +117,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FA", justifyContent: "center" },
   formContainer: { paddingHorizontal: 30 },
-  title: {
-    fontSize: 40,
-    fontWeight: "900",
-    color: "#4A3B6B",
-    textAlign: "center",
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#8E7AB5",
-    textAlign: "center",
-    marginBottom: 40,
-  },
+  title: { fontSize: 40, fontWeight: "900", color: "#4A3B6B", textAlign: "center", marginBottom: 5 },
+  subtitle: { fontSize: 16, color: "#8E7AB5", textAlign: "center", marginBottom: 40 },
   input: {
     backgroundColor: "#FFFFFF",
     height: 55,
