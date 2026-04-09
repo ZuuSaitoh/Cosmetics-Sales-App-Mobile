@@ -183,7 +183,12 @@ export default function CostumeDetailScreen() {
           onPress={() => router.push({
             pathname: '/(screens)/chat-detail' as any,
             // Chỗ này truyền providerId của Shop sang màn hình Chat
-            params: { partnerId: costume.providerId } 
+            params: { 
+      partnerId: costume.providerId,
+    
+      partnerName: costume.shopName || costume.providerName || "Cửa hàng Cosplay",
+      partnerAvatar: costume.shopAvatar || (costume.imageUrls && costume.imageUrls[0])
+    }
           })}
         >
           <Ionicons name="chatbubble-ellipses-outline" size={24} color="#B59DFF" />

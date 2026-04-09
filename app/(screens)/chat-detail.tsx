@@ -18,7 +18,7 @@ export default function ChatDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  // --- STATE MỚI ĐỂ LƯU THÔNG TIN HIỂN THỊ LÊN HEADER ---
+  // --- THÔNG TIN HIỂN THỊ HEADER ---
   const [headerName, setHeaderName] = useState<string>(typeof partnerName === 'string' ? partnerName : 'Đang tải...');
   const [headerAvatar, setHeaderAvatar] = useState<string>('https://via.placeholder.com/150');
 
@@ -34,54 +34,50 @@ export default function ChatDetailScreen() {
 
       const decoded: any = jwtDecode(token);
       
-      // ---> MAGIC TƯƠNG TỰ BÊN NÀY <---
+      // Xác định ID người đang dùng (Shop hoặc User cá nhân)
       const activeId = decoded.providerId ? Number(decoded.providerId) : Number(decoded.sub);
       setCurrentUserId(activeId);
 
       let currentRoom = activeRoomId;
 
-      // NẾU BẤM TỪ ĐƠN HÀNG -> TÌM PHÒNG BẰNG activeId
+      // 1. NẾU CHƯA CÓ ROOM ID (ĐI TỪ TRANG DETAIL SANG) -> TÌM HOẶC TẠO PHÒNG
       if (!currentRoom && partnerId) {
-        const roomRes = await axiosClient.get(`/chat/room?user1Id=${activeId}&user2Id=${partnerId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
+        const roomRes = await axiosClient.get(`/chat/room?user1Id=${activeId}&user2Id=${partnerId}`);
         if (roomRes.data.code === 0 && roomRes.data.result) {
           currentRoom = roomRes.data.result.id;
           setActiveRoomId(currentRoom);
         }
       }
 
-      // NẾU CÓ PHÒNG RỒI -> LOAD THÔNG TIN PARTNER VÀ TIN NHẮN BẰNG activeId
-      if (currentRoom) {
+      // 2. LẤY THÔNG TIN ĐỐI TÁC (PARTNER) ĐỂ HIỆN HEADER
+      if (partnerId) {
         try {
-          const partnerRes = await axiosClient.get(`/chat/room/${currentRoom}/partner?currentUserId=${activeId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+          // TUYỆT CHIÊU: Gọi API Provider để lấy shopName thay vì lấy fullName của User
+          const partnerRes = await axiosClient.get(`/providers/id/${partnerId}`);
+          
           if (partnerRes.data.code === 0 && partnerRes.data.result) {
-            const partnerData = partnerRes.data.result;
-            if (partnerName && partnerName !== 'undefined') {
-  setHeaderName(partnerName as string);
-} else {
-  setHeaderName(partnerData.fullName || 'Cửa hàng');
-}
-            if (partnerData.avatarUrl) {
-              setHeaderAvatar(partnerData.avatarUrl);
-            }
+            const pData = partnerRes.data.result;
+            
+            // Ưu tiên 1: Tên truyền từ màn hình trước
+            // Ưu tiên 2: shopName từ API Provider
+            // Ưu tiên 3: fullName (phat2004) nếu mấy cái kia hụt
+            const finalName = (partnerName && partnerName !== 'undefined') 
+              ? partnerName as string 
+              : (pData.shopName || pData.fullName || 'Cửa hàng');
+
+            setHeaderName(finalName);
+            if (pData.avatarUrl) setHeaderAvatar(pData.avatarUrl);
           }
         } catch (err) {
-          console.error("Lỗi lấy thông tin partner:", err);
-          setHeaderName(typeof partnerName === 'string' ? partnerName : 'Cửa hàng');
+          console.error("Lỗi lấy profile đối tác:", err);
         }
+      }
 
-        // 2. LOAD LỊCH SỬ TIN NHẮN
-        const msgRes = await axiosClient.get(`/chat/messages/${currentRoom}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
+      // 3. LOAD LỊCH SỬ TIN NHẮN NẾU ĐÃ CÓ PHÒNG
+      if (currentRoom) {
+        const msgRes = await axiosClient.get(`/chat/messages/${currentRoom}`);
         if (msgRes.data.code === 0) {
-          const fetchedMessages = msgRes.data.result || [];
-          setMessages(fetchedMessages.reverse()); 
+          setMessages(msgRes.data.result.reverse() || []);
         }
       }
     } catch (error) {
@@ -90,11 +86,12 @@ export default function ChatDetailScreen() {
       setIsLoading(false);
     }
   };
+
   const handleSend = () => {
     if (!inputText.trim()) return;
     
-    // 🚨 VẪN ĐANG CHỜ API GỬI TIN NHẮN TỪ BACKEND 🚨
-    Alert.alert("Chưa nối dây mạng!", "Bạn hãy hỏi dev Backend xem cái API POST để gửi tin nhắn ổng giấu ở đâu nhé?");
+    // Tạm thời hiện Alert cho đến khi ráp WebSocket vào nha sếp!
+    Alert.alert("STOMP WebSocket", "Đang đợi Zun-kun ráp cái ống dẫn WebSocket vào đây nè!");
 
     const newMsg = {
       id: Date.now(),
@@ -109,7 +106,6 @@ export default function ChatDetailScreen() {
 
   const renderMessage = ({ item }: { item: any }) => {
     const isMe = Number(item.senderId) === currentUserId; 
-
     return (
       <View style={[styles.messageBubble, isMe ? styles.myMessage : styles.partnerMessage]}>
         <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.partnerMessageText]}>
@@ -121,22 +117,23 @@ export default function ChatDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER ĐÃ ĐƯỢC CẬP NHẬT ĐỂ HIỆN AVATAR VÀ TÊN CHUẨN */}
+      {/* HEADER CHIẾN THUẬT MỚI */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={28} color="#4A3B6B" />
         </TouchableOpacity>
         
         <View style={styles.headerInfo}>
-          {headerAvatar ? (
-             <Image source={{ uri: headerAvatar }} style={styles.avatarImage} />
-          ) : (
-            <View style={styles.avatarMini}>
-              <Ionicons name="person" size={18} color="#fff" />
-            </View>
-          )}
-          <Text style={styles.headerName}>{headerName}</Text>
+          <Image source={{ uri: headerAvatar }} style={styles.avatarImage} />
+          <View>
+            <Text style={styles.headerName} numberOfLines={1}>{headerName}</Text>
+            <Text style={styles.statusOnline}>Đang hoạt động</Text>
+          </View>
         </View>
+        
+        <TouchableOpacity style={{marginLeft: 'auto'}}>
+          <Ionicons name="call-outline" size={22} color="#B59DFF" />
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -150,7 +147,7 @@ export default function ChatDetailScreen() {
           contentContainerStyle={styles.messageList}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-             <Text style={{textAlign: 'center', color: '#999', marginTop: 20}}>Hãy gửi tin nhắn đầu tiên!</Text>
+             <Text style={styles.emptyText}>Hãy gửi tin nhắn đầu tiên!</Text>
           }
         />
       )}
@@ -160,6 +157,9 @@ export default function ChatDetailScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
       >
         <View style={styles.inputContainer}>
+          <TouchableOpacity style={styles.plusBtn}>
+            <Ionicons name="add-circle-outline" size={24} color="#B59DFF" />
+          </TouchableOpacity>
           <TextInput
             style={styles.input}
             placeholder="Nhập tin nhắn..."
@@ -181,26 +181,61 @@ export default function ChatDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB' },
-  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingVertical: 12, paddingHorizontal: 15, borderBottomWidth: 1, borderBottomColor: '#E0E0E0', elevation: 2 },
-  backBtn: { marginRight: 10 },
-  headerInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  avatarMini: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#B59DFF', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  avatarImage: { width: 36, height: 36, borderRadius: 18, marginRight: 10, backgroundColor: '#E0D7FF' },
-  headerName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  container: { flex: 1, backgroundColor: '#F4F5F7' },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#fff', 
+    paddingVertical: 10, 
+    paddingHorizontal: 15, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#EAEAEA', 
+    elevation: 3 
+  },
+  backBtn: { marginRight: 12 },
+  headerInfo: { flexDirection: 'row', alignItems: 'center', flex: 0.8 },
+  avatarImage: { width: 40, height: 40, borderRadius: 20, marginRight: 12, backgroundColor: '#E0D7FF' },
+  headerName: { fontSize: 17, fontWeight: 'bold', color: '#333' },
+  statusOnline: { fontSize: 11, color: '#28A745', marginTop: 1 },
 
-  messageList: { paddingHorizontal: 15, paddingVertical: 20 },
-  messageBubble: { maxWidth: '80%', padding: 12, borderRadius: 16, marginBottom: 10 },
-  
-  messageText: { fontSize: 15, lineHeight: 22 }, 
+  messageList: { paddingHorizontal: 15, paddingVertical: 15 },
+  messageBubble: { maxWidth: '75%', padding: 12, borderRadius: 20, marginBottom: 8 },
+  messageText: { fontSize: 15, lineHeight: 21 }, 
 
-  partnerMessage: { alignSelf: 'flex-start', backgroundColor: '#fff', borderBottomLeftRadius: 4, elevation: 1 },
+  partnerMessage: { alignSelf: 'flex-start', backgroundColor: '#fff', borderTopLeftRadius: 4 },
   partnerMessageText: { color: '#333' }, 
   
-  myMessage: { alignSelf: 'flex-end', backgroundColor: '#B59DFF', borderBottomRightRadius: 4, elevation: 1 },
+  myMessage: { alignSelf: 'flex-end', backgroundColor: '#B59DFF', borderTopRightRadius: 4 },
   myMessageText: { color: '#fff' }, 
 
-  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', padding: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#E0E0E0' },
-  input: { flex: 1, backgroundColor: '#F0F0F0', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, paddingTop: 12, maxHeight: 100, fontSize: 15, color: '#333' },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#B59DFF', justifyContent: 'center', alignItems: 'center', marginLeft: 10, marginBottom: 2 },
+  inputContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 10, 
+    paddingVertical: 8, 
+    backgroundColor: '#fff', 
+    borderTopWidth: 1, 
+    borderTopColor: '#F0F0F0' 
+  },
+  plusBtn: { marginRight: 8 },
+  input: { 
+    flex: 1, 
+    backgroundColor: '#F3F4F6', 
+    borderRadius: 22, 
+    paddingHorizontal: 18, 
+    paddingVertical: 8, 
+    maxHeight: 100, 
+    fontSize: 15, 
+    color: '#333' 
+  },
+  sendBtn: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#B59DFF', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginLeft: 10 
+  },
+  emptyText: { textAlign: 'center', color: '#999', marginTop: 40, fontStyle: 'italic' }
 });
