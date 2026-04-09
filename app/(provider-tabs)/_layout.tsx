@@ -42,7 +42,7 @@ export default function TabLayout() {
     >
      
 
-  {/* TAB 1: QUẢN LÝ KHO ĐỒ (ITEMS) */}
+  {/* TAB : QUẢN LÝ KHO ĐỒ (ITEMS) */}
   <Tabs.Screen
     name="items"
     options={{
@@ -57,7 +57,7 @@ export default function TabLayout() {
     }}
   />
 
-   {/* TAB 2: QUẢN LÝ ĐƠN HÀNG */}
+   {/* TAB : QUẢN LÝ ĐƠN HÀNG */}
   <Tabs.Screen
     name="index"
     options={{
@@ -71,8 +71,23 @@ export default function TabLayout() {
       ),
     }}
   />
+
+  {/* TAB : THÔNG BÁO */}
+      <Tabs.Screen
+  name="notifications"
+  options={{
+    title: 'Thông báo',
+    tabBarIcon: ({ color, focused }) => (
+      <Ionicons 
+        name={focused ? "notifications" : "notifications-outline"} 
+        size={24} 
+        color={color} 
+      />
+    ),
+  }}
+/>
   
-    {/* TAB 3: HỒ SƠ CÁ NHÂN */}
+    {/* TAB : HỒ SƠ CÁ NHÂN */}
   <Tabs.Screen
         name="profile"
         options={{
@@ -86,6 +101,9 @@ export default function TabLayout() {
           ),
         }}
       />
+    
     </Tabs>
+
+    
   );
 }
