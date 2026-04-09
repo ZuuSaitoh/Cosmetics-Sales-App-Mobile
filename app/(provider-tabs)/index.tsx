@@ -24,6 +24,9 @@ export default function OrderManagementScreen() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // --- STATE LƯU TRỮ HÌNH ẢNH TRANG PHỤC ---
+  const [costumeImages, setCostumeImages] = useState<Record<number, string>>({});
+
   const [isShipModalVisible, setIsShipModalVisible] = useState(false);
   const [shipOrderId, setShipOrderId] = useState<number | null>(null);
   const [trackingCode, setTrackingCode] = useState('');
@@ -47,12 +50,45 @@ export default function OrderManagementScreen() {
       const response = await axiosClient.get(`/orders/provider/${providerId}`);
 
       if (response.data.code === 0) {
-        setOrders(response.data.result);
+        const fetchedOrders = response.data.result;
+        setOrders(fetchedOrders);
+        
+        // GỌI HÀM LẤY ẢNH SAU KHI CÓ DANH SÁCH ĐƠN
+        fetchImagesForOrders(fetchedOrders);
       }
     } catch (error) {
       console.error("Lỗi tải đơn hàng:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // --- HÀM QUÉT DANH SÁCH VÀ GỌI API LẤY ẢNH ---
+  const fetchImagesForOrders = async (ordersList: any[]) => {
+    const newImageMap: Record<number, string> = { ...costumeImages };
+    let hasNewImages = false;
+
+    for (const order of ordersList) {
+      const firstItem = order.details && order.details.length > 0 ? order.details[0] : null;
+      if (firstItem && firstItem.costumeId) {
+        const cId = firstItem.costumeId;
+        
+        if (!newImageMap[cId]) {
+          try {
+            const imgRes = await axiosClient.get(`/images/costume/${cId}`);
+            if (imgRes.data.code === 0 && imgRes.data.result && imgRes.data.result.length > 0) {
+              newImageMap[cId] = imgRes.data.result[0].imageUrl || imgRes.data.result[0];
+              hasNewImages = true;
+            }
+          } catch (err) {
+            console.log(`Không thể lấy ảnh cho costume ${cId}`);
+          }
+        }
+      }
+    }
+
+    if (hasNewImages) {
+      setCostumeImages(newImageMap);
     }
   };
 
@@ -67,7 +103,7 @@ export default function OrderManagementScreen() {
   });
 
   // ==========================================
-  // CÁC HÀM XỬ LÝ API KÈM TỰ ĐỘNG CHUYỂN TAB
+  // CÁC HÀM XỬ LÝ API 
   // ==========================================
   
   const handlePrepareOrder = (orderId: number) => {
@@ -78,7 +114,7 @@ export default function OrderManagementScreen() {
             const res = await axiosClient.post(`/orders/${orderId}/prepare`);
             if (res.data.code === 0) { 
               Alert.alert("Thành công", "Đã chuyển sang trạng thái Đang chuẩn bị!");
-              setSelectedStatus('PREPARING'); // Tự động nhảy sang tab Đang chuẩn bị
+              setSelectedStatus('PREPARING'); 
               fetchOrders(); 
             }
           } catch (error) { Alert.alert("Lỗi", "Không thể chuẩn bị đơn."); }
@@ -96,7 +132,7 @@ export default function OrderManagementScreen() {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], // Sửa theo chuẩn mới của Expo
+      mediaTypes: ['images'], 
       allowsEditing: true,
       quality: 0.8,
     });
@@ -109,13 +145,10 @@ export default function OrderManagementScreen() {
       const formData = new FormData();
       
       if (shipImage) {
-        // Fix lỗi đường dẫn ảnh trên máy ảo / iOS
         const localUri = Platform.OS === 'ios' ? shipImage.uri.replace('file://', '') : shipImage.uri;
         const filename = localUri.split('/').pop() || 'image.jpg';
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : `image/jpeg`;
-        
-        // ⚠️ Lưu ý: Nếu swagger yêu cầu tên khác (ví dụ 'image' hoặc 'file') thì sửa chữ 'images' ở đây
         formData.append('images', { uri: localUri, name: filename, type } as any);
       }
 
@@ -125,19 +158,15 @@ export default function OrderManagementScreen() {
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
-      // NẾU BACKEND BÁO THÀNH CÔNG
       if (res.data.code === 0) { 
-        setIsShipModalVisible(false); // Đóng Modal
+        setIsShipModalVisible(false); 
         Alert.alert("Thành công", "Đã bàn giao cho đơn vị vận chuyển!");
-        setSelectedStatus('SHIPPING_OUT'); // Chuyển Tab
-        fetchOrders(); // Load lại data
-      } 
-      // NẾU BACKEND TỪ CHỐI -> LÔI CÁI LỖI RA ĐỂ XEM
-      else {
+        setSelectedStatus('SHIPPING_OUT'); 
+        fetchOrders(); 
+      } else {
         Alert.alert("Lỗi từ Server", res.data.message || "Không thể xác nhận giao hàng.");
       }
     } catch (error: any) { 
-      // NẾU API CHẾT NGẮC (LỖI 400, 500)
       console.error("Lỗi submitShipOrder:", error);
       Alert.alert("Lỗi Hệ Thống", error?.response?.data?.message || "Gọi API giao hàng thất bại."); 
     }
@@ -146,20 +175,17 @@ export default function OrderManagementScreen() {
   const handleDeliverOut = (orderId: number) => {
     Alert.alert("Mô phỏng ĐVVC", `Chuyển đơn #${orderId} sang trạng thái Đang giao đến khách (DELIVERING_OUT)?`, [
       { text: "Hủy", style: "cancel" },
-      { 
-        text: "Xác nhận", 
-        onPress: async () => {
+      { text: "Xác nhận", onPress: async () => {
           try {
             const res = await axiosClient.post(`/orders/${orderId}/deliver-out`);
             if (res.data.code === 0) {
               Alert.alert("Thành công", "Đơn hàng đã được shipper cầm đi giao!");
-              setSelectedStatus('DELIVERING_OUT'); // Tự động nhảy sang tab Đang giao khách
+              setSelectedStatus('DELIVERING_OUT'); 
               fetchOrders(); 
             } else {
               Alert.alert("Lỗi", res.data.message);
             }
           } catch (error) {
-            console.error("Lỗi test deliver out:", error);
             Alert.alert("Lỗi", "Không thể đẩy trạng thái giao hàng.");
           }
         }
@@ -175,7 +201,7 @@ export default function OrderManagementScreen() {
             const res = await axiosClient.post(`/orders/${orderId}/complete`);
             if (res.data.code === 0) { 
               Alert.alert("Thành công", "Đã nhận lại đồ và hoàn tất đơn!");
-              setSelectedStatus('COMPLETED'); // Tự động nhảy sang tab Hoàn thành
+              setSelectedStatus('COMPLETED'); 
               fetchOrders(); 
             }
           } catch (error) { Alert.alert("Lỗi", "Không thể hoàn tất đơn."); }
@@ -201,10 +227,7 @@ export default function OrderManagementScreen() {
     }
     if (item.status === 'SHIPPING_OUT') {
       return (
-        <TouchableOpacity 
-          style={[styles.actionBtn, { backgroundColor: '#FF9900' }]} 
-          onPress={() => handleDeliverOut(item.id)}
-        >
+        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FF9900' }]} onPress={() => handleDeliverOut(item.id)}>
           <Text style={styles.actionBtnText}>Test: Đang giao khách</Text>
         </TouchableOpacity>
       );
@@ -217,10 +240,7 @@ export default function OrderManagementScreen() {
       );
     }
     return (
-      <TouchableOpacity 
-        style={styles.defaultBtn} 
-        onPress={() => router.push({ pathname: '/(screens)/order-detail' as any, params: { id: item.id } })}
-      >
+      <TouchableOpacity style={styles.defaultBtn} onPress={() => router.push({ pathname: '/(screens)/order-detail' as any, params: { id: item.id } })}>
         <Text style={styles.defaultBtnText}>Xem chi tiết</Text>
       </TouchableOpacity>
     );
@@ -254,7 +274,19 @@ export default function OrderManagementScreen() {
         <FlatList 
           data={filteredOrders} 
           keyExtractor={(item: any) => item.id.toString()} 
-          renderItem={({ item }) => (
+          renderItem={({ item }) => {
+             // --- LOGIC HIỂN THỊ THÔNG TIN & ẢNH ---
+             const firstItem = item.details && item.details.length > 0 ? item.details[0] : null;
+             const costumeId = firstItem ? firstItem.costumeId : null;
+             
+             // Lấy ảnh từ state (nếu đã tải xong)
+             const coverImage = (costumeId && costumeImages[costumeId]) 
+               ? costumeImages[costumeId] 
+               : "https://via.placeholder.com/200x200.png?text=Loading...";
+         
+             const costumeName = firstItem ? `Trang phục ID: ${costumeId}` : "Đơn hàng Cosplay";
+
+            return (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.customerInfo}>
@@ -263,13 +295,20 @@ export default function OrderManagementScreen() {
                 </View>
                 <Text style={[styles.statusBadge, { color: item.status === 'COMPLETED' ? '#28A745' : '#FF9900' }]}>{item.status}</Text>
               </View>
+
+              <View style={styles.productInfo}>
+                <Image source={{ uri: coverImage }} style={styles.productImage} />
+                <View style={styles.productDetails}>
+                  <Text style={styles.itemName} numberOfLines={2}>
+                    {costumeName} {firstItem && firstItem.size ? `(Size: ${firstItem.size})` : ""}
+                  </Text>
+                  <Text style={styles.price}>{formatPrice(item.totalAmount)}</Text>
+                </View>
+              </View>
+
               <View style={styles.cardBody}>
                 <Text style={styles.orderId}>Mã đơn: #{item.id}</Text>
                 <Text style={styles.orderDesc} numberOfLines={2}>Gồm {item.details?.length || 0} món đồ (Cọc: {formatPrice(item.totalDepositAmount)})</Text>
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>Tổng tiền:</Text>
-                  <Text style={styles.priceValue}>{formatPrice(item.totalAmount)}</Text>
-                </View>
               </View>
               <View style={styles.cardFooter}>
                 <TouchableOpacity style={styles.btnOutline} onPress={() => router.push({ pathname: '/(screens)/order-detail' as any, params: { id: item.id } })}>
@@ -278,7 +317,7 @@ export default function OrderManagementScreen() {
                 {renderDynamicButton(item)}
               </View>
             </View>
-          )} 
+          )}} 
           contentContainerStyle={styles.listContainer} 
           ListEmptyComponent={<Text style={styles.emptyText}>Chưa có đơn hàng nào.</Text>} 
         />
@@ -323,13 +362,21 @@ const styles = StyleSheet.create({
   avatarPlaceholder: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#C4B9DF', justifyContent: 'center', alignItems: 'center', marginRight: 8 },
   customerName: { fontSize: 14, fontWeight: '600', color: '#333' },
   statusBadge: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
-  cardBody: { marginBottom: 15 },
+  
+  // --- THÊM STYLE CHO ẢNH VÀ THÔNG TIN SẢN PHẨM ---
+  productInfo: { flexDirection: "row", marginBottom: 15 },
+  productImage: { width: 80, height: 80, borderRadius: 8, marginRight: 12, backgroundColor: "#E0D7FF" },
+  productDetails: { flex: 1, justifyContent: "center" },
+  itemName: { fontSize: 15, color: "#333", marginBottom: 5, fontWeight: '500' },
+  price: { fontSize: 16, fontWeight: "bold", color: "#B59DFF" },
+
+  cardBody: { marginBottom: 15, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   orderId: { fontSize: 13, color: '#888', marginBottom: 4 },
-  orderDesc: { fontSize: 14, color: '#444', marginBottom: 8, lineHeight: 20 },
+  orderDesc: { fontSize: 14, color: '#444', lineHeight: 20 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   priceLabel: { fontSize: 14, color: '#666' },
   priceValue: { fontSize: 16, fontWeight: 'bold', color: '#B59DFF' },
-  cardFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 },
   btnOutline: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 6, borderWidth: 1, borderColor: '#E0D7FF' },
   btnOutlineText: { color: '#4A3B6B', fontSize: 13, fontWeight: '600' },
   actionBtn: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 6, backgroundColor: '#B59DFF' },

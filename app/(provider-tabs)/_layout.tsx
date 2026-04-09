@@ -86,6 +86,21 @@ export default function TabLayout() {
     ),
   }}
 />
+
+{/* NÚT : TIN NHẮN */}
+        <Tabs.Screen
+          name="chats"
+          options={{
+            title: 'Tin nhắn',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons 
+                name={focused ? "chatbubbles" : "chatbubbles-outline"} 
+                size={24} 
+                color={color} 
+              />
+            ),
+          }}
+        />
   
     {/* TAB : HỒ SƠ CÁ NHÂN */}
   <Tabs.Screen

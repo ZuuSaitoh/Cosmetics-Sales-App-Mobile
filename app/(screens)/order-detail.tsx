@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, SafeAreaView, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-// 1. Import axiosClient thay vì axios mặc định
+// Import axiosClient thay vì axios mặc định
 import axiosClient from '../api/axiosClient'; 
 
 export default function OrderDetailScreen() {
@@ -17,7 +17,6 @@ export default function OrderDetailScreen() {
 
   const fetchOrderDetail = async () => {
     try {
-      // 2. GỌI API QUA axiosClient: Gọn tưng, không cần headers, không cần IP
       const response = await axiosClient.get(`/orders/${id}`);
       
       if (response.data.code === 0) {
@@ -40,6 +39,28 @@ export default function OrderDetailScreen() {
     const time = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
     const date = `${d.getDate().toString().padStart(2, '0')}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getFullYear()}`;
     return `${time}  |  ${date}`;
+  };
+
+  // === HÀM MỚI: XỬ LÝ BẤM NÚT CHAT ===
+  const handleContactShop = () => {
+    // ⚠️ LƯU Ý: Tui đang giả định Backend trả về thông tin shop trong object order
+    // Bạn cần console.log(order) để xem chính xác key của nó là providerId, shopId hay providerUserId nhé
+    const partnerId = order?.providerId || order?.providerUserId || order?.shopId; 
+    const partnerName = order?.shopName || order?.providerName || "Cửa hàng";
+
+    if (!partnerId) {
+      Alert.alert("Thông báo", "Đang cập nhật thông tin cửa hàng, không thể chat lúc này!");
+      return;
+    }
+
+    // Chuyển sang màn hình chat chi tiết và mang theo ID của Shop
+    router.push({
+      pathname: '/(screens)/chat-detail' as any,
+      params: { 
+        partnerId: partnerId, 
+        partnerName: partnerName 
+      }
+    });
   };
 
   if (isLoading) {
@@ -155,8 +176,12 @@ export default function OrderDetailScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.btnAction}>
-          <Text style={styles.btnActionText}>Liên hệ cửa hàng</Text>
+        {/* === NÚT ĐƯỢC GẮN EVENT CHUYỂN TRANG === */}
+        <TouchableOpacity style={styles.btnAction} onPress={handleContactShop}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="chatbubble-ellipses" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.btnActionText}>Liên hệ cửa hàng</Text>
+          </View>
         </TouchableOpacity>
 
       </ScrollView>

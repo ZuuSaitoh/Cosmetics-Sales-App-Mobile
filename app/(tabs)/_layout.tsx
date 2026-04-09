@@ -40,6 +40,22 @@ export default function TabsLayout() {
         }
       }}
     >
+
+      {/* NÚT : TRANG CHỦ */}
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: 'Trang chủ',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? "home" : "home-outline"} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+
       {/* NÚT : THEO DÕI ĐƠN HÀNG */}
       <Tabs.Screen
         name="index"
@@ -68,6 +84,21 @@ export default function TabsLayout() {
     ),
   }}
 />
+
+{/* NÚT : TIN NHẮN */}
+        <Tabs.Screen
+          name="chats"
+          options={{
+            title: 'Tin nhắn',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons 
+                name={focused ? "chatbubbles" : "chatbubbles-outline"} 
+                size={24} 
+                color={color} 
+              />
+            ),
+          }}
+        />
 
       {/* NÚT : TRANG CÁ NHÂN */}
       <Tabs.Screen
