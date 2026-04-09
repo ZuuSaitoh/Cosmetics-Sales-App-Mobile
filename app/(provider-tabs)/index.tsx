@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, ScrollView, Alert, Modal, TextInput, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, ScrollView, Alert, Modal, TextInput, Image, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from "jwt-decode";
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-// 1. Import axiosClient thay cho axios mặc định
 import axiosClient from '../api/axiosClient'; 
 
-// ĐÃ CẬP NHẬT: Thêm trạng thái DELIVERING_OUT vào bộ lọc
 const RENTAL_STATUSES = [
   { key: 'ALL', label: 'Tất cả' },
   { key: 'PENDING', label: 'Chờ xác nhận' },
@@ -69,53 +67,21 @@ export default function OrderManagementScreen() {
   });
 
   // ==========================================
-  // CÁC HÀM XỬ LÝ API 
+  // CÁC HÀM XỬ LÝ API KÈM TỰ ĐỘNG CHUYỂN TAB
   // ==========================================
+  
   const handlePrepareOrder = (orderId: number) => {
     Alert.alert("Xác nhận đơn", `Chuẩn bị đồ cho đơn #${orderId}?`, [
       { text: "Hủy", style: "cancel" },
       { text: "Xác nhận", onPress: async () => {
           try {
             const res = await axiosClient.post(`/orders/${orderId}/prepare`);
-            if (res.data.code === 0) { fetchOrders(); }
-          } catch (error) { Alert.alert("Lỗi", "Không thể chuẩn bị đơn."); }
-        }
-      }
-    ]);
-  };
-
-  const handleCompleteOrder = (orderId: number) => {
-    Alert.alert("Chốt đơn", `Nhận lại đồ đơn #${orderId} và hoàn cọc?`, [
-      { text: "Hủy", style: "cancel" },
-      { text: "Chốt đơn", onPress: async () => {
-          try {
-            const res = await axiosClient.post(`/orders/${orderId}/complete`);
-            if (res.data.code === 0) { fetchOrders(); }
-          } catch (error) { Alert.alert("Lỗi", "Không thể hoàn tất đơn."); }
-        }
-      }
-    ]);
-  };
-
-  // ĐÃ CẬP NHẬT: Hàm mô phỏng đẩy đơn cho shipper đi giao (DELIVERING_OUT)
-  const handleDeliverOut = (orderId: number) => {
-    Alert.alert("Mô phỏng ĐVVC", `Chuyển đơn #${orderId} sang trạng thái Đang giao đến khách (DELIVERING_OUT)?`, [
-      { text: "Hủy", style: "cancel" },
-      { 
-        text: "Xác nhận", 
-        onPress: async () => {
-          try {
-            const res = await axiosClient.post(`/orders/${orderId}/deliver-out`);
-            if (res.data.code === 0) {
-              Alert.alert("Thành công", "Đơn hàng đã được shipper cầm đi giao!");
+            if (res.data.code === 0) { 
+              Alert.alert("Thành công", "Đã chuyển sang trạng thái Đang chuẩn bị!");
+              setSelectedStatus('PREPARING'); // Tự động nhảy sang tab Đang chuẩn bị
               fetchOrders(); 
-            } else {
-              Alert.alert("Lỗi", res.data.message);
             }
-          } catch (error) {
-            console.error("Lỗi test deliver out:", error);
-            Alert.alert("Lỗi", "Không thể đẩy trạng thái giao hàng.");
-          }
+          } catch (error) { Alert.alert("Lỗi", "Không thể chuẩn bị đơn."); }
         }
       }
     ]);
@@ -130,7 +96,7 @@ export default function OrderManagementScreen() {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ['images'], // Sửa theo chuẩn mới của Expo
       allowsEditing: true,
       quality: 0.8,
     });
@@ -141,11 +107,15 @@ export default function OrderManagementScreen() {
     if (!trackingCode.trim()) { Alert.alert("Lỗi", "Vui lòng nhập mã vận đơn!"); return; }
     try {
       const formData = new FormData();
+      
       if (shipImage) {
-        const localUri = shipImage.uri;
+        // Fix lỗi đường dẫn ảnh trên máy ảo / iOS
+        const localUri = Platform.OS === 'ios' ? shipImage.uri.replace('file://', '') : shipImage.uri;
         const filename = localUri.split('/').pop() || 'image.jpg';
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : `image/jpeg`;
+        
+        // ⚠️ Lưu ý: Nếu swagger yêu cầu tên khác (ví dụ 'image' hoặc 'file') thì sửa chữ 'images' ở đây
         formData.append('images', { uri: localUri, name: filename, type } as any);
       }
 
@@ -155,11 +125,63 @@ export default function OrderManagementScreen() {
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
+      // NẾU BACKEND BÁO THÀNH CÔNG
       if (res.data.code === 0) { 
-        setIsShipModalVisible(false); 
-        fetchOrders(); 
+        setIsShipModalVisible(false); // Đóng Modal
+        Alert.alert("Thành công", "Đã bàn giao cho đơn vị vận chuyển!");
+        setSelectedStatus('SHIPPING_OUT'); // Chuyển Tab
+        fetchOrders(); // Load lại data
+      } 
+      // NẾU BACKEND TỪ CHỐI -> LÔI CÁI LỖI RA ĐỂ XEM
+      else {
+        Alert.alert("Lỗi từ Server", res.data.message || "Không thể xác nhận giao hàng.");
       }
-    } catch (error) { Alert.alert("Lỗi", "Giao hàng thất bại."); }
+    } catch (error: any) { 
+      // NẾU API CHẾT NGẮC (LỖI 400, 500)
+      console.error("Lỗi submitShipOrder:", error);
+      Alert.alert("Lỗi Hệ Thống", error?.response?.data?.message || "Gọi API giao hàng thất bại."); 
+    }
+  };
+
+  const handleDeliverOut = (orderId: number) => {
+    Alert.alert("Mô phỏng ĐVVC", `Chuyển đơn #${orderId} sang trạng thái Đang giao đến khách (DELIVERING_OUT)?`, [
+      { text: "Hủy", style: "cancel" },
+      { 
+        text: "Xác nhận", 
+        onPress: async () => {
+          try {
+            const res = await axiosClient.post(`/orders/${orderId}/deliver-out`);
+            if (res.data.code === 0) {
+              Alert.alert("Thành công", "Đơn hàng đã được shipper cầm đi giao!");
+              setSelectedStatus('DELIVERING_OUT'); // Tự động nhảy sang tab Đang giao khách
+              fetchOrders(); 
+            } else {
+              Alert.alert("Lỗi", res.data.message);
+            }
+          } catch (error) {
+            console.error("Lỗi test deliver out:", error);
+            Alert.alert("Lỗi", "Không thể đẩy trạng thái giao hàng.");
+          }
+        }
+      }
+    ]);
+  };
+
+  const handleCompleteOrder = (orderId: number) => {
+    Alert.alert("Chốt đơn", `Nhận lại đồ đơn #${orderId} và hoàn cọc?`, [
+      { text: "Hủy", style: "cancel" },
+      { text: "Chốt đơn", onPress: async () => {
+          try {
+            const res = await axiosClient.post(`/orders/${orderId}/complete`);
+            if (res.data.code === 0) { 
+              Alert.alert("Thành công", "Đã nhận lại đồ và hoàn tất đơn!");
+              setSelectedStatus('COMPLETED'); // Tự động nhảy sang tab Hoàn thành
+              fetchOrders(); 
+            }
+          } catch (error) { Alert.alert("Lỗi", "Không thể hoàn tất đơn."); }
+        }
+      }
+    ]);
   };
 
   const renderDynamicButton = (item: any) => {
@@ -177,7 +199,6 @@ export default function OrderManagementScreen() {
         </TouchableOpacity>
       );
     }
-    // ĐÃ CẬP NHẬT: Nút Test Đang giao khách xuất hiện khi ở SHIPPING_OUT
     if (item.status === 'SHIPPING_OUT') {
       return (
         <TouchableOpacity 

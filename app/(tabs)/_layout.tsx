@@ -40,7 +40,7 @@ export default function TabsLayout() {
         }
       }}
     >
-      {/* NÚT 1: THEO DÕI ĐƠN HÀNG */}
+      {/* NÚT : THEO DÕI ĐƠN HÀNG */}
       <Tabs.Screen
         name="index"
         options={{
@@ -54,8 +54,22 @@ export default function TabsLayout() {
           ),
         }}
       />
+        {/* NÚT : THÔNG BÁO */}
+        <Tabs.Screen
+  name="notifications"
+  options={{
+    title: 'Thông báo',
+    tabBarIcon: ({ color, focused }) => (
+      <Ionicons 
+        name={focused ? "notifications" : "notifications-outline"} 
+        size={24} 
+        color={color} 
+      />
+    ),
+  }}
+/>
 
-      {/* NÚT 2: TRANG CÁ NHÂN */}
+      {/* NÚT : TRANG CÁ NHÂN */}
       <Tabs.Screen
         name="profile"
         options={{
