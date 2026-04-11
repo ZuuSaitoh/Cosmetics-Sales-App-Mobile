@@ -23,6 +23,7 @@ export default function CostumeDetailScreen() {
   const [costume, setCostume] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [provider, setProvider] = useState<any>(null); // State lưu thông tin shop
 
   useEffect(() => {
     if (id) fetchCostumeDetail();
@@ -30,13 +31,29 @@ export default function CostumeDetailScreen() {
 
   const fetchCostumeDetail = async () => {
     try {
-      setIsLoading(true);
+      // Chỉ hiện loading ở lần đầu tiên để tránh lỗi nhảy trang
+      if (!costume) setIsLoading(true);
+
       const response = await axiosClient.get(`/costumes/${id}`);
+
       if (response.data.code === 0) {
-        setCostume(response.data.result);
+        const costumeData = response.data.result;
+        setCostume(costumeData);
+
+        // 🚩 SỬ DỤNG ENDPOINT MỚI: /api/providers/id/{providerId}
+        if (costumeData.providerId) {
+          const shopRes = await axiosClient.get(
+            `/providers/id/${costumeData.providerId}`,
+          );
+
+          if (shopRes.data.code === 0) {
+            // Kết quả trả về chứa đầy đủ shopName, bio và quan trọng nhất là userId
+            setProvider(shopRes.data.result);
+          }
+        }
       }
     } catch (error) {
-      console.error("Lỗi tải chi tiết trang phục:", error);
+      console.error("Lỗi tải thông tin chi tiết:", error);
     } finally {
       setIsLoading(false);
     }
@@ -145,6 +162,43 @@ export default function CostumeDetailScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        {/* SECTION THÔNG TIN SHOP */}
+        <View style={styles.shopSection}>
+          <View style={styles.shopInfoLeft}>
+            <View style={styles.shopAvatar}>
+              {provider?.avatarUrl ? (
+                <Image
+                  source={{ uri: provider.avatarUrl }}
+                  style={styles.avatarImg}
+                />
+              ) : (
+                <Ionicons name="storefront" size={24} color="#B59DFF" />
+              )}
+            </View>
+            <View>
+              <Text style={styles.shopName}>
+                {provider?.shopName || "Đang tải..."}
+              </Text>
+              <Text style={styles.shopSubtitle}>
+                Người đăng: ID {costume.providerId || "N/A"}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => {
+              if (costume?.providerId) {
+                router.push({
+                  pathname: "/(screens)/provider-rental-shop" as any,
+                  params: { providerId: costume.providerId }, // Chuyển sang dùng providerId
+                });
+              }
+            }}
+          >
+            <Text>Xem Shop</Text>
+          </TouchableOpacity>
         </View>
 
         {/* --- PHẦN 1: THÔNG SỐ KỸ THUẬT --- */}
@@ -354,4 +408,52 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   rentButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  // Bổ sung vào styles
+  shopSection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    padding: 15,
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+    // Đổ bóng nhẹ cho sang sếp nhé
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  shopInfoLeft: { flexDirection: "row", alignItems: "center" },
+  shopAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F4F1FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+    overflow: "hidden",
+  },
+  avatarImg: { width: "100%", height: "100%" },
+  shopName: { fontSize: 16, fontWeight: "bold", color: "#333" },
+  shopSubtitle: { fontSize: 12, color: "#999", marginTop: 2 },
+  btnViewShop: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#B59DFF",
+  },
+  btnViewShopText: {
+    color: "#B59DFF",
+    fontSize: 13,
+    fontWeight: "600",
+    marginRight: 4,
+  },
 });
