@@ -1,40 +1,54 @@
+import { Ionicons } from "@expo/vector-icons"; // Thêm icon cho đẹp
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  Modal,
+  RefreshControl,
   SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Modal, // Thêm Modal vào đây
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons"; // Thêm icon cho đẹp
 import axiosClient from "../api/axiosClient";
 
 export default function OrdersScreen() {
   const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [costumeImages, setCostumeImages] = useState<Record<number, string>>({});
+  const [costumeImages, setCostumeImages] = useState<Record<number, string>>(
+    {},
+  );
 
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
   const [confirmOrderId, setConfirmOrderId] = useState<number | null>(null);
   const [confirmImage, setConfirmImage] = useState<any>(null);
+  const [reviewedOrders, setReviewedOrders] = useState<Record<number, boolean>>(
+    {},
+  );
 
   useEffect(() => {
     fetchOrders();
   }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchOrders(); // Tự động load lại dữ liệu mỗi khi sếp "quay xe" về trang này
+    }, []),
+  );
 
   const fetchOrders = async () => {
     setIsLoading(true);
+    // 🚩 FIX 1: Xóa sạch trạng thái review cũ để tránh "râu ông nọ chắp cằm bà kia"
+    setReviewedOrders({});
+
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
       if (!token) {
@@ -51,6 +65,40 @@ export default function OrdersScreen() {
         const fetchedOrders = response.data.result;
         setOrders(fetchedOrders);
         fetchImagesForOrders(fetchedOrders);
+
+        const reviewStatusMap: Record<number, boolean> = {};
+        const completedOrders = fetchedOrders.filter(
+          (o: any) => o.status === "COMPLETED",
+        );
+
+        await Promise.all(
+          completedOrders.map(async (order: any) => {
+            try {
+              const revRes = await axiosClient.get(
+                `/reviews/order/${order.id}`,
+              );
+
+              // 🚩 SỬA LẠI ĐIỀU KIỆN TẠI ĐÂY:
+              // Kiểm tra xem result có phải là mảng và có phần tử nào không
+              if (
+                revRes.data.code === 0 &&
+                revRes.data.result &&
+                Array.isArray(revRes.data.result) &&
+                revRes.data.result.length > 0
+              ) {
+                console.log(`Đơn #${order.id}: Đã có đánh giá thực sự.`);
+                reviewStatusMap[Number(order.id)] = true;
+              } else {
+                console.log(
+                  `Đơn #${order.id}: Mảng rỗng hoặc không có dữ liệu -> Chưa đánh giá.`,
+                );
+              }
+            } catch (err) {
+              // API lỗi thì mặc định là chưa đánh giá
+            }
+          }),
+        );
+        setReviewedOrders(reviewStatusMap);
       } else {
         Alert.alert("Lỗi dữ liệu", response.data.message);
       }
@@ -61,19 +109,31 @@ export default function OrdersScreen() {
     }
   };
 
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true); // Bắt đầu hiện icon xoay
+    await fetchOrders(); // Gọi lại hàm lấy dữ liệu cũ của sếp
+    setRefreshing(false); // Tắt icon xoay sau khi xong
+  }, []);
+
   const fetchImagesForOrders = async (ordersList: any[]) => {
     const newImageMap: Record<number, string> = { ...costumeImages };
     let hasNewImages = false;
 
     for (const order of ordersList) {
-      const firstItem = order.details && order.details.length > 0 ? order.details[0] : null;
+      const firstItem =
+        order.details && order.details.length > 0 ? order.details[0] : null;
       if (firstItem && firstItem.costumeId) {
         const cId = firstItem.costumeId;
         if (!newImageMap[cId]) {
           try {
             const imgRes = await axiosClient.get(`/images/costume/${cId}`);
-            if (imgRes.data.code === 0 && imgRes.data.result && imgRes.data.result.length > 0) {
-              newImageMap[cId] = imgRes.data.result[0].imageUrl || imgRes.data.result[0];
+            if (
+              imgRes.data.code === 0 &&
+              imgRes.data.result &&
+              imgRes.data.result.length > 0
+            ) {
+              newImageMap[cId] =
+                imgRes.data.result[0].imageUrl || imgRes.data.result[0];
               hasNewImages = true;
             }
           } catch (err) {
@@ -104,7 +164,10 @@ export default function OrdersScreen() {
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (permissionResult.granted === false) {
-      Alert.alert("Quyền truy cập", "Bạn cần cấp quyền camera để chụp ảnh xác nhận.");
+      Alert.alert(
+        "Quyền truy cập",
+        "Bạn cần cấp quyền camera để chụp ảnh xác nhận.",
+      );
       return;
     }
 
@@ -119,7 +182,10 @@ export default function OrdersScreen() {
 
   const submitConfirmDelivery = async () => {
     if (!confirmImage) {
-      Alert.alert("Thông báo", "Vui lòng chụp ảnh tình trạng đồ để làm bằng chứng.");
+      Alert.alert(
+        "Thông báo",
+        "Vui lòng chụp ảnh tình trạng đồ để làm bằng chứng.",
+      );
       return;
     }
 
@@ -157,16 +223,28 @@ export default function OrdersScreen() {
   };
 
   const renderOrderItem = ({ item }: { item: any }) => {
-    const firstItem = item.details && item.details.length > 0 ? item.details[0] : null;
+    const isReviewed = !!reviewedOrders[Number(item.id)];
+    const firstItem =
+      item.details && item.details.length > 0 ? item.details[0] : null;
     const costumeId = firstItem ? firstItem.costumeId : null;
-    const coverImage = costumeId && costumeImages[costumeId] ? costumeImages[costumeId] : "https://via.placeholder.com/200x200.png?text=Loading...";
-    const costumeName = firstItem ? `Trang phục ID: ${costumeId}` : "Đơn hàng Cosplay";
+    const coverImage =
+      costumeId && costumeImages[costumeId]
+        ? costumeImages[costumeId]
+        : "https://via.placeholder.com/200x200.png?text=Loading...";
+    const costumeName = firstItem
+      ? `Trang phục ID: ${costumeId}`
+      : "Đơn hàng Cosplay";
 
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.shopName}>Cửa hàng ID: {item.providerId}</Text>
-          <Text style={[styles.statusText, { color: item.status === "COMPLETED" ? "#28A745" : "#B59DFF" }]}>
+          <Text
+            style={[
+              styles.statusText,
+              { color: item.status === "COMPLETED" ? "#28A745" : "#B59DFF" },
+            ]}
+          >
             {item.status || "Đang xử lý"}
           </Text>
         </View>
@@ -175,34 +253,94 @@ export default function OrdersScreen() {
           <Image source={{ uri: coverImage }} style={styles.productImage} />
           <View style={styles.productDetails}>
             <Text style={styles.itemName} numberOfLines={2}>
-              {costumeName} {firstItem && firstItem.size ? `(Size: ${firstItem.size})` : ""}
+              {costumeName}{" "}
+              {firstItem && firstItem.size ? `(Size: ${firstItem.size})` : ""}
             </Text>
             <Text style={styles.price}>{formatPrice(item.totalAmount)}</Text>
           </View>
         </View>
 
         <View style={styles.actionRow}>
+          {item.status === "COMPLETED" && (
+            <TouchableOpacity
+              style={[
+                styles.btnOutline,
+                {
+                  borderColor: isReviewed ? "#CCC" : "#FFD700",
+                  backgroundColor: isReviewed ? "#F5F5F5" : "#FFFDE7",
+                },
+              ]}
+              onPress={() => {
+                if (!isReviewed) {
+                  router.push({
+                    pathname: "/(screens)/review" as any,
+                    params: { orderId: item.id, cosplayerId: item.cosplayerId },
+                  } as any);
+                }
+              }}
+              disabled={isReviewed} // KHÓA NÚT NẾU ĐÃ ĐÁNH GIÁ
+            >
+              <Text
+                style={[
+                  styles.btnOutlineText,
+                  { color: isReviewed ? "#999" : "#FBC02D" },
+                ]}
+              >
+                {isReviewed ? "Đã đánh giá" : "Đánh giá ngay"}
+              </Text>
+            </TouchableOpacity>
+          )}
           {item.status === "DELIVERING_OUT" && (
             <TouchableOpacity
-              style={[styles.btnOutline, { borderColor: "#28A745", backgroundColor: "#F0FFF4" }]}
+              style={[
+                styles.btnOutline,
+                { borderColor: "#28A745", backgroundColor: "#F0FFF4" },
+              ]}
               onPress={() => openConfirmModal(item.id)}
             >
-              <Text style={[styles.btnOutlineText, { color: "#28A745" }]}>Đã nhận được hàng</Text>
+              <Text style={[styles.btnOutlineText, { color: "#28A745" }]}>
+                Đã nhận được hàng
+              </Text>
             </TouchableOpacity>
           )}
 
-          {item.status === "IN_USE" && (
+          {(item.status === "IN_USE" || item.status === "SHIPPING_BACK") && (
             <TouchableOpacity
-              style={[styles.btnOutline, { borderColor: "#FF9900", backgroundColor: "#FFF9F0" }]}
+              style={[
+                styles.btnOutline,
+                {
+                  borderColor:
+                    item.status === "SHIPPING_BACK" ? "#CCC" : "#FF9900",
+                  backgroundColor:
+                    item.status === "SHIPPING_BACK" ? "#F5F5F5" : "#FFF9F0",
+                },
+              ]}
               onPress={() => handleReturnItem(item.id)}
+              disabled={item.status === "SHIPPING_BACK"} // VÔ HIỆU HÓA NÚT TẠI ĐÂY
             >
-              <Text style={[styles.btnOutlineText, { color: "#FF9900" }]}>Trả đồ & Nhận cọc</Text>
+              <Text
+                style={[
+                  styles.btnOutlineText,
+                  {
+                    color: item.status === "SHIPPING_BACK" ? "#999" : "#FF9900",
+                  },
+                ]}
+              >
+                {item.status === "SHIPPING_BACK"
+                  ? "Đang chờ xác nhận trả"
+                  : "Trả đồ & Nhận cọc"}
+              </Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity
             style={styles.btnOutline}
-            onPress={() => router.push({ pathname: "/(screens)/order-detail" as any, params: { id: item.id } })}
+            onPress={() =>
+              router.push({
+                pathname: "/(screens)/order-detail" as any,
+                params: { id: item.id },
+              })
+            }
           >
             <Text style={styles.btnOutlineText}>Xem chi tiết</Text>
           </TouchableOpacity>
@@ -219,6 +357,14 @@ export default function OrdersScreen() {
         renderItem={renderOrderItem}
         contentContainerStyle={{ padding: 15, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#B59DFF"]} // Màu tím chuẩn CosMate của sếp
+            tintColor="#B59DFF" // Dành cho iOS
+          />
+        }
       />
 
       {/* MODAL ĐÃ ĐƯỢC THÊM LẠI ĐẦY ĐỦ Ở ĐÂY */}
@@ -238,21 +384,30 @@ export default function OrdersScreen() {
             </View>
 
             <Text style={styles.modalSubText}>
-              Vui lòng chụp ảnh tình trạng đồ lúc nhận để làm bằng chứng bảo vệ bạn nhé!
+              Vui lòng chụp ảnh tình trạng đồ lúc nhận để làm bằng chứng bảo vệ
+              bạn nhé!
             </Text>
 
             <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
               {confirmImage ? (
-                <Image source={{ uri: confirmImage.uri }} style={styles.previewImage} />
+                <Image
+                  source={{ uri: confirmImage.uri }}
+                  style={styles.previewImage}
+                />
               ) : (
                 <View style={{ alignItems: "center" }}>
                   <Ionicons name="camera-outline" size={40} color="#A090C5" />
-                  <Text style={{ marginTop: 8, color: "#8E7AB5" }}>Bấm để mở Camera</Text>
+                  <Text style={{ marginTop: 8, color: "#8E7AB5" }}>
+                    Bấm để mở Camera
+                  </Text>
                 </View>
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.modalSubmitBtn} onPress={submitConfirmDelivery}>
+            <TouchableOpacity
+              style={styles.modalSubmitBtn}
+              onPress={submitConfirmDelivery}
+            >
               <Text style={styles.modalSubmitText}>Gửi xác nhận & Thuê đồ</Text>
             </TouchableOpacity>
           </View>
@@ -264,27 +419,96 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F5F7" },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 15, marginBottom: 15, elevation: 3 },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: "#F0F0F0", paddingBottom: 10, marginBottom: 10 },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 15,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
   shopName: { fontSize: 14, fontWeight: "bold", color: "#4A3B6B" },
   statusText: { fontSize: 12, fontWeight: "bold" },
   productInfo: { flexDirection: "row", marginBottom: 15 },
-  productImage: { width: 80, height: 80, borderRadius: 8, marginRight: 12, backgroundColor: "#E0D7FF" },
+  productImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: "#E0D7FF",
+  },
   productDetails: { flex: 1, justifyContent: "center" },
   itemName: { fontSize: 15, color: "#333", marginBottom: 5 },
   price: { fontSize: 16, fontWeight: "bold", color: "#B59DFF" },
-  actionRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 15, gap: 10 },
-  btnOutline: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: "#B59DFF", backgroundColor: "#fff" },
+  actionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 15,
+    gap: 10,
+  },
+  btnOutline: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#B59DFF",
+    backgroundColor: "#fff",
+  },
   btnOutlineText: { color: "#B59DFF", fontWeight: "bold" },
 
   // STYLES CHO MODAL MỚI THÊM
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 },
-  modalContainer: { width: "100%", backgroundColor: "#fff", borderRadius: 16, padding: 20, elevation: 5 },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
   modalTitle: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
-  modalSubText: { fontSize: 13, color: "#666", marginBottom: 20, lineHeight: 18 },
-  uploadBox: { height: 160, borderWidth: 1, borderColor: "#D1C4E9", borderStyle: "dashed", borderRadius: 12, justifyContent: "center", alignItems: "center", marginBottom: 20, backgroundColor: "#FAF9FF", overflow: "hidden" },
+  modalSubText: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  uploadBox: {
+    height: 160,
+    borderWidth: 1,
+    borderColor: "#D1C4E9",
+    borderStyle: "dashed",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    backgroundColor: "#FAF9FF",
+    overflow: "hidden",
+  },
   previewImage: { width: "100%", height: "100%", resizeMode: "cover" },
-  modalSubmitBtn: { backgroundColor: "#B59DFF", paddingVertical: 15, borderRadius: 8, alignItems: "center" },
+  modalSubmitBtn: {
+    backgroundColor: "#B59DFF",
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
   modalSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });
