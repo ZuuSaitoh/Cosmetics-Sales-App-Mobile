@@ -28,6 +28,7 @@ export default function OrderDetailScreen() {
   const [isPreviewVisible, setIsPreviewVisible] = useState(false); // Trạng thái đóng/mở Modal
   const { width: screenWidth } = Dimensions.get("window");
   const [review, setReview] = useState<any>(null); // State lưu thông tin đánh giá
+  const reviewImages = Array.isArray(review?.images) ? review.images : [];
 
   useEffect(() => {
     fetchOrderDetail();
@@ -37,8 +38,7 @@ export default function OrderDetailScreen() {
   const fetchReviewInfo = async () => {
     try {
       const res = await axiosClient.get(`/reviews/order/${id}`);
-
-      // Kiểm tra mảng result và lấy phần tử đầu tiên
+      // Kiểm tra: Nếu có kết quả và mảng có phần tử thì mới lấy
       if (
         res.data.code === 0 &&
         res.data.result &&
@@ -46,7 +46,7 @@ export default function OrderDetailScreen() {
       ) {
         setReview(res.data.result[0]);
       } else {
-        setReview(null);
+        setReview(null); // Không có đánh giá thì để null
       }
     } catch (err) {
       setReview(null);
@@ -288,13 +288,13 @@ export default function OrderDetailScreen() {
               </Text>
 
               {/* HIỂN THỊ ẢNH REVIEW (NẾU CÓ) */}
-              {review.images && review.images.length > 0 && (
+              {reviewImages.length > 0 && (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   style={styles.reviewImagesScroll}
                 >
-                  {review.images.map((img: any, index: number) => (
+                  {reviewImages.map((img: any, index: number) => (
                     <TouchableOpacity
                       key={index}
                       onPress={() => {
@@ -337,7 +337,11 @@ export default function OrderDetailScreen() {
         </TouchableOpacity>
       </ScrollView>
       {/* MODAL GALLERY XEM ẢNH */}
-      <Modal visible={isPreviewVisible} transparent={true} animationType="fade">
+      <Modal
+        visible={isPreviewVisible && reviewImages.length > 0}
+        transparent={true}
+        animationType="fade"
+      >
         <View style={styles.previewOverlay}>
           {/* Nút đóng */}
           <TouchableOpacity
@@ -348,10 +352,13 @@ export default function OrderDetailScreen() {
           </TouchableOpacity>
 
           <FlatList
-            data={review.images}
+            data={reviewImages}
             horizontal
             pagingEnabled // Tự động hít vào giữa ảnh khi lướt
-            initialScrollIndex={initialIndex} // Mở đúng ảnh đã bấm
+            initialScrollIndex={Math.min(
+              initialIndex,
+              Math.max(reviewImages.length - 1, 0),
+            )} // Mở đúng ảnh đã bấm
             getItemLayout={(_, index) => ({
               length: screenWidth,
               offset: screenWidth * index,

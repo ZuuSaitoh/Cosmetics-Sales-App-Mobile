@@ -109,6 +109,34 @@ export default function OrdersScreen() {
     }
   };
 
+  const handleCancelOrder = (orderId: number) => {
+    Alert.alert("Xác nhận hủy", "Sếp chắc chắn muốn hủy đơn hàng này không?", [
+      { text: "Không", style: "cancel" },
+      {
+        text: "Hủy đơn",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            // Gửi yêu cầu cập nhật trạng thái sang CANCELLED
+            const res = await axiosClient.post(`/orders/${orderId}/status`, {
+              status: "CANCELLED",
+            });
+
+            if (res.data.code === 0) {
+              Alert.alert("Thành công", "Đã hủy đơn hàng thành công! 🫡");
+              fetchOrders(); // Load lại danh sách để cập nhật UI
+            }
+          } catch (err) {
+            Alert.alert(
+              "Lỗi",
+              "Không thể hủy đơn lúc này, sếp thử lại sau nha!",
+            );
+          }
+        },
+      },
+    ]);
+  };
+
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true); // Bắt đầu hiện icon xoay
     await fetchOrders(); // Gọi lại hàm lấy dữ liệu cũ của sếp
@@ -261,6 +289,22 @@ export default function OrdersScreen() {
         </View>
 
         <View style={styles.actionRow}>
+          {/* NÚT HỦY ĐƠN: CHỈ HIỆN KHI NGƯỜI BÁN CHƯA GỬI HÀNG */}
+          {(item.status === "UNPAID" ||
+            item.status === "PAID" ||
+            item.status === "PREPARING") && (
+            <TouchableOpacity
+              style={[
+                styles.btnOutline,
+                { borderColor: "#FF4D4D", backgroundColor: "#FFF5F5" },
+              ]}
+              onPress={() => handleCancelOrder(item.id)}
+            >
+              <Text style={[styles.btnOutlineText, { color: "#FF4D4D" }]}>
+                Hủy đơn hàng
+              </Text>
+            </TouchableOpacity>
+          )}
           {item.status === "COMPLETED" && (
             <TouchableOpacity
               style={[
