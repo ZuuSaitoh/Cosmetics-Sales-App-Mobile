@@ -11,6 +11,7 @@ import {
   Modal,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -34,13 +35,32 @@ export default function OrdersScreen() {
   const [reviewedOrders, setReviewedOrders] = useState<Record<number, boolean>>(
     {},
   );
+  const ORDER_STATUS_TABS = [
+    { key: "ALL", label: "Tất cả" },
+    { key: "WAITING", label: "Chờ hàng" },
+    { key: "DELIVERING_OUT", label: "Đang giao" },
+    { key: "IN_USE", label: "Đang thuê" },
+    { key: "SHIPPING_BACK", label: "Trả đồ" },
+    { key: "COMPLETED", label: "Hoàn thành" },
+    { key: "CANCELLED", label: "Đã hủy" },
+  ];
+  const [selectedTab, setSelectedTab] = useState("ALL");
+  const filteredOrders = (orders || []).filter((order: any) => {
+    if (selectedTab === "ALL") return true;
+    if (selectedTab === "WAITING") {
+      return ["UNPAID", "PAID", "PREPARING", "SHIPPING_OUT"].includes(
+        order.status,
+      );
+    }
+    return order.status === selectedTab;
+  });
 
   useEffect(() => {
     fetchOrders();
   }, []);
   useFocusEffect(
     React.useCallback(() => {
-      fetchOrders(); // Tự động load lại dữ liệu mỗi khi sếp "quay xe" về trang này
+      fetchOrders(); // Tự động load lại dữ liệu mỗi khi bạn "quay xe" về trang này
     }, []),
   );
 
@@ -110,7 +130,7 @@ export default function OrdersScreen() {
   };
 
   const handleCancelOrder = (orderId: number) => {
-    Alert.alert("Xác nhận hủy", "Sếp chắc chắn muốn hủy đơn hàng này không?", [
+    Alert.alert("Xác nhận hủy", "Bạn chắc chắn muốn hủy đơn hàng này không?", [
       { text: "Không", style: "cancel" },
       {
         text: "Hủy đơn",
@@ -129,7 +149,7 @@ export default function OrdersScreen() {
           } catch (err) {
             Alert.alert(
               "Lỗi",
-              "Không thể hủy đơn lúc này, sếp thử lại sau nha!",
+              "Không thể hủy đơn lúc này, bạn thử lại sau nha!",
             );
           }
         },
@@ -139,7 +159,7 @@ export default function OrdersScreen() {
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true); // Bắt đầu hiện icon xoay
-    await fetchOrders(); // Gọi lại hàm lấy dữ liệu cũ của sếp
+    await fetchOrders(); // Gọi lại hàm lấy dữ liệu cũ của bạn
     setRefreshing(false); // Tắt icon xoay sau khi xong
   }, []);
 
@@ -395,17 +415,50 @@ export default function OrdersScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.mainTitle}>Đơn thuê của tôi</Text>
+      </View>
+      {/* THANH TAB TRẠNG THÁI */}
+      <View style={styles.filterWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContainer}
+        >
+          {ORDER_STATUS_TABS.map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[
+                styles.filterChip,
+                selectedTab === tab.key && styles.filterChipActive,
+              ]}
+              onPress={() => setSelectedTab(tab.key)}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  selectedTab === tab.key && styles.filterChipTextActive,
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
       <FlatList
-        data={orders}
+        data={filteredOrders} // Luôn là filteredOrders sếp nhé!
         keyExtractor={(item: any) => item.id.toString()}
         renderItem={renderOrderItem}
-        contentContainerStyle={{ padding: 15, paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#B59DFF"]} // Màu tím chuẩn CosMate của sếp
+            colors={["#B59DFF"]} // Màu tím chuẩn CosMate của bạn
             tintColor="#B59DFF" // Dành cho iOS
           />
         }
@@ -555,4 +608,71 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  // Trong phần styles của index.tsx
+  tabContainer: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    gap: 10,
+  },
+  tabItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: "#F0F0F0",
+    borderWidth: 1,
+    borderColor: "#EEE",
+  },
+  tabItemActive: {
+    backgroundColor: "#B59DFF", // Màu tím mộng mơ thương hiệu
+    borderColor: "#B59DFF",
+  },
+  tabText: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  tabTextActive: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  filterWrapper: {
+    backgroundColor: "#fff",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  filterContainer: { paddingHorizontal: 15 },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F4F5F7",
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  filterChipActive: { backgroundColor: "#F4F1FF", borderColor: "#B59DFF" },
+  filterChipText: { fontSize: 13, color: "#666", fontWeight: "500" },
+  filterChipTextActive: { color: "#B59DFF", fontWeight: "bold" },
+  listContainer: {
+    padding: 15,
+    paddingBottom: 100,
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#999",
+    marginTop: 50,
+    fontStyle: "italic",
+  },
+  header: {
+    backgroundColor: "#fff",
+    padding: 20,
+    // Xóa borderBottomWidth ở đây nếu sếp muốn Header và Tab Bar dính liền nhau
+  },
+  mainTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#4A3B6B", // Màu tím đậm đặc trưng của CosMate
+  },
 });
