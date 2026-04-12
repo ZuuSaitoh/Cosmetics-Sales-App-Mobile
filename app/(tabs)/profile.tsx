@@ -25,6 +25,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<number | null>(null);
+  const [balance, setBalance] = useState<number>(0); // State lưu số dư
 
   // State cho Modal Chỉnh sửa
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -56,6 +57,18 @@ export default function ProfileScreen() {
         setProfile(data);
         setEditFullName(data.fullName || "");
         setEditPhone(data.phone || "");
+      }
+
+      const profileRes = await axiosClient.get(`/users/${uId}/profile`);
+      if (profileRes.data.code === 0) {
+        setProfile(profileRes.data.result);
+        setEditFullName(profileRes.data.result.fullName || "");
+        setEditPhone(profileRes.data.result.phone || "");
+      }
+
+      const walletRes = await axiosClient.get(`/wallets/user/${uId}`);
+      if (walletRes.data.code === 0) {
+        setBalance(walletRes.data.result.balance); // Giả định result có field balance
       }
     } catch (error) {
       console.error("Lỗi lấy profile:", error);
@@ -180,6 +193,30 @@ export default function ProfileScreen() {
             {profile?.fullName || "Người dùng CosMate"}
           </Text>
           <Text style={styles.username}>@{profile?.username}</Text>
+        </View>
+
+        <View style={styles.walletCard}>
+          <View style={styles.walletLeft}>
+            <View style={styles.walletIconWrap}>
+              <Ionicons name="wallet-outline" size={24} color="#B59DFF" />
+            </View>
+            <View>
+              <Text style={styles.walletLabel}>Số dư ví CosMate</Text>
+              <Text style={styles.walletBalance}>
+                {new Intl.NumberFormat("vi-VN", {
+                  style: "currency",
+                  currency: "VND",
+                }).format(balance)}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.depositBtn}
+            onPress={() => router.push("/(screens)/top-up" as any)} // Dẫn sang trang nạp tiền nếu sếp có làm
+          >
+            <Text style={styles.depositBtnText}>Nạp tiền</Text>
+          </TouchableOpacity>
         </View>
 
         {/* INFO SECTION */}
@@ -434,4 +471,37 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  walletCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    marginHorizontal: 20,
+    marginTop: -25, // Đè lên phần Header một chút cho hiện đại
+    padding: 15,
+    borderRadius: 15,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  walletLeft: { flexDirection: "row", alignItems: "center" },
+  walletIconWrap: {
+    width: 45,
+    height: 45,
+    borderRadius: 22,
+    backgroundColor: "#F4F1FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  walletLabel: { fontSize: 12, color: "#8E7AB5", marginBottom: 2 },
+  walletBalance: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
+  depositBtn: {
+    backgroundColor: "#B59DFF",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  depositBtnText: { color: "#fff", fontSize: 13, fontWeight: "bold" },
 });
