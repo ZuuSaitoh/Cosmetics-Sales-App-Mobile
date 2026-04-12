@@ -54,7 +54,6 @@ export default function ProfileScreen() {
       if (response.data.code === 0) {
         const data = response.data.result;
         setProfile(data);
-        // Gán dữ liệu mặc định vào state của form Edit
         setEditFullName(data.fullName || "");
         setEditPhone(data.phone || "");
       }
@@ -66,7 +65,6 @@ export default function ProfileScreen() {
     }
   };
 
-  // --- HÀM GỌI API CẬP NHẬT PROFILE ---
   const handleUpdateProfile = async () => {
     if (!editFullName.trim()) {
       Alert.alert("Lỗi", "Họ và tên không được để trống.");
@@ -83,26 +81,21 @@ export default function ProfileScreen() {
 
       if (response.data.code === 0) {
         Alert.alert("Thành công", "Đã cập nhật hồ sơ!");
-        setProfile(response.data.result); // Cập nhật lại giao diện ngay lập tức
-        setIsEditModalVisible(false); // Tắt Modal
-      } else {
-        Alert.alert("Lỗi", response.data.message);
+        setProfile(response.data.result);
+        setIsEditModalVisible(false);
       }
     } catch (error) {
-      console.error("Lỗi cập nhật profile:", error);
-      Alert.alert("Lỗi", "Không thể cập nhật hồ sơ lúc này.");
+      Alert.alert("Lỗi", "Không thể cập nhật hồ sơ.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ---> HÀM MỚI: Chọn ảnh và Upload Avatar <---
   const handleChangeAvatar = async () => {
-    // 1. Mở thư viện ảnh (Ép crop tỉ lệ 1:1 cho vuông vức)
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      aspect: [1, 1], // Tỉ lệ 1:1 cho Avatar tròn
+      aspect: [1, 1],
       quality: 0.8,
     });
 
@@ -115,7 +108,6 @@ export default function ProfileScreen() {
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : `image/jpeg`;
 
-        // LƯU Ý: Tên field phải đúng chữ 'avatar' theo Swagger
         formData.append("avatar", {
           uri: localUri,
           name: filename,
@@ -127,14 +119,11 @@ export default function ProfileScreen() {
         });
 
         if (res.data.code === 0) {
-          Alert.alert("Thành công", "Đã cập nhật ảnh đại diện mới!");
-          setProfile(res.data.result); // Cập nhật ngay hình mới lên app
-        } else {
-          Alert.alert("Lỗi", res.data.message);
+          Alert.alert("Thành công", "Đã cập nhật ảnh đại diện!");
+          setProfile(res.data.result);
         }
       } catch (error) {
-        console.error("Lỗi cập nhật avatar:", error);
-        Alert.alert("Lỗi", "Không thể upload ảnh đại diện lúc này.");
+        Alert.alert("Lỗi", "Không thể upload ảnh.");
       } finally {
         setIsUpdatingAvatar(false);
       }
@@ -142,7 +131,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn thoát không?", [
+    Alert.alert("Đăng xuất", "Bạn có chắc muốn thoát không?", [
       { text: "Hủy", style: "cancel" },
       {
         text: "Thoát",
@@ -155,18 +144,17 @@ export default function ProfileScreen() {
     ]);
   };
 
-  if (isLoading) {
+  if (isLoading)
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#B59DFF" />
       </View>
     );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* HEADER: AVATAR & NAME */}
+        {/* HEADER */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <Image
@@ -175,25 +163,11 @@ export default function ProfileScreen() {
               }}
               style={styles.avatar}
             />
-
-            {/* Hiệu ứng loading đè lên avatar khi đang upload */}
             {isUpdatingAvatar && (
-              <View
-                style={[
-                  StyleSheet.absoluteFill,
-                  {
-                    backgroundColor: "rgba(255,255,255,0.7)",
-                    borderRadius: 55,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  },
-                ]}
-              >
+              <View style={[StyleSheet.absoluteFill, styles.loadingAvatar]}>
                 <ActivityIndicator size="small" color="#B59DFF" />
               </View>
             )}
-
-            {/* Gắn hàm handleChangeAvatar vào nút */}
             <TouchableOpacity
               style={styles.editBadge}
               onPress={handleChangeAvatar}
@@ -208,7 +182,7 @@ export default function ProfileScreen() {
           <Text style={styles.username}>@{profile?.username}</Text>
         </View>
 
-        {/* CHI TIẾT THÔNG TIN */}
+        {/* INFO SECTION */}
         <View style={styles.infoSection}>
           <View style={styles.infoRow}>
             <Ionicons name="mail-outline" size={20} color="#8E7AB5" />
@@ -217,7 +191,6 @@ export default function ProfileScreen() {
               <Text style={styles.infoValue}>{profile?.email}</Text>
             </View>
           </View>
-
           <View style={styles.infoRow}>
             <Ionicons name="call-outline" size={20} color="#8E7AB5" />
             <View style={styles.infoTextColumn}>
@@ -227,63 +200,75 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons
-              name="shield-checkmark-outline"
-              size={20}
-              color="#8E7AB5"
-            />
-            <View style={styles.infoTextColumn}>
-              <Text style={styles.infoLabel}>Trạng thái tài khoản</Text>
-              <Text style={[styles.infoValue, { color: "#28A745" }]}>
-                {profile?.status}
-              </Text>
-            </View>
-          </View>
         </View>
 
-        {/* NÚT HÀNH ĐỘNG */}
+        {/* ACTION SECTION */}
         <View style={styles.actionSection}>
-          {/* Nút Chỉnh sửa hồ sơ hiện có */}
+          {/* Wishlist */}
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => router.push("/(screens)/wishlist" as any)}
+          >
+            <View style={styles.actionLeft}>
+              <View style={[styles.iconWrap, { backgroundColor: "#FFEBEE" }]}>
+                <Ionicons name="heart" size={20} color="#FF5252" />
+              </View>
+              <Text style={styles.actionText}>Danh sách yêu thích</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+          </TouchableOpacity>
+
+          {/* Edit Profile */}
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => setIsEditModalVisible(true)}
           >
-            <Ionicons name="create-outline" size={22} color="#4A3B6B" />
-            <Text style={styles.actionBtnText}>Chỉnh sửa hồ sơ</Text>
+            <View style={styles.actionLeft}>
+              <View style={[styles.iconWrap, { backgroundColor: "#F4F1FF" }]}>
+                <Ionicons name="create-outline" size={20} color="#4A3B6B" />
+              </View>
+              <Text style={styles.actionText}>Chỉnh sửa hồ sơ</Text>
+            </View>
             <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
 
-          {/* ---> MỤC MỚI: SỔ ĐỊA CHỈ <--- */}
+          {/* Address Book */}
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => router.push("/(screens)/address-book" as any)}
           >
-            <Ionicons name="location-outline" size={22} color="#4A3B6B" />
-            <Text style={styles.actionBtnText}>Sổ địa chỉ</Text>
+            <View style={styles.actionLeft}>
+              <View style={[styles.iconWrap, { backgroundColor: "#E8F5E9" }]}>
+                <Ionicons name="location-outline" size={20} color="#28A745" />
+              </View>
+              <Text style={styles.actionText}>Sổ địa chỉ</Text>
+            </View>
             <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
 
-          {/* Nút Đăng xuất hiện có */}
+          {/* Logout */}
           <TouchableOpacity
-            style={[styles.actionBtn, styles.logoutBtn]}
+            style={[styles.actionBtn, { borderBottomWidth: 0 }]}
             onPress={handleLogout}
           >
-            <Ionicons name="log-out-outline" size={22} color="#FF4D4D" />
-            <Text style={[styles.actionBtnText, { color: "#FF4D4D" }]}>
-              Đăng xuất
-            </Text>
+            <View style={styles.actionLeft}>
+              <View style={[styles.iconWrap, { backgroundColor: "#FFE5E5" }]}>
+                <Ionicons name="log-out-outline" size={20} color="#FF4D4D" />
+              </View>
+              <Text style={[styles.actionText, { color: "#FF4D4D" }]}>
+                Đăng xuất
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      {/* MODAL CHỈNH SỬA THÔNG TIN */}
+      {/* MODAL EDIT */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={isEditModalVisible}
-        onRequestClose={() => setIsEditModalVisible(false)}
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
@@ -296,26 +281,21 @@ export default function ProfileScreen() {
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
-
             <Text style={styles.inputLabel}>Họ và tên</Text>
             <TextInput
               style={styles.input}
               value={editFullName}
               onChangeText={setEditFullName}
-              placeholder="Nhập họ và tên..."
             />
-
             <Text style={styles.inputLabel}>Số điện thoại</Text>
             <TextInput
               style={styles.input}
               value={editPhone}
               onChangeText={setEditPhone}
-              placeholder="Nhập số điện thoại..."
               keyboardType="phone-pad"
             />
-
             <TouchableOpacity
-              style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
+              style={styles.saveBtn}
               onPress={handleUpdateProfile}
               disabled={isSaving}
             >
@@ -342,9 +322,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
   },
   avatarContainer: { position: "relative", marginBottom: 15 },
   avatar: {
@@ -353,6 +330,12 @@ const styles = StyleSheet.create({
     borderRadius: 55,
     borderWidth: 3,
     borderColor: "#F4F1FF",
+  },
+  loadingAvatar: {
+    backgroundColor: "rgba(255,255,255,0.7)",
+    borderRadius: 55,
+    justifyContent: "center",
+    alignItems: "center",
   },
   editBadge: {
     position: "absolute",
@@ -369,7 +352,6 @@ const styles = StyleSheet.create({
   },
   fullName: { fontSize: 22, fontWeight: "bold", color: "#4A3B6B" },
   username: { fontSize: 14, color: "#8E7AB5", marginTop: 4 },
-
   infoSection: {
     backgroundColor: "#fff",
     marginTop: 20,
@@ -382,26 +364,33 @@ const styles = StyleSheet.create({
   infoTextColumn: { marginLeft: 15 },
   infoLabel: { fontSize: 12, color: "#A090C5", marginBottom: 2 },
   infoValue: { fontSize: 15, fontWeight: "600", color: "#333" },
-
-  actionSection: { marginTop: 20, marginHorizontal: 20, paddingBottom: 100 },
+  actionSection: {
+    marginTop: 20,
+    marginHorizontal: 20,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    elevation: 1,
+    paddingBottom: 5,
+  },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 15,
-    marginBottom: 10,
+    justifyContent: "space-between",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
-  actionBtnText: {
-    flex: 1,
-    marginLeft: 15,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#4A3B6B",
+  actionLeft: { flexDirection: "row", alignItems: "center" },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
-  logoutBtn: { marginTop: 10, borderWidth: 1, borderColor: "#FFE5E5" },
-
-  // --- STYLE CHO MODAL CHỈNH SỬA ---
+  actionText: { fontSize: 16, fontWeight: "600", color: "#4A3B6B" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

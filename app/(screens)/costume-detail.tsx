@@ -1,5 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,10 +26,81 @@ export default function CostumeDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [provider, setProvider] = useState<any>(null); // State lưu thông tin shop
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [wishlistId, setWishlistId] = useState<number | null>(null);
+  const [isProcessingWishlist, setIsProcessingWishlist] = useState(false);
 
   useEffect(() => {
     if (id) fetchCostumeDetail();
   }, [id]);
+
+  useEffect(() => {
+    if (id) checkWishlistStatus();
+  }, [id]);
+
+  const checkWishlistStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (!token) return;
+      const decoded: any = jwtDecode(token);
+      const userId = decoded.sub;
+
+      // Lấy danh sách yêu thích của user
+      const res = await axiosClient.get(`/users/${userId}/wishlist`);
+      if (res.data.code === 0) {
+        // Tìm xem trang phục hiện tại (id) có trong danh sách không
+        const item = res.data.result.find(
+          (w: any) => w.costume.id === Number(id),
+        );
+        if (item) {
+          setIsWishlisted(true);
+          setWishlistId(item.id);
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi check wishlist:", error);
+    }
+  };
+
+  const toggleWishlist = async () => {
+    if (isProcessingWishlist) return;
+    setIsProcessingWishlist(true);
+
+    try {
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (!token) {
+        router.push("/(auth)/login");
+        return;
+      }
+      const decoded: any = jwtDecode(token);
+      const userId = decoded.sub;
+
+      if (isWishlisted && wishlistId) {
+        // 🚩 DELETE: Bỏ yêu thích
+        const res = await axiosClient.delete(
+          `/users/${userId}/wishlist/${wishlistId}`,
+        );
+        if (res.data.code === 0) {
+          setIsWishlisted(false);
+          setWishlistId(null);
+        }
+      } else {
+        // 🚩 POST: Thêm vào yêu thích
+        // Truyền costumeId vào body theo đúng yêu cầu API của sếp
+        const res = await axiosClient.post(`/users/${userId}/wishlist`, {
+          costumeId: Number(id),
+        });
+        if (res.data.code === 0) {
+          setIsWishlisted(true);
+          setWishlistId(res.data.result.id);
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi toggle wishlist:", error);
+    } finally {
+      setIsProcessingWishlist(false);
+    }
+  };
 
   const fetchCostumeDetail = async () => {
     try {
@@ -93,6 +166,18 @@ export default function CostumeDetailScreen() {
       <View style={styles.headerFloating}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#333" />
+        </TouchableOpacity>
+        {/* NÚT TRÁI TIM MỚI */}
+        <TouchableOpacity
+          style={[styles.backBtn, styles.wishlistBtn]}
+          onPress={toggleWishlist}
+          disabled={isProcessingWishlist}
+        >
+          <Ionicons
+            name={isWishlisted ? "heart" : "heart-outline"}
+            size={24}
+            color={isWishlisted ? "#FF5252" : "#333"}
+          />
         </TouchableOpacity>
       </View>
 
@@ -286,7 +371,7 @@ export default function CostumeDetailScreen() {
           }}
         >
           <Text style={styles.rentButtonText}>
-            {costume.status === "AVAILABLE" ? "Thuê Ngay" : "Hết hàng"}
+            {costume.status === "AVAILABLE" ? "Thuê Ngay" : "Đã Thuê"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -301,7 +386,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: Platform.OS === "ios" ? 50 : 20,
     left: 15,
+    right: 15,
     zIndex: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   backBtn: {
     width: 40,
@@ -455,5 +544,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     marginRight: 4,
+  },
+  wishlistBtn: {
+    // Kế thừa style của backBtn sếp đã viết
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
 });
