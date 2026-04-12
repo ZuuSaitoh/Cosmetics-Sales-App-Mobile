@@ -15,48 +15,48 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-// Import axiosClient thay vì axios mặc định
 import axiosClient from "../api/axiosClient";
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams();
   const [order, setOrder] = useState<any>(null);
+  const [trackings, setTrackings] = useState<any[]>([]); // 🚩 State mới cho tracking
   const [isLoading, setIsLoading] = useState(true);
-  const [reviewData, setReviewData] = useState<any>(null);
   const [initialIndex, setInitialIndex] = useState(0);
-  const [isPreviewVisible, setIsPreviewVisible] = useState(false); // Trạng thái đóng/mở Modal
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const { width: screenWidth } = Dimensions.get("window");
-  const [review, setReview] = useState<any>(null); // State lưu thông tin đánh giá
+  const [review, setReview] = useState<any>(null);
   const reviewImages = Array.isArray(review?.images) ? review.images : [];
 
   useEffect(() => {
-    fetchOrderDetail();
-    fetchReviewInfo(); // Gọi thêm hàm lấy review
+    if (id) {
+      fetchOrderDetail();
+      fetchReviewInfo();
+      fetchOrderTrackings(); // 🚩 Gọi API tracking mới
+    }
   }, [id]);
 
-  const fetchReviewInfo = async () => {
+  // 🚩 HÀM MỚI: Lấy thông tin tracking từ controller chuyên biệt
+  // Trong file order-detail.tsx
+
+  const fetchOrderTrackings = async () => {
     try {
-      const res = await axiosClient.get(`/reviews/order/${id}`);
-      // Kiểm tra: Nếu có kết quả và mảng có phần tử thì mới lấy
-      if (
-        res.data.code === 0 &&
-        res.data.result &&
-        res.data.result.length > 0
-      ) {
-        setReview(res.data.result[0]);
-      } else {
-        setReview(null); // Không có đánh giá thì để null
+      const response = await axiosClient.get(`/order-tracking/order/${id}`);
+      if (response.data.code === 0) {
+        const sortedTrackings = response.data.result.sort(
+          (a: any, b: any) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+        setTrackings(sortedTrackings);
       }
-    } catch (err) {
-      setReview(null);
+    } catch (error) {
+      console.error("Lỗi lấy tracking:", error);
     }
   };
 
   const fetchOrderDetail = async () => {
     try {
       const response = await axiosClient.get(`/orders/${id}`);
-
       if (response.data.code === 0) {
         setOrder(response.data.result);
       }
@@ -67,68 +67,64 @@ export default function OrderDetailScreen() {
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN", {
+  const fetchReviewInfo = async () => {
+    try {
+      const res = await axiosClient.get(`/reviews/order/${id}`);
+      if (
+        res.data.code === 0 &&
+        res.data.result &&
+        res.data.result.length > 0
+      ) {
+        setReview(res.data.result[0]);
+      }
+    } catch (err) {
+      setReview(null);
+    }
+  };
+
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
     }).format(price || 0);
-  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
     const d = new Date(dateString);
-    const time = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-    const date = `${d.getDate().toString().padStart(2, "0")}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getFullYear()}`;
-    return `${time}  |  ${date}`;
+    return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}  |  ${d.getDate().toString().padStart(2, "0")}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getFullYear()}`;
   };
 
-  // === HÀM MỚI: XỬ LÝ BẤM NÚT CHAT ===
   const handleContactShop = () => {
-    // ⚠️ LƯU Ý: Tui đang giả định Backend trả về thông tin shop trong object order
-    // Bạn cần console.log(order) để xem chính xác key của nó là providerId, shopId hay providerUserId nhé
     const partnerId =
       order?.providerId || order?.providerUserId || order?.shopId;
     const partnerName = order?.shopName || order?.providerName || "Cửa hàng";
 
     if (!partnerId) {
-      Alert.alert(
-        "Thông báo",
-        "Đang cập nhật thông tin cửa hàng, không thể chat lúc này!",
-      );
+      Alert.alert("Thông báo", "Đang cập nhật thông tin cửa hàng!");
       return;
     }
 
-    // Chuyển sang màn hình chat chi tiết và mang theo ID của Shop
     router.push({
       pathname: "/(screens)/chat-detail" as any,
-      params: {
-        partnerId: partnerId,
-        partnerName: partnerName,
-      },
+      params: { partnerId, partnerName },
     });
   };
 
-  if (isLoading) {
+  if (isLoading)
     return (
       <SafeAreaView style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#B59DFF" />
       </SafeAreaView>
     );
-  }
-
-  if (!order) {
+  if (!order)
     return (
       <SafeAreaView style={[styles.container, styles.centered]}>
-        <Text style={{ color: "#8E7AB5" }}>
-          Không tìm thấy thông tin đơn hàng.
-        </Text>
+        <Text style={{ color: "#8E7AB5" }}>Không tìm thấy đơn hàng.</Text>
       </SafeAreaView>
     );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#4A3B6B" />
@@ -138,7 +134,6 @@ export default function OrderDetailScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* BANNER TRẠNG THÁI TỔNG */}
         <View style={styles.statusBanner}>
           <View>
             <Text style={styles.statusText}>{order.status}</Text>
@@ -147,7 +142,7 @@ export default function OrderDetailScreen() {
           <Ionicons name="cube-outline" size={40} color="#fff" />
         </View>
 
-        {/* 1. TIMELINE TRACKING */}
+        {/* 1. TIMELINE TRACKING (Đã cập nhật state mới) */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons
@@ -159,8 +154,8 @@ export default function OrderDetailScreen() {
           </View>
 
           <View style={styles.trackingContainer}>
-            {order.trackings && order.trackings.length > 0 ? (
-              order.trackings.map((track: any, index: number) => {
+            {trackings && trackings.length > 0 ? (
+              trackings.map((track: any, index: number) => {
                 const isFirst = index === 0;
                 return (
                   <View key={track.id} style={styles.trackingRow}>
@@ -171,7 +166,7 @@ export default function OrderDetailScreen() {
                           isFirst ? styles.dotActive : styles.dotInactive,
                         ]}
                       />
-                      {index !== order.trackings.length - 1 && (
+                      {index !== trackings.length - 1 && (
                         <View style={styles.line} />
                       )}
                     </View>
@@ -197,7 +192,8 @@ export default function OrderDetailScreen() {
           </View>
         </View>
 
-        {/* 2. ĐỊA CHỈ NHẬN HÀNG */}
+        {/* ... Các phần Địa chỉ, Sản phẩm, Đánh giá giữ nguyên như cũ ... */}
+
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="location-outline" size={20} color="#B59DFF" />
@@ -220,34 +216,30 @@ export default function OrderDetailScreen() {
           )}
         </View>
 
-        {/* 3. CHI TIẾT SẢN PHẨM */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="shirt-outline" size={20} color="#B59DFF" />
             <Text style={styles.cardTitle}>Sản phẩm đã thuê</Text>
           </View>
-          {order.details &&
-            order.details.map((item: any) => (
-              <View key={item.id} style={styles.itemRow}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemName}>
-                    Trang phục ID: {item.costumeId}
-                  </Text>
-                  <Text style={styles.itemSub}>
-                    Size: {item.size} | Số lượng: x{item.numberOfItems}
-                  </Text>
-                  <Text style={styles.itemSub}>
-                    Thời gian: {item.rentDay} ngày
-                  </Text>
-                </View>
-                <Text style={styles.itemPrice}>
-                  {formatPrice(item.rentAmount)}
+          {order.details?.map((item: any) => (
+            <View key={item.id} style={styles.itemRow}>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName}>
+                  Trang phục ID: {item.costumeId}
+                </Text>
+                <Text style={styles.itemSub}>
+                  Size: {item.size} | Số lượng: x{item.numberOfItems}
+                </Text>
+                <Text style={styles.itemSub}>
+                  Thời gian: {item.rentDay} ngày
                 </Text>
               </View>
-            ))}
-
+              <Text style={styles.itemPrice}>
+                {formatPrice(item.rentAmount)}
+              </Text>
+            </View>
+          ))}
           <View style={styles.divider} />
-
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Tiền cọc (Hoàn trả sau):</Text>
             <Text style={styles.depositPrice}>
@@ -262,14 +254,12 @@ export default function OrderDetailScreen() {
           </View>
         </View>
 
-        {/* 4. PHẦN ĐÁNH GIÁ CỦA BẠN (CHỈ HIỆN KHI ĐÃ REVIEW) */}
         {review && (
           <View style={styles.reviewCard}>
             <View style={styles.cardHeader}>
               <Ionicons name="star" size={20} color="#FFD700" />
               <Text style={styles.cardTitle}>Đánh giá của bạn</Text>
             </View>
-
             <View style={styles.reviewContent}>
               <View style={styles.starsRow}>
                 {[1, 2, 3, 4, 5].map((s) => (
@@ -282,12 +272,9 @@ export default function OrderDetailScreen() {
                 ))}
                 <Text style={styles.ratingLabel}> - {review.rating}/5 sao</Text>
               </View>
-
               <Text style={styles.reviewComment}>
                 {review.comment || "Không có bình luận."}
               </Text>
-
-              {/* HIỂN THỊ ẢNH REVIEW (NẾU CÓ) */}
               {reviewImages.length > 0 && (
                 <ScrollView
                   horizontal
@@ -298,7 +285,7 @@ export default function OrderDetailScreen() {
                     <TouchableOpacity
                       key={index}
                       onPress={() => {
-                        setInitialIndex(index); // Lưu vị trí ảnh vừa bấm
+                        setInitialIndex(index);
                         setIsPreviewVisible(true);
                       }}
                     >
@@ -317,7 +304,6 @@ export default function OrderDetailScreen() {
           </View>
         )}
 
-        {/* === NÚT ĐƯỢC GẮN EVENT CHUYỂN TRANG === */}
         <TouchableOpacity style={styles.btnAction} onPress={handleContactShop}>
           <View
             style={{
@@ -336,29 +322,25 @@ export default function OrderDetailScreen() {
           </View>
         </TouchableOpacity>
       </ScrollView>
-      {/* MODAL GALLERY XEM ẢNH */}
+
+      {/* MODAL GALLERY GIỮ NGUYÊN NHƯ CŨ */}
       <Modal
         visible={isPreviewVisible && reviewImages.length > 0}
         transparent={true}
         animationType="fade"
       >
         <View style={styles.previewOverlay}>
-          {/* Nút đóng */}
           <TouchableOpacity
             style={styles.closePreview}
             onPress={() => setIsPreviewVisible(false)}
           >
             <Ionicons name="close-circle" size={45} color="#fff" />
           </TouchableOpacity>
-
           <FlatList
             data={reviewImages}
             horizontal
-            pagingEnabled // Tự động hít vào giữa ảnh khi lướt
-            initialScrollIndex={Math.min(
-              initialIndex,
-              Math.max(reviewImages.length - 1, 0),
-            )} // Mở đúng ảnh đã bấm
+            pagingEnabled
+            initialScrollIndex={initialIndex}
             getItemLayout={(_, index) => ({
               length: screenWidth,
               offset: screenWidth * index,
@@ -388,6 +370,7 @@ export default function OrderDetailScreen() {
   );
 }
 
+// ... Styles giữ nguyên ...
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F5F7" },
   centered: { justifyContent: "center", alignItems: "center" },
