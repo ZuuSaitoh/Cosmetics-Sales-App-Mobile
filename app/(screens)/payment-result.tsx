@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // 🚩 Bổ sung
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
-import { jwtDecode } from "jwt-decode"; // 🚩 Bổ sung
-import React, { useEffect, useState } from "react";
+import { jwtDecode } from "jwt-decode";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -11,49 +11,103 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import axiosClient from "../api/axiosClient"; // 🚩 Bổ sung
+import axiosClient from "../api/axiosClient";
+
+type PaymentType = "order" | "topup";
 
 export default function PaymentResultScreen() {
   const params = useLocalSearchParams();
   const [isSuccess, setIsSuccess] = useState(false);
-  const [latestTx, setLatestTx] = useState<any>(null); // 🚩 State lưu giao dịch mới nhất
+  const [paymentType, setPaymentType] = useState<PaymentType>("order");
+  const [orderData, setOrderData] = useState<any>(null);
+  const [topupData, setTopupData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // 1. Kiểm tra trạng thái sơ bộ từ URL để hiện màu xanh/đỏ ngay
-    if (
-      params.vnp_ResponseCode === "00" ||
-      params.resultCode === "0" ||
-      params.status === "success"
-    ) {
-      setIsSuccess(true);
-    }
+  const vnpaySuccess =
+    params.vnp_ResponseCode === "00" ||
+    params.resultCode === "0" ||
+    params.status === "success";
 
-    // 2. Gọi API lấy dữ liệu thực tế từ DB để hiển thị chi tiết
-    fetchLatestTransaction();
-  }, [params]);
+  // Phân biệt luồng top-up hay order dựa trên params
+  // Top-up: có vnp_TxnRef, vnp_Amount, không có orderId
+  // Order: có orderId
+  const isTopupFlow =
+    !params.orderId &&
+    !params.order_id &&
+    (!!params.vnp_TxnRef || !!params.txnRef);
 
-  const fetchLatestTransaction = async () => {
+  const fetchPaymentResult = useCallback(async () => {
     try {
-      // Lấy userId từ token giống bên trang Profile
       const token = await AsyncStorage.getItem("cosmate_token");
-      if (!token) return;
-      const decoded: any = jwtDecode(token);
-      const uId = decoded.sub;
+      if (!token) { setIsLoading(false); return; }
+      jwtDecode(token);
 
-      // Gọi API lấy danh sách giao dịch của User
-      const res = await axiosClient.get(`/wallets/user/${uId}/transactions`);
+      if (isTopupFlow) {
+        // ====== LUỒNG NẠP TIỀN ======
+        setPaymentType("topup");
 
-      if (res.data.code === 0 && res.data.result.length > 0) {
-        // Lấy giao dịch đầu tiên (mới nhất)
-        setLatestTx(res.data.result[0]);
+        // Lấy transaction mới nhất từ ví để xác nhận đã nạp thành công
+        const decoded: any = jwtDecode(token);
+        const uId = decoded.sub;
+        const res = await axiosClient.get(`/wallets/user/${uId}/transactions`);
+
+        if (res.data.code === 0 && res.data.result.length > 0) {
+          // Lấy transaction mới nhất
+          const latestTx = res.data.result[0];
+          setTopupData({
+            id: latestTx.id,
+            amount: latestTx.amount,
+            paymentMethod: latestTx.paymentMethod || "VNPAY",
+            createdAt: latestTx.createdAt,
+            // Lấy từ params VNPAY
+            vnp_TransactionNo: params.vnp_TransactionNo || null,
+            vnp_TxnRef: params.vnp_TxnRef || params.txnRef || null,
+          });
+        }
+      } else {
+        // ====== LUỒNG THUÊ TRANG PHỤC ======
+        setPaymentType("order");
+        const orderId = params.orderId || params.order_id;
+
+        if (!orderId) {
+          console.warn("Không có orderId trong params");
+          setIsLoading(false);
+          return;
+        }
+
+        const orderRes = await axiosClient.get(`/orders/${orderId}`);
+        if (orderRes.data.code === 0) {
+          const order = orderRes.data.result;
+          setOrderData(order);
+
+          const dbStatus = order.status;
+          if (dbStatus === "PAID") {
+            setIsSuccess(true);
+          } else if (dbStatus === "UNPAID") {
+            try {
+              await axiosClient.post(`/orders/${orderId}/confirm-payment`);
+              setIsSuccess(true);
+            } catch {
+              // Backend sẽ tự xử lý qua IPN
+            }
+          }
+        }
       }
     } catch (error) {
-      console.error("Lỗi lấy chi tiết giao dịch:", error);
+      console.error("Lỗi xác nhận thanh toán:", error);
     } finally {
       setIsLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (vnpaySuccess) {
+      setIsSuccess(true);
+    }
+    fetchPaymentResult();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const formatPrice = (price: any) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -69,6 +123,90 @@ export default function PaymentResultScreen() {
       </View>
     );
   }
+
+  // ============ RENDER THEO TỪNG LUỒNG ============
+
+  const renderOrderDetail = () => {
+    if (!orderData) return null;
+    return (
+      <View style={styles.detailCard}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Mã đơn hàng:</Text>
+          <Text style={styles.detailValue}>#{orderData.id}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Phương thức:</Text>
+          <Text style={[styles.detailValue, { textTransform: "uppercase" }]}>
+            {orderData.paymentMethod || "VNPAY"}
+          </Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Số tiền:</Text>
+          <Text style={styles.detailValue}>
+            {formatPrice(orderData.totalAmount)}
+          </Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Trạng thái:</Text>
+          <Text style={[styles.detailValue, { color: "#28A745" }]}>
+            {orderData.status}
+          </Text>
+        </View>
+        {orderData.rentStart && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Ngày thuê:</Text>
+            <Text style={styles.detailValue}>
+              {new Date(orderData.rentStart).toLocaleDateString("vi-VN")}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderTopupDetail = () => {
+    if (!topupData) return null;
+    return (
+      <View style={styles.detailCard}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Mã giao dịch:</Text>
+          <Text style={styles.detailValue}>#{topupData.id}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Phương thức:</Text>
+          <Text style={[styles.detailValue, { textTransform: "uppercase" }]}>
+            {topupData.paymentMethod}
+          </Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Số tiền nạp:</Text>
+          <Text style={[styles.detailValue, { color: "#28A745" }]}>
+            {formatPrice(topupData.amount)}
+          </Text>
+        </View>
+        {topupData.vnp_TransactionNo && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Mã VNPAY:</Text>
+            <Text style={styles.detailValue}>{topupData.vnp_TransactionNo}</Text>
+          </View>
+        )}
+        {topupData.vnp_TxnRef && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Mã tham chiếu:</Text>
+            <Text style={styles.detailValue}>{topupData.vnp_TxnRef}</Text>
+          </View>
+        )}
+        {topupData.createdAt && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Thời gian:</Text>
+            <Text style={styles.detailValue}>
+              {new Date(topupData.createdAt).toLocaleString("vi-VN")}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -87,47 +225,22 @@ export default function PaymentResultScreen() {
         </View>
 
         <Text style={styles.resultTitle}>
-          {isSuccess ? "Nạp tiền thành công!" : "Giao dịch thất bại"}
+          {isSuccess
+            ? paymentType === "topup"
+              ? "Nạp tiền thành công!"
+              : "Thanh toán thành công!"
+            : "Giao dịch thất bại"}
         </Text>
 
         <Text style={styles.resultSubText}>
           {isSuccess
-            ? "Cảm ơn sếp đã tin tưởng CosMate. Số dư ví đã được cập nhật."
-            : "Đã có lỗi xảy ra trong quá trình thanh toán. Vui lòng thử lại sau sếp nhé!"}
+            ? paymentType === "topup"
+              ? "Cảm ơn bạn đã tin tưởng CosMate. Số dư ví đã được cập nhật."
+              : "Cảm ơn bạn đã thuê trang phục tại CosMate. Chúc bạn cosplay vui vẻ!"
+            : "Đã có lỗi xảy ra trong quá trình thanh toán. Vui lòng thử lại sau nhé!"}
         </Text>
 
-        <View style={styles.detailCard}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mã giao dịch:</Text>
-            {/* 🚩 Dùng ID từ API Transaction */}
-            <Text style={styles.detailValue}>#{latestTx?.id || "N/A"}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Phương thức:</Text>
-            {/* 🚩 Hiện luôn loại thanh toán cho chuyên nghiệp */}
-            <Text style={[styles.detailValue, { textTransform: "uppercase" }]}>
-              {latestTx?.paymentMethod || "CosMate Wallet"}
-            </Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Số tiền:</Text>
-            {/* 🚩 Dùng Amount chuẩn từ Database */}
-            <Text style={styles.detailValue}>
-              {formatPrice(latestTx?.amount)}
-            </Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Thời gian:</Text>
-            <Text style={styles.detailValue}>
-              {latestTx?.createdAt
-                ? new Date(latestTx.createdAt).toLocaleString("vi-VN")
-                : new Date().toLocaleDateString("vi-VN")}
-            </Text>
-          </View>
-        </View>
+        {paymentType === "topup" ? renderTopupDetail() : renderOrderDetail()}
 
         <TouchableOpacity
           style={styles.homeBtn}
@@ -139,9 +252,15 @@ export default function PaymentResultScreen() {
         {!isSuccess && (
           <TouchableOpacity
             style={styles.retryBtn}
-            onPress={() => router.replace("/(screens)/top-up" as any)}
+            onPress={() =>
+              router.replace(
+                paymentType === "topup" ? "/(screens)/top-up" as any : "/(tabs)" as any
+              )
+            }
           >
-            <Text style={styles.retryBtnText}>Thử nạp lại</Text>
+            <Text style={styles.retryBtnText}>
+              {paymentType === "topup" ? "Thử nạp lại" : "Quay về trang chủ"}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -151,7 +270,7 @@ export default function PaymentResultScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFC" },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" }, // 🚩 Bổ sung
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   content: {
     flex: 1,
     alignItems: "center",
