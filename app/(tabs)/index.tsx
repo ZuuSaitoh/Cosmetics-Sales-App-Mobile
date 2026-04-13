@@ -138,7 +138,7 @@ export default function OrdersScreen() {
         onPress: async () => {
           try {
             // Gửi yêu cầu cập nhật trạng thái sang CANCELLED
-            const res = await axiosClient.post(`/orders/${orderId}/status`, {
+            const res = await axiosClient.post(`/orders/${orderId}/cancel`, {
               status: "CANCELLED",
             });
 

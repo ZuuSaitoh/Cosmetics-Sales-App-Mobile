@@ -3,7 +3,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useEffect, useState } from "react";
+// 🚩 Bổ sung useCallback và useFocusEffect
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,18 +27,21 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<number | null>(null);
-  const [balance, setBalance] = useState<number>(0); // State lưu số dư
+  const [balance, setBalance] = useState<number>(0);
 
-  // State cho Modal Chỉnh sửa
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editFullName, setEditFullName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  // 🚩 THAY THẾ useEffect CŨ
+  // Tự động làm mới dữ liệu mỗi khi màn hình được Focus (quay trở lại trang Profile)
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, []),
+  );
 
   const fetchProfile = async () => {
     try {
@@ -50,29 +55,22 @@ export default function ProfileScreen() {
       const uId = decoded.sub;
       setUserId(uId);
 
-      const response = await axiosClient.get(`/users/${uId}/profile`);
+      // 🚩 Bổ sung: Lấy số dư ví (Wallet)
+      const walletRes = await axiosClient.get(`/wallets/user/${uId}`);
+      if (walletRes.data.code === 0) {
+        setBalance(walletRes.data.result.balance);
+      }
 
-      if (response.data.code === 0) {
-        const data = response.data.result;
+      // 🚩 Lấy thông tin Profile (Đã dọn dẹp đoạn gọi trùng lặp)
+      const profileRes = await axiosClient.get(`/users/${uId}/profile`);
+      if (profileRes.data.code === 0) {
+        const data = profileRes.data.result;
         setProfile(data);
         setEditFullName(data.fullName || "");
         setEditPhone(data.phone || "");
       }
-
-      const profileRes = await axiosClient.get(`/users/${uId}/profile`);
-      if (profileRes.data.code === 0) {
-        setProfile(profileRes.data.result);
-        setEditFullName(profileRes.data.result.fullName || "");
-        setEditPhone(profileRes.data.result.phone || "");
-      }
-
-      const walletRes = await axiosClient.get(`/wallets/user/${uId}`);
-      if (walletRes.data.code === 0) {
-        setBalance(walletRes.data.result.balance); // Giả định result có field balance
-      }
     } catch (error) {
-      console.error("Lỗi lấy profile:", error);
-      Alert.alert("Lỗi", "Không thể tải thông tin cá nhân.");
+      console.error("Lỗi cập nhật dữ liệu Profile:", error);
     } finally {
       setIsLoading(false);
     }
@@ -195,6 +193,7 @@ export default function ProfileScreen() {
           <Text style={styles.username}>@{profile?.username}</Text>
         </View>
 
+        {/* WALLET CARD - NƠI HIỂN THỊ SỐ DƯ */}
         <View style={styles.walletCard}>
           <View style={styles.walletLeft}>
             <View style={styles.walletIconWrap}>
@@ -213,7 +212,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.depositBtn}
-            onPress={() => router.push("/(screens)/top-up" as any)} // Dẫn sang trang nạp tiền nếu sếp có làm
+            onPress={() => router.push("/(screens)/top-up" as any)}
           >
             <Text style={styles.depositBtnText}>Nạp tiền</Text>
           </TouchableOpacity>
@@ -241,7 +240,6 @@ export default function ProfileScreen() {
 
         {/* ACTION SECTION */}
         <View style={styles.actionSection}>
-          {/* Wishlist */}
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => router.push("/(screens)/wishlist" as any)}
@@ -255,7 +253,6 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
 
-          {/* Edit Profile */}
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => setIsEditModalVisible(true)}
@@ -269,7 +266,6 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
 
-          {/* Address Book */}
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => router.push("/(screens)/address-book" as any)}
@@ -283,7 +279,6 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#CCC" />
           </TouchableOpacity>
 
-          {/* Logout */}
           <TouchableOpacity
             style={[styles.actionBtn, { borderBottomWidth: 0 }]}
             onPress={handleLogout}
@@ -477,7 +472,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     backgroundColor: "#fff",
     marginHorizontal: 20,
-    marginTop: -25, // Đè lên phần Header một chút cho hiện đại
+    marginTop: -25,
     padding: 15,
     borderRadius: 15,
     elevation: 4,
