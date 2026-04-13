@@ -2,64 +2,74 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    RefreshControl,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import axiosClient from "../api/axiosClient";
 
+// 🚩 1. Định nghĩa Interface để tránh lỗi 'never'
+interface Service {
+  id: number;
+  serviceType: string;
+  description: string;
+  pricePerSlot: number;
+  imageUrls: string[];
+}
+
 export default function UserHomeScreen() {
   const [costumes, setCostumes] = useState<any[]>([]);
+  const [photographers, setPhotographers] = useState<Service[]>([]); // 🚩 State thợ ảnh
+  const [staffs, setStaffs] = useState<Service[]>([]); // 🚩 State staff
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // GỌI API LẤY TẤT CẢ TRANG PHỤC KHI VỪA MỞ APP
   useEffect(() => {
-    fetchCostumes();
+    fetchData();
   }, []);
 
-  const fetchCostumes = async () => {
+  // 🚩 2. Cập nhật hàm lấy dữ liệu để lấy cả dịch vụ
+  const fetchData = async () => {
     try {
       setIsLoading(true);
-      // Gọi API /api/costumes (Lấy danh sách tất cả đồ Cosplay)
-      const response = await axiosClient.get("/costumes");
+      // Gọi song song để tối ưu tốc độ
+      const [costumeRes, photoRes, staffRes] = await Promise.all([
+        axiosClient.get("/costumes"),
+        axiosClient.get("/services/type/PHOTOGRAPHER"),
+        axiosClient.get("/services/type/EVENT_STAFF"),
+      ]);
 
-      if (response.data.code === 0) {
-        setCostumes(response.data.result || []);
-      }
+      if (costumeRes.data.code === 0) setCostumes(costumeRes.data.result || []);
+      if (photoRes.data.code === 0)
+        setPhotographers(photoRes.data.result || []);
+      if (staffRes.data.code === 0) setStaffs(staffRes.data.result || []);
     } catch (error) {
-      console.error("Lỗi tải danh sách trang phục:", error);
+      console.error("Lỗi tải dữ liệu Home:", error);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
   };
 
-  // HÀM TÌM KIẾM THEO TỪ KHÓA
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      fetchCostumes(); // Nếu ô tìm kiếm trống thì gọi lại danh sách gốc
+      fetchData();
       return;
     }
-
     try {
       setIsLoading(true);
-      // Gọi API /api/costumes/search?keyword=...
       const response = await axiosClient.get(`/costumes/search`, {
         params: { keyword: searchQuery },
       });
-
-      if (response.data.code === 0) {
-        setCostumes(response.data.result || []);
-      }
+      if (response.data.code === 0) setCostumes(response.data.result || []);
     } catch (error) {
       console.error("Lỗi tìm kiếm:", error);
     } finally {
@@ -67,12 +77,6 @@ export default function UserHomeScreen() {
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchCostumes();
-  };
-
-  // HÀM FORMAT TIỀN TỆ VNĐ
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
@@ -80,22 +84,42 @@ export default function UserHomeScreen() {
     }).format(price || 0);
   };
 
-  // UI CHO TỪNG Ô SẢN PHẨM (DẠNG LƯỚI - GRID)
-  const renderItem = ({ item }: { item: any }) => {
-    // 1. LẤY ẢNH TỪ MẢNG imageUrls (Lấy tấm đầu tiên)
-    const coverImage =
-      item.imageUrls && item.imageUrls.length > 0
-        ? item.imageUrls[0]
-        : "https://via.placeholder.com/200"; // Ảnh mặc định nếu lỡ shop quên up ảnh
+  // 🚩 3. UI cho từng ô Dịch vụ (Photographer/Staff)
+  const renderServiceItem = ({ item }: { item: Service }) => (
+    <TouchableOpacity
+      style={styles.serviceCard}
+      onPress={() =>
+        router.push({
+          pathname: "/(screens)/service-detail" as any,
+          params: { id: item.id },
+        })
+      }
+    >
+      <Image
+        source={{
+          uri: item.imageUrls?.[0] || "https://via.placeholder.com/150",
+        }}
+        style={styles.serviceImage}
+      />
+      <View style={styles.serviceInfo}>
+        <Text style={styles.serviceName} numberOfLines={1}>
+          {item.description}
+        </Text>
+        <Text style={styles.servicePrice}>
+          {formatPrice(item.pricePerSlot)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 
-    // 2. STATUS TÌNH TRẠNG
-    const isAvailable = item.status !== "RENTED"; // Nếu không phải RENTED thì coi như Sẵn sàng
+  // UI cho từng trang phục (Giữ nguyên của sếp)
+  const renderCostumeItem = ({ item }: { item: any }) => {
+    const coverImage = item.imageUrls?.[0] || "https://via.placeholder.com/200";
+    const isAvailable = item.status !== "RENTED";
 
     return (
       <TouchableOpacity
         style={styles.card}
-        activeOpacity={0.8}
-        // Khi bấm vào thì nhảy sang màn hình Chi tiết sản phẩm
         onPress={() =>
           router.push({
             pathname: "/(screens)/costume-detail" as any,
@@ -103,58 +127,83 @@ export default function UserHomeScreen() {
           })
         }
       >
-        {/* Ảnh Sản Phẩm */}
-        <Image
-          source={{ uri: coverImage }}
-          style={styles.cardImage}
-          resizeMode="cover"
-        />
-
-        {/* Badge Tình Trạng */}
-        {isAvailable ? (
-          <View style={[styles.badge, { backgroundColor: "#28A745" }]}>
-            <Text style={styles.badgeText}>Sẵn sàng</Text>
-          </View>
-        ) : (
-          <View style={[styles.badge, { backgroundColor: "#FF6B6B" }]}>
-            <Text style={styles.badgeText}>Đang thuê</Text>
-          </View>
-        )}
-
-        {/* Thông tin sản phẩm */}
+        <Image source={{ uri: coverImage }} style={styles.cardImage} />
+        <View
+          style={[
+            styles.badge,
+            { backgroundColor: isAvailable ? "#28A745" : "#FF6B6B" },
+          ]}
+        >
+          <Text style={styles.badgeText}>
+            {isAvailable ? "Sẵn sàng" : "Đang thuê"}
+          </Text>
+        </View>
         <View style={styles.cardInfo}>
           <Text style={styles.cardTitle} numberOfLines={2}>
-            {item.name || "Tên trang phục"}
+            {item.name}
           </Text>
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceText}>
-              {formatPrice(item.pricePerDay)}
-              <Text style={styles.perDay}>/ngày</Text>
-            </Text>
-          </View>
-
-          {/* Thông tin Shop & Đánh giá */}
-          <View style={styles.footerRow}>
-            <View style={styles.shopInfo}>
-              <Ionicons name="storefront-outline" size={12} color="#888" />
-              <Text style={styles.shopName} numberOfLines={1}>
-                Cửa hàng ID: {item.providerId}
-              </Text>
-            </View>
-            <View style={styles.ratingInfo}>
-              <Ionicons name="star" size={12} color="#FFD700" />
-              <Text style={styles.ratingText}>5.0</Text>
-            </View>
-          </View>
+          <Text style={styles.priceText}>
+            {formatPrice(item.pricePerDay)}
+            <Text style={styles.perDay}>/ngày</Text>
+          </Text>
         </View>
       </TouchableOpacity>
     );
   };
 
+  // 🚩 4. PHẦN HEADER CHỨA CÁC MỤC MỚI
+  const ListHeader = () => (
+    <View>
+      {/* Photographer Section */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Thợ ảnh nổi bật</Text>
+        <TouchableOpacity
+          onPress={() =>
+            router.push("/(provider-service-tabs)/photographer" as any)
+          }
+        >
+          <Text style={styles.seeAllText}>Xem tất cả</Text>
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        data={photographers}
+        renderItem={renderServiceItem}
+        keyExtractor={(item) => "photo-" + item.id}
+        contentContainerStyle={styles.horizontalList}
+      />
+
+      {/* Staff Section */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Staff sự kiện</Text>
+        <TouchableOpacity
+          onPress={() =>
+            router.push("/(provider-service-tabs)/event-staff" as any)
+          }
+        >
+          <Text style={styles.seeAllText}>Xem tất cả</Text>
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        data={staffs}
+        renderItem={renderServiceItem}
+        keyExtractor={(item) => "staff-" + item.id}
+        contentContainerStyle={styles.horizontalList}
+      />
+
+      {/* Tiêu đề cho phần Trang phục bên dưới */}
+      <View style={[styles.sectionHeader, { marginBottom: 10 }]}>
+        <Text style={styles.sectionTitle}>Trang phục Cosplay</Text>
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER & THANH TÌM KIẾM */}
+      {/* SEARCH BAR (Giữ cố định ở trên) */}
       <View style={styles.header}>
         <View style={styles.searchContainer}>
           <Ionicons
@@ -165,56 +214,34 @@ export default function UserHomeScreen() {
           />
           <TextInput
             style={styles.searchInput}
-            placeholder="Tìm kiếm trang phục, nhân vật..."
+            placeholder="Tìm kiếm trang phục, nháy, staff..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch} // Chạy tìm kiếm khi bấm Enter/Search trên bàn phím
+            onSubmitEditing={handleSearch}
             returnKeyType="search"
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              onPress={() => {
-                setSearchQuery("");
-                fetchCostumes();
-              }}
-            >
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color="#ccc"
-                style={{ marginRight: 10 }}
-              />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
 
-      {/* DANH SÁCH SẢN PHẨM */}
-      {isLoading ? (
+      {isLoading && !refreshing ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#B59DFF" />
         </View>
       ) : (
         <FlatList
+          ListHeaderComponent={ListHeader} // 🚩 Đưa Photographer & Staff vào đây
           data={costumes}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderItem}
-          numColumns={2} // Chia làm 2 cột giống Shopee
+          keyExtractor={(item) => "costume-" + item.id}
+          renderItem={renderCostumeItem}
+          numColumns={2}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={onRefresh}
+              onRefresh={fetchData}
               colors={["#B59DFF"]}
             />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="shirt-outline" size={60} color="#D1C4E9" />
-              <Text style={styles.emptyText}>Chưa có trang phục nào!</Text>
-            </View>
           }
         />
       )}
@@ -225,12 +252,9 @@ export default function UserHomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FB" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-
-  // Header Search
   header: {
     backgroundColor: "#fff",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
@@ -243,23 +267,61 @@ const styles = StyleSheet.create({
     borderColor: "#E0E0E0",
   },
   searchIcon: { paddingHorizontal: 10 },
-  searchInput: { flex: 1, height: 40, fontSize: 14, color: "#333" },
+  searchInput: { flex: 1, height: 40, fontSize: 14 },
 
-  // Grid List
-  listContainer: { padding: 10, paddingBottom: 20 },
-  row: { justifyContent: "space-between", marginBottom: 15 },
+  // Section Styles
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 15,
+    marginTop: 20,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
+  seeAllText: { color: "#B59DFF", fontWeight: "600" },
+  horizontalList: { paddingLeft: 15, paddingVertical: 15 },
 
-  // Card Sản phẩm
+  // Service Card (Horizontal)
+  serviceCard: {
+    width: 150,
+    marginRight: 15,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    elevation: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    marginBottom: 5,
+  },
+  serviceImage: {
+    width: "100%",
+    height: 100,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  serviceInfo: { padding: 8 },
+  serviceName: { fontSize: 13, fontWeight: "600", color: "#333" },
+  servicePrice: {
+    fontSize: 13,
+    color: "#B59DFF",
+    fontWeight: "bold",
+    marginTop: 4,
+  },
+
+  // Costume Card (Grid)
+  listContainer: { paddingBottom: 20 },
+  row: {
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+    marginBottom: 15,
+  },
   card: {
     width: "48%",
     backgroundColor: "#fff",
     borderRadius: 12,
     overflow: "hidden",
     elevation: 2,
-    position: "relative",
   },
-  cardImage: { width: "100%", height: 180, backgroundColor: "#E0D7FF" },
-
+  cardImage: { width: "100%", height: 180 },
   badge: {
     position: "absolute",
     top: 8,
@@ -269,43 +331,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   badgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
-
   cardInfo: { padding: 10 },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 6,
-    height: 38,
-  }, // Height cố định để tên 1 hay 2 dòng thẻ vẫn đều
-
-  priceRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  cardTitle: { fontSize: 14, fontWeight: "600", color: "#333", height: 38 },
   priceText: { fontSize: 15, fontWeight: "bold", color: "#B59DFF" },
   perDay: { fontSize: 11, color: "#888", fontWeight: "normal" },
-
-  footerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
-    paddingTop: 8,
-  },
-  shopInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    paddingRight: 5,
-  },
-  shopName: { fontSize: 11, color: "#666", marginLeft: 4 },
-  ratingInfo: { flexDirection: "row", alignItems: "center" },
-  ratingText: {
-    fontSize: 11,
-    color: "#666",
-    marginLeft: 2,
-    fontWeight: "bold",
-  },
-
-  emptyContainer: { alignItems: "center", marginTop: 50 },
-  emptyText: { marginTop: 15, fontSize: 16, color: "#A0A0A0" },
 });

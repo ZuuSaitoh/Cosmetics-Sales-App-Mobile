@@ -1,7 +1,8 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
+import * as Linking from "expo-linking";
 import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
@@ -22,17 +23,22 @@ export default function BookingScreen() {
   const { id } = useLocalSearchParams();
   const [costume, setCostume] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBooking, setIsBooking] = useState(false); // Loading khi bấm thuê
 
-  // --- QUẢN LÝ LỰA CHỌN CỦA USER ---
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
-  const [selectedAccessoryIds, setSelectedAccessoryIds] = useState<number[]>(
-    [],
-  );
+  const [selectedAccessoryIds, setSelectedAccessoryIds] = useState<number[]>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+
+  const paymentMethods = [
+    { id: "VNPAY", label: "Ví điện tử VNPAY", icon: "credit-card" as const },
+    { id: "COD", label: "Thanh toán khi nhận hàng", icon: "truck" as const },
+    { id: "WALLET", label: "Ví CosMate", icon: "pocket" as const },
+  ];
 
   // Lịch và Số ngày
   const [rentStartDate, setRentStartDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [numDaysStr, setNumDaysStr] = useState("1"); // Lưu chuỗi để xóa trắng được
+  const [numDaysStr, setNumDaysStr] = useState("1");
 
   const minDays = 1;
   const maxDays = 99;
@@ -57,19 +63,16 @@ export default function BookingScreen() {
     }
   };
 
-  // Hàm xử lý nhập số ngày
   const handleNumDaysChange = (text: string) => {
     const numericValue = text.replace(/[^0-9]/g, "");
     if (!numericValue) {
       setNumDaysStr("");
       return;
     }
-
     const parsed = Math.min(maxDays, Math.max(minDays, Number(numericValue)));
     setNumDaysStr(String(parsed));
   };
 
-  // Hàm xử lý chọn lịch
   const onDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") {
       setShowDatePicker(false);
@@ -99,8 +102,7 @@ export default function BookingScreen() {
         ?.filter((a: any) => selectedAccessoryIds.includes(a.id))
         .reduce((sum: number, a: any) => sum + a.price, 0) || 0;
     const surchargesPrice =
-      costume.surcharges?.reduce((sum: number, s: any) => sum + s.price, 0) ||
-      0;
+      costume.surcharges?.reduce((sum: number, s: any) => sum + s.price, 0) || 0;
     const deposit = costume.depositAmount || 0;
 
     return {
@@ -109,8 +111,7 @@ export default function BookingScreen() {
       accessories: accessoriesPrice,
       surcharges: surchargesPrice,
       deposit: deposit,
-      total:
-        baseRent + optionPrice + accessoriesPrice + surchargesPrice + deposit,
+      total: baseRent + optionPrice + accessoriesPrice + surchargesPrice + deposit,
     };
   };
 
@@ -123,55 +124,68 @@ export default function BookingScreen() {
   };
 
   const handleBooking = async () => {
+    if (!selectedPaymentMethod) {
+      Alert.alert("Thông báo", "Vui lòng chọn phương thức thanh toán!");
+      return;
+    }
+
     try {
+      setIsBooking(true);
       const token = await AsyncStorage.getItem("cosmate_token");
       if (!token) return;
       const decoded: any = jwtDecode(token);
+      const cosplayerId = Number(decoded.sub);
 
+      // BƯỚC 1: Tạo đơn hàng trước
       const payload = {
-        cosplayerId: Number(decoded.sub),
-        providerId: costume.providerId,
-        orderType: "RENT_COSTUME",
-        totalAmount: prices.total,
-        totalDepositAmount: prices.deposit,
-        details: [
-          {
-            costumeId: Number(id),
-            size: costume.size,
-            numberOfItems: 1,
-            rentStart: rentStartDate.toISOString(),
-            rentEnd: new Date(
-              rentStartDate.getTime() + actualNumDays * 86400000,
-            ).toISOString(),
-            rentAmount: prices.rent,
-            depositAmount: prices.deposit,
-            rentOptionAmount: prices.options,
-            accessoriesAmount: prices.accessories,
-            surchargeAmount: prices.surcharges,
-          },
-        ],
-        rentalOptions: selectedOptionId ? [{ id: selectedOptionId }] : [],
-        accessories: selectedAccessoryIds.map((id) => ({ id })),
-        addresses: [
-          {
-            name: "Nhà riêng",
-            address: "S1.02 Vinhome GrandPark, Phường Long Thạnh Mỹ",
-            phone: "0982214957",
-            addressFrom: "COSPLAYER",
-          },
-        ],
+        costumeId: Number(id),
+        rentDay: actualNumDays,
+        rentStart: rentStartDate.toISOString(),
+        paymentMethod: selectedPaymentMethod,
+        cosplayerAddressId: 1, // TODO: cho user chọn địa chỉ thật
+        selectedAccessoryIds: selectedAccessoryIds,
+        selectedRentalOptionId: selectedOptionId || null,
       };
 
-      const res = await axiosClient.post("/orders", payload);
+      const res = await axiosClient.post(`/orders?cosplayerId=${cosplayerId}`, payload);
+
       if (res.data.code === 0) {
-        Alert.alert(
-          "Thành công",
-          "Đã chốt đơn! Chúc bạn cosplay vui vẻ nhé Zun-kun!",
-          [{ text: "OK", onPress: () => router.replace("/(tabs)") }],
-        );
+        const orderId = res.data.result.id;
+        const totalAmount = prices.total;
+
+        // BƯỚC 2: Xử lý theo phương thức thanh toán
+        if (selectedPaymentMethod === "VNPAY") {
+          // Tạo link thanh toán VNPAY
+          const SERVER_IP = "192.168.101.107";
+          const returnUrl = `exp://${SERVER_IP}:8081/--/payment-result`;
+
+          const paymentRes = await axiosClient.post("/payment/api/vnpay/create", null, {
+            params: {
+              userId: cosplayerId,
+              amount: totalAmount,
+              returnUrl: returnUrl,
+              orderId: orderId,
+            },
+          });
+
+          if (paymentRes.data.code === 0) {
+            const url = paymentRes.data.result.paymentUrl || paymentRes.data.result;
+            await Linking.openURL(url); // Mở trình duyệt thanh toán
+            router.replace("/(tabs)/profile" as any); // Đẩy về profile đợi kết quả
+          }
+        } else {
+          // COD hoặc WALLET (Backend tự trừ tiền nếu chọn WALLET)
+          Alert.alert(
+            "Thành công",
+            "Đã chốt đơn thành công! Chúc bạn cosplay vui vẻ!",
+            [{ text: "Đã hiểu", onPress: () => router.replace("/(tabs)") }],
+          );
+        }
       }
     } catch (err: any) {
       Alert.alert("Lỗi", err.response?.data?.message || "Đặt đồ thất bại.");
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -182,7 +196,7 @@ export default function BookingScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#4A3B6B" />
+          <Feather name="arrow-left" size={24} color="#4A3B6B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Xác nhận thuê đồ</Text>
       </View>
@@ -219,7 +233,7 @@ export default function BookingScreen() {
             style={[styles.datePickerBtn, { flex: 2 }]}
             onPress={() => setShowDatePicker(true)}
           >
-            <Ionicons name="calendar-outline" size={20} color="#B59DFF" />
+            <Feather name="calendar" size={20} color="#B59DFF" />
             <Text style={styles.dateText}>
               {rentStartDate.toLocaleDateString("vi-VN")}
             </Text>
@@ -240,7 +254,6 @@ export default function BookingScreen() {
           </View>
         </View>
 
-        {/* LỊCH ĐÃ ĐƯỢC ĐỔI THÀNH DẠNG BẢNG (INLINE) */}
         {showDatePicker && (
           <DateTimePicker
             value={rentStartDate}
@@ -261,12 +274,8 @@ export default function BookingScreen() {
             style={styles.checkRow}
             onPress={() => handleToggleAccessory(acc.id)}
           >
-            <Ionicons
-              name={
-                selectedAccessoryIds.includes(acc.id)
-                  ? "checkbox"
-                  : "square-outline"
-              }
+            <Feather
+              name={selectedAccessoryIds.includes(acc.id) ? "check-square" : "square"}
               size={20}
               color="#B59DFF"
             />
@@ -281,11 +290,7 @@ export default function BookingScreen() {
         <Text style={styles.label}>Phụ phí (Luôn áp dụng)</Text>
         {costume.surcharges?.map((sur: any) => (
           <View key={sur.id} style={styles.checkRow}>
-            <Ionicons
-              name="information-circle-outline"
-              size={20}
-              color="#888"
-            />
+            <Feather name="info" size={20} color="#888" />
             <Text style={[styles.checkLabel, { color: "#888" }]}>
               {sur.name}
             </Text>
@@ -293,6 +298,38 @@ export default function BookingScreen() {
               {new Intl.NumberFormat("vi-VN").format(sur.price)}đ
             </Text>
           </View>
+        ))}
+
+        {/* PHƯƠNG THỨC THANH TOÁN */}
+        <Text style={styles.label}>Phương thức thanh toán</Text>
+        {paymentMethods.map((method) => (
+          <TouchableOpacity
+            key={method.id}
+            style={[
+              styles.checkRow,
+              selectedPaymentMethod === method.id && styles.activeRow,
+            ]}
+            onPress={() => setSelectedPaymentMethod(method.id)}
+          >
+            <Feather
+              name={method.icon as any}
+              size={20}
+              color={selectedPaymentMethod === method.id ? "#B59DFF" : "#888"}
+            />
+            <Text
+              style={[
+                styles.checkLabel,
+                selectedPaymentMethod === method.id && styles.checkLabelActive,
+              ]}
+            >
+              {method.label}
+            </Text>
+            <Feather
+              name={selectedPaymentMethod === method.id ? "check-circle" : "circle"}
+              size={18}
+              color={selectedPaymentMethod === method.id ? "#B59DFF" : "#DDD"}
+            />
+          </TouchableOpacity>
         ))}
 
         {/* TẠM TÍNH */}
@@ -311,11 +348,7 @@ export default function BookingScreen() {
           <View style={styles.priceLine}>
             <Text>Phụ kiện & Phí</Text>
             <Text>
-              +
-              {new Intl.NumberFormat("vi-VN").format(
-                prices.accessories + prices.surcharges,
-              )}
-              đ
+              +{new Intl.NumberFormat("vi-VN").format(prices.accessories + prices.surcharges)}đ
             </Text>
           </View>
           <View style={styles.priceLine}>
@@ -332,8 +365,16 @@ export default function BookingScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.btnSubmit} onPress={handleBooking}>
-          <Text style={styles.btnSubmitText}>Thuê ngay</Text>
+        <TouchableOpacity
+          style={[styles.btnSubmit, isBooking && styles.btnSubmitDisabled]}
+          onPress={handleBooking}
+          disabled={isBooking}
+        >
+          {isBooking ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.btnSubmitText}>Xác nhận & Thuê ngay</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -405,11 +446,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     paddingVertical: 0,
   },
-  dayLabel: {
-    color: "#B59DFF",
-    fontSize: 13,
-    fontWeight: "500",
-  },
+  dayLabel: { color: "#B59DFF", fontSize: 13, fontWeight: "500" },
 
   checkRow: {
     flexDirection: "row",
@@ -417,9 +454,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F5F5F5",
+    borderRadius: 8,
+    paddingHorizontal: 4,
   },
-  checkLabel: { flex: 1, marginLeft: 10, fontSize: 14 },
+  activeRow: {
+    borderColor: "#B59DFF",
+    backgroundColor: "#F9F8FF",
+    borderWidth: 1,
+  },
+  checkLabel: { flex: 1, marginLeft: 10, fontSize: 14, color: "#444" },
+  checkLabelActive: { color: "#B59DFF", fontWeight: "bold" },
   checkPrice: { fontWeight: "bold", color: "#444" },
+
   summaryBox: {
     marginTop: 30,
     padding: 20,
@@ -453,5 +499,6 @@ const styles = StyleSheet.create({
     elevation: 5,
     marginBottom: 20,
   },
+  btnSubmitDisabled: { opacity: 0.7 },
   btnSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });
