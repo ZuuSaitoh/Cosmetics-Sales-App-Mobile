@@ -42,7 +42,7 @@ export default function BookingScreen() {
 
   const paymentMethods = [
     { id: "VNPAY", label: "Ví điện tử VNPAY", icon: "credit-card" as const },
-    { id: "COD", label: "Thanh toán khi nhận hàng", icon: "truck" as const },
+    { id: "MOMO", label: "Ví MoMo", icon: "phone-portrait" as const },
     { id: "WALLET", label: "Ví CosMate", icon: "pocket" as const },
   ];
 
@@ -189,32 +189,53 @@ export default function BookingScreen() {
         const orderId = res.data.result.id;
 
         // BƯỚC 2: Xử lý theo phương thức thanh toán
-        if (selectedPaymentMethod === "VNPAY") {
+        if (
+          selectedPaymentMethod === "VNPAY" ||
+          selectedPaymentMethod === "MOMO"
+        ) {
           const SERVER_IP = "10.88.54.16";
-          // ✅ Sửa: redirect qua backend để backend xử lý IPN trước, rồi mới redirect về app
-          const returnUrl = `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`;
+          const returnUrl =
+            selectedPaymentMethod === "VNPAY"
+              ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
+              : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
 
-          // ✅ API đúng: POST /api/orders/{orderId}/pay
           const paymentRes = await axiosClient.post(
             `/orders/${orderId}/pay`,
             null,
             {
               params: {
                 cosplayerId: cosplayerId,
-                paymentMethod: "VNPAY",
+                paymentMethod: selectedPaymentMethod,
                 returnUrl: returnUrl,
               },
             },
           );
 
           if (paymentRes.data.code === 0) {
-            const paymentUrl = paymentRes.data.result?.paymentUrl || paymentRes.data.result;
-            console.log("[Booking] paymentUrl:", paymentUrl);
-            await Linking.openURL(paymentUrl);
-            router.replace("/(tabs)/profile" as any);
+            const result = paymentRes.data.result;
+            let paymentUrl: string | null = null;
+
+            if (typeof result === "string") {
+              paymentUrl = result;
+            } else if (typeof result === "object") {
+              paymentUrl =
+                result.url ||
+                result.paymentUrl ||
+                result.deeplink ||
+                result.payUrl ||
+                result;
+            }
+
+            if (paymentUrl && typeof paymentUrl === "string") {
+              console.log("[Booking] paymentUrl:", paymentUrl);
+              await Linking.openURL(paymentUrl);
+              router.replace("/(tabs)/profile" as any);
+            } else {
+              Alert.alert("Lỗi", "Không lấy được URL thanh toán.");
+            }
           }
         } else {
-          // COD hoặc WALLET (Backend tự trừ tiền nếu chọn WALLET)
+          // WALLET: Backend tự trừ tiền
           Alert.alert(
             "Thành công",
             "Đã chốt đơn thành công! Chúc bạn cosplay vui vẻ!",
@@ -469,7 +490,8 @@ export default function BookingScreen() {
               style={{ maxHeight: 400 }}
               ListEmptyComponent={
                 <Text style={styles.emptyText}>
-                  Bạn chưa có địa chỉ nào.{'\n'}Hãy thêm địa chỉ trong Sổ địa chỉ nhé!
+                  Bạn chưa có địa chỉ nào.{"\n"}Hãy thêm địa chỉ trong Sổ địa
+                  chỉ nhé!
                 </Text>
               }
               renderItem={({ item }) => (
@@ -614,7 +636,12 @@ const styles = StyleSheet.create({
     padding: 15,
     gap: 10,
   },
-  addressName: { fontSize: 14, fontWeight: "bold", color: "#4A3B6B", marginBottom: 4 },
+  addressName: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#4A3B6B",
+    marginBottom: 4,
+  },
   addressText: { fontSize: 13, color: "#8E7AB5" },
   addressPlaceholder: { color: "#A090C5", flex: 1 },
 
@@ -653,10 +680,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#F4F1FF",
     borderColor: "#B59DFF",
   },
-  addressCardName: { fontSize: 14, fontWeight: "bold", color: "#4A3B6B", marginBottom: 3 },
+  addressCardName: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#4A3B6B",
+    marginBottom: 3,
+  },
   addressCardPhone: { fontSize: 13, color: "#666", marginBottom: 3 },
   addressCardAddr: { fontSize: 12, color: "#8E7AB5" },
-  emptyText: { textAlign: "center", color: "#999", paddingVertical: 30, lineHeight: 20 },
+  emptyText: {
+    textAlign: "center",
+    color: "#999",
+    paddingVertical: 30,
+    lineHeight: 20,
+  },
   addAddressBtn: {
     flexDirection: "row",
     alignItems: "center",

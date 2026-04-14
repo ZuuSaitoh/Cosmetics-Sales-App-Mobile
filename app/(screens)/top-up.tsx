@@ -83,15 +83,29 @@ export default function TopUpScreen() {
       });
 
       if (response.data.code === 0 && response.data.result) {
-        const paymentUrl =
-          response.data.result.url ||
-          response.data.result.paymentUrl ||
-          response.data.result;
+        const result = response.data.result;
+        // result có thể là string (URL) hoặc object có url / paymentUrl / deeplink...
+        let paymentUrl: string | null = null;
 
-        if (typeof paymentUrl === "string") {
-          await Linking.openURL(paymentUrl); // Mở trình duyệt nạp tiền
+        if (typeof result === "string") {
+          paymentUrl = result;
+        } else if (typeof result === "object") {
+          paymentUrl =
+            result.url ||
+            result.paymentUrl ||
+            result.deeplink ||
+            result.payUrl ||
+            result;
+        }
+
+        if (paymentUrl && typeof paymentUrl === "string") {
+          await Linking.openURL(paymentUrl);
         } else {
-          Alert.alert("Lỗi", "Backend trả về định dạng URL không hợp lệ.");
+          console.log("[TopUp] result:", JSON.stringify(result));
+          Alert.alert(
+            "Lỗi",
+            "Backend trả về định dạng không hợp lệ. Xem console để debug.",
+          );
         }
       }
     } catch (error) {

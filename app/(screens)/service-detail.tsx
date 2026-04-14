@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { jwtDecode } from "jwt-decode";
@@ -27,7 +28,7 @@ export default function ServiceDetailScreen() {
 
   const paymentMethods = [
     { id: "VNPAY", label: "Ví điện tử VNPAY", icon: "credit-card" as const },
-    { id: "COD", label: "Thanh toán khi nhận hàng", icon: "truck" as const },
+    { id: "MOMO", label: "Ví MoMo", icon: "phone-portrait" as const },
     { id: "WALLET", label: "Ví CosMate", icon: "pocket" as const },
   ];
 
@@ -80,11 +81,55 @@ export default function ServiceDetailScreen() {
       const res = await axiosClient.post(`/bookings?cosplayerId=${cosplayerId}`, payload);
 
       if (res.data.code === 0) {
-        Alert.alert(
-          "Thành công",
-          "Đã đặt dịch vụ thành công!",
-          [{ text: "OK", onPress: () => router.replace("/(tabs)") }],
-        );
+        const bookingId = res.data.result?.id || res.data.result;
+
+        // Thanh toán online: VNPAY hoặc MOMO
+        if (selectedPaymentMethod === "VNPAY" || selectedPaymentMethod === "MOMO") {
+          const SERVER_IP = "10.88.54.16";
+          const returnUrl =
+            selectedPaymentMethod === "VNPAY"
+              ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
+              : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
+
+          const paymentRes = await axiosClient.post(
+            `/bookings/${bookingId}/pay`,
+            null,
+            {
+              params: {
+                cosplayerId: cosplayerId,
+                paymentMethod: selectedPaymentMethod,
+                returnUrl: returnUrl,
+              },
+            },
+          );
+
+          if (paymentRes.data.code === 0) {
+            const result = paymentRes.data.result;
+            let paymentUrl: string | null = null;
+
+            if (typeof result === "string") {
+              paymentUrl = result;
+            } else if (typeof result === "object") {
+              paymentUrl =
+                result.url || result.paymentUrl || result.deeplink || result.payUrl || result;
+            }
+
+            if (paymentUrl && typeof paymentUrl === "string") {
+              console.log("[ServiceDetail] paymentUrl:", paymentUrl);
+              await Linking.openURL(paymentUrl);
+              router.replace("/(tabs)/profile" as any);
+            } else {
+              Alert.alert("Lỗi", "Không lấy được URL thanh toán.");
+            }
+          }
+        } else {
+          // WALLET: thanh toán thành công luôn
+          Alert.alert(
+            "Thành công",
+            "Đã đặt dịch vụ thành công!",
+            [{ text: "OK", onPress: () => router.replace("/(tabs)") }],
+          );
+        }
       }
     } catch (err: any) {
       Alert.alert("Lỗi", err.response?.data?.message || "Đặt dịch vụ thất bại.");

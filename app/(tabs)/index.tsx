@@ -98,20 +98,13 @@ export default function OrdersScreen() {
                 `/reviews/order/${order.id}`,
               );
 
-              // 🚩 SỬA LẠI ĐIỀU KIỆN TẠI ĐÂY:
-              // Kiểm tra xem result có phải là mảng và có phần tử nào không
               if (
                 revRes.data.code === 0 &&
                 revRes.data.result &&
                 Array.isArray(revRes.data.result) &&
                 revRes.data.result.length > 0
               ) {
-                console.log(`Đơn #${order.id}: Đã có đánh giá thực sự.`);
                 reviewStatusMap[Number(order.id)] = true;
-              } else {
-                console.log(
-                  `Đơn #${order.id}: Mảng rỗng hoặc không có dữ liệu -> Chưa đánh giá.`,
-                );
               }
             } catch (err) {
               // API lỗi thì mặc định là chưa đánh giá

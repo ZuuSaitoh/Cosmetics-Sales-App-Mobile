@@ -47,10 +47,13 @@ export default function LoginScreen() {
         const roles = decoded.roles || []; 
 
         if (roles.includes("PROVIDER_RENTAL")) {
-          // Chủ shop -> Vào thẳng Kho đồ (Items) nằm bên trái
+          // Chủ shop thuê đồ -> Vào thẳng Kho đồ (Items)
           router.replace("/(provider-tabs)/items");
+        } else if (roles.includes("PROVIDER_PHOTOGRAPHER") || roles.includes("PROVIDER_STAFF")) {
+          // Thợ ảnh / Staff -> Vào quản lý dịch vụ
+          router.replace("/(provider-service-tabs)/service-management" as any);
         } else if (roles.includes("COSPLAYER")) {
-          // Khách hàng -> Vào tab Đơn hàng
+          // Khách hàng -> Vào tab đơn hàng
           router.replace("/(tabs)");
         } else {
           Alert.alert("Lỗi phân quyền", "Tài khoản không hợp lệ!");

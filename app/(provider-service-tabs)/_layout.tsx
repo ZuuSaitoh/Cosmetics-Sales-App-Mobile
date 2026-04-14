@@ -30,12 +30,12 @@ export default function ProviderServiceTabLayout() {
       }}
     >
       <Tabs.Screen
-        name="photographer"
+        name="service-management"
         options={{
-          title: "Thợ ảnh",
+          title: "Kho dịch vụ",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? "camera" : "camera-outline"}
+              name={focused ? "briefcase" : "briefcase-outline"}
               size={24}
               color={color}
             />
@@ -43,12 +43,12 @@ export default function ProviderServiceTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="event-staff"
+        name="booking-history"
         options={{
-          title: "Staff",
+          title: "Lịch sử thuê",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? "people" : "people-outline"}
+              name={focused ? "calendar" : "calendar-outline"}
               size={24}
               color={color}
             />

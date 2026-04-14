@@ -5,19 +5,19 @@ import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import axiosClient from "../api/axiosClient";
@@ -82,7 +82,7 @@ export default function OrderManagementScreen() {
   const handleCancelOrder = (orderId: number) => {
     Alert.alert(
       "Xác nhận hủy",
-      "Sếp muốn hủy đơn hàng này? Khách sẽ nhận được thông báo hủy đơn ngay lập tức.",
+      "bạn muốn hủy đơn hàng này? Khách sẽ nhận được thông báo hủy đơn ngay lập tức.",
       [
         { text: "Quay lại", style: "cancel" },
         {
@@ -90,7 +90,7 @@ export default function OrderManagementScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              // Gửi POST đến API hủy đơn theo đúng Swagger sếp gửi
+              // Gửi POST đến API hủy đơn theo đúng Swagger bạn gửi
               const res = await axiosClient.post(`/orders/${orderId}/cancel`);
 
               if (res.data.code === 0) {

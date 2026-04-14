@@ -28,57 +28,108 @@ export default function PaymentResultScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Computed fresh on each render — NOT inside useCallback to avoid stale closure
-  const vnpaySuccess =
-    params.vnp_ResponseCode === "00" ||
-    params.resultCode === "0" ||
-    params.status === "success";
+  // VNPAY: vnp_ResponseCode="00"
+  const vnpaySuccess = params.vnp_ResponseCode === "00";
+  // MoMo (backend redirect): status=success/failed, transactionId, orderId
+  const momoSuccess = params.status === "success";
 
   const fetchPaymentResult = useCallback(async () => {
-    // Luôn compute fresh từ params để tránh stale closure
     const currentParams = params;
-    const currentVnpaySuccess =
-      currentParams.vnp_ResponseCode === "00" ||
-      currentParams.resultCode === "0" ||
-      currentParams.status === "success";
-    const currentIsTopupFlow =
-      !currentParams.orderId &&
-      !currentParams.order_id &&
-      (!!currentParams.vnp_TxnRef || !!currentParams.txnRef);
+    const currentVnpaySuccess = currentParams.vnp_ResponseCode === "00";
+    const currentMomoSuccess = currentParams.status === "success";
 
-    console.log("[PaymentResult] fetchPaymentResult called | params:", JSON.stringify(currentParams));
+    // Luồng nạp tiền: có vnp_TxnRef (VNPAY) HOẶC status=success nhưng KHÔNG có orderId
+    // Luồng order: có orderId hoặc order_id
+    const hasOrderId = !!(currentParams.orderId || currentParams.order_id);
+    const isTopupFlow = hasOrderId
+      ? false
+      : !!currentParams.vnp_TxnRef || currentMomoSuccess;
+
+    console.log(
+      "[PaymentResult] fetchPaymentResult called | params:",
+      JSON.stringify(currentParams),
+    );
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
-      if (!token) { console.log("[PaymentResult] No token"); setIsLoading(false); return; }
+      if (!token) {
+        console.log("[PaymentResult] No token");
+        setIsLoading(false);
+        return;
+      }
       jwtDecode(token);
 
-      console.log("[PaymentResult] isTopupFlow:", currentIsTopupFlow);
+      console.log(
+        "[PaymentResult] isTopupFlow:",
+        isTopupFlow,
+        "| hasOrderId:",
+        hasOrderId,
+      );
 
-      if (currentIsTopupFlow) {
+      // ✅ Fallback: nếu backend redirect không có orderId, dùng transaction history để phân biệt
+      // Kiểm tra transaction mới nhất trong ví — nếu có transaction liên quan đến order thì là luồng order
+      if (!hasOrderId && currentMomoSuccess) {
+        const decoded: any = jwtDecode(token);
+        const uId = decoded.sub;
+        const txRes = await axiosClient.get(
+          `/wallets/user/${uId}/transactions`,
+        );
+        if (txRes.data.code === 0 && txRes.data.result.length > 0) {
+          const latestTx = txRes.data.result[0];
+          // Nếu transaction mới nhất có trường orderId hoặc referenceOrderId → là luồng order
+          if (latestTx.orderId || latestTx.referenceOrderId) {
+            const detectedOrderId =
+              latestTx.orderId || latestTx.referenceOrderId;
+            console.log(
+              "[PaymentResult] Detected orderId from tx:",
+              detectedOrderId,
+            );
+            // Gọi luồng order với orderId tìm được
+            setPaymentType("order");
+            const orderRes = await axiosClient.get(
+              `/orders/${detectedOrderId}`,
+            );
+            if (orderRes.data.code === 0) {
+              setOrderData(orderRes.data.result);
+              setIsSuccess(true);
+            }
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+
+      if (isTopupFlow) {
         // ====== LUỒNG NẠP TIỀN ======
         setPaymentType("topup");
 
-        // Lấy transaction mới nhất từ ví để xác nhận đã nạp thành công
         const decoded: any = jwtDecode(token);
         const uId = decoded.sub;
         const res = await axiosClient.get(`/wallets/user/${uId}/transactions`);
 
         if (res.data.code === 0 && res.data.result.length > 0) {
-          // Lấy transaction mới nhất
           const latestTx = res.data.result[0];
+          const isMomo = !!currentParams.status;
           setTopupData({
             id: latestTx.id,
             amount: latestTx.amount,
-            paymentMethod: latestTx.paymentMethod || "VNPAY",
+            paymentMethod: isMomo ? "MOMO" : latestTx.paymentMethod || "VNPAY",
             createdAt: latestTx.createdAt,
-            // Lấy từ params VNPAY
+            // MoMo params từ backend redirect
+            transId:
+              currentParams.transactionId || currentParams.transId || null,
+            resultCode:
+              currentParams.status === "success" ? "0" : currentParams.status,
+            message: currentParams.message || null,
+            // VNPAY fallback
             vnp_TransactionNo: params.vnp_TransactionNo || null,
             vnp_TxnRef: params.vnp_TxnRef || params.txnRef || null,
           });
         }
       } else {
-        // ====== LUỒNG THUÊ TRANG PHỤC ======
+        // ====== LUỒNG THUÊ TRANG PHỤC / DỊCH VỤ ======
         setPaymentType("order");
-        const orderId = params.orderId || params.order_id;
+        // Backend MoMo gửi orderId, VNPAY gửi order_id
+        const orderId = currentParams.orderId || currentParams.order_id;
 
         if (!orderId) {
           console.warn("Không có orderId trong params");
@@ -93,12 +144,14 @@ export default function PaymentResultScreen() {
           setOrderData(order);
 
           const dbStatus = order.status;
-          console.log("[PaymentResult] dbStatus:", dbStatus, "| currentVnpaySuccess:", currentVnpaySuccess);
+          console.log("[PaymentResult] dbStatus:", dbStatus);
           if (dbStatus === "PAID") {
             console.log("[PaymentResult] Status PAID -> setSuccess");
             setIsSuccess(true);
           } else if (dbStatus === "UNPAID") {
-            console.log("[PaymentResult] Status UNPAID -> calling confirm-payment");
+            console.log(
+              "[PaymentResult] Status UNPAID -> calling confirm-payment",
+            );
             let confirmed = false;
             for (let attempt = 0; attempt < 3; attempt++) {
               try {
@@ -108,12 +161,22 @@ export default function PaymentResultScreen() {
                 confirmed = true;
                 break;
               } catch (err: any) {
-                console.log(`[PaymentResult] confirm attempt ${attempt + 1} FAILED:`, err?.response?.data || err?.message);
+                console.log(
+                  `[PaymentResult] confirm attempt ${attempt + 1} FAILED:`,
+                  err?.response?.data || err?.message,
+                );
                 await new Promise((resolve) => setTimeout(resolve, 1000));
               }
             }
-            console.log("[PaymentResult] confirmed:", confirmed, "| currentVnpaySuccess:", currentVnpaySuccess);
-            if (confirmed || currentVnpaySuccess) {
+            console.log(
+              "[PaymentResult] confirmed:",
+              confirmed,
+              "| currentVnpaySuccess:",
+              currentVnpaySuccess,
+              "| currentMomoSuccess:",
+              currentMomoSuccess,
+            );
+            if (confirmed || currentVnpaySuccess || currentMomoSuccess) {
               console.log("[PaymentResult] setSuccess(true)");
               setIsSuccess(true);
             }
@@ -128,8 +191,10 @@ export default function PaymentResultScreen() {
   }, [params]);
 
   useEffect(() => {
-    if (vnpaySuccess) {
-      console.log("[PaymentResult] vnpaySuccess=true -> setSuccess immediately");
+    if (vnpaySuccess || momoSuccess) {
+      console.log(
+        "[PaymentResult] vnpaySuccess or momoSuccess=true -> setSuccess immediately",
+      );
       setIsSuccess(true);
     }
     fetchPaymentResult();
@@ -193,6 +258,7 @@ export default function PaymentResultScreen() {
 
   const renderTopupDetail = () => {
     if (!topupData) return null;
+    const isMomo = topupData.paymentMethod === "MOMO";
     return (
       <View style={styles.detailCard}>
         <View style={styles.detailRow}>
@@ -211,13 +277,27 @@ export default function PaymentResultScreen() {
             {formatPrice(topupData.amount)}
           </Text>
         </View>
-        {topupData.vnp_TransactionNo && (
+        {isMomo && topupData.transId && (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mã VNPAY:</Text>
-            <Text style={styles.detailValue}>{topupData.vnp_TransactionNo}</Text>
+            <Text style={styles.detailLabel}>Mã MoMo:</Text>
+            <Text style={styles.detailValue}>{topupData.transId}</Text>
           </View>
         )}
-        {topupData.vnp_TxnRef && (
+        {isMomo && topupData.message && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Thông báo:</Text>
+            <Text style={styles.detailValue}>{topupData.message}</Text>
+          </View>
+        )}
+        {!isMomo && topupData.vnp_TransactionNo && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Mã VNPAY:</Text>
+            <Text style={styles.detailValue}>
+              {topupData.vnp_TransactionNo}
+            </Text>
+          </View>
+        )}
+        {!isMomo && topupData.vnp_TxnRef && (
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Mã tham chiếu:</Text>
             <Text style={styles.detailValue}>{topupData.vnp_TxnRef}</Text>
@@ -281,7 +361,9 @@ export default function PaymentResultScreen() {
             style={styles.retryBtn}
             onPress={() =>
               router.replace(
-                paymentType === "topup" ? "/(screens)/top-up" as any : "/(tabs)" as any
+                paymentType === "topup"
+                  ? ("/(screens)/top-up" as any)
+                  : ("/(tabs)" as any),
               )
             }
           >

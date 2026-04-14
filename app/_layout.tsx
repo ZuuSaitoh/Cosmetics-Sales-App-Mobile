@@ -4,8 +4,8 @@ import { StatusBar } from "expo-status-bar";
 export default function RootLayout() {
   return (
     <>
-      {/* Ép thanh % pin, giờ, wifi thành chữ MÀU ĐEN (dark) */}
-      <StatusBar style="dark" />
+      {/* Luôn hiển thị chữ đen trên thanh trạng thái (pin, wifi, đồng hồ) */}
+      <StatusBar style="dark" backgroundColor="#ffffff" />
 
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
