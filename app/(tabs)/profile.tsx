@@ -337,6 +337,20 @@ export default function ProfileScreen() {
                 <Text style={styles.saveBtnText}>Lưu thay đổi</Text>
               )}
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.resetPasswordBtn}
+              onPress={() => {
+                setIsEditModalVisible(false);
+                router.push({
+                  pathname: "/(screens)/reset-password",
+                  params: { identifier: profile?.email || profile?.username || "" },
+                });
+              }}
+            >
+              <Ionicons name="key-outline" size={18} color="#B59DFF" />
+              <Text style={styles.resetPasswordBtnText}>Đổi mật khẩu</Text>
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -466,6 +480,15 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  resetPasswordBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 15,
+    padding: 10,
+    gap: 6,
+  },
+  resetPasswordBtnText: { fontSize: 15, color: "#B59DFF", fontWeight: "600" },
   walletCard: {
     flexDirection: "row",
     alignItems: "center",

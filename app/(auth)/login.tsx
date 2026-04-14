@@ -157,6 +157,13 @@ export default function LoginScreen() {
             <Text style={styles.registerLinkBtn}>Đăng kí</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.forgotPasswordLink}
+          onPress={() => router.push("/(screens)/forgot-password")}
+        >
+          <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -227,4 +234,9 @@ const styles = StyleSheet.create({
   },
   registerLinkText: { fontSize: 14, color: "#888" },
   registerLinkBtn: { fontSize: 14, fontWeight: "bold", color: "#B59DFF" },
+  forgotPasswordLink: {
+    alignSelf: "center",
+    marginTop: 10,
+  },
+  forgotPasswordText: { fontSize: 13, color: "#B59DFF" },
 });
