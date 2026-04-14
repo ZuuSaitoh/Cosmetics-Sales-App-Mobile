@@ -32,9 +32,8 @@ export default function OrdersScreen() {
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
   const [confirmOrderId, setConfirmOrderId] = useState<number | null>(null);
   const [confirmImage, setConfirmImage] = useState<any>(null);
-  const [reviewedOrders, setReviewedOrders] = useState<Record<number, boolean>>(
-    {},
-  );
+  // Ref track review status — không trigger re-render trong lúc fetch
+  const reviewedOrdersRef = React.useRef<Record<number, boolean>>({});
   const ORDER_STATUS_TABS = [
     { key: "ALL", label: "Tất cả" },
     { key: "WAITING", label: "Chờ hàng" },
@@ -66,8 +65,7 @@ export default function OrdersScreen() {
 
   const fetchOrders = async () => {
     setIsLoading(true);
-    // 🚩 FIX 1: Xóa sạch trạng thái review cũ để tránh "râu ông nọ chắp cằm bà kia"
-    setReviewedOrders({});
+    reviewedOrdersRef.current = {};
 
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
@@ -111,7 +109,7 @@ export default function OrdersScreen() {
             }
           }),
         );
-        setReviewedOrders(reviewStatusMap);
+        reviewedOrdersRef.current = reviewStatusMap;
       } else {
         Alert.alert("Lỗi dữ liệu", response.data.message);
       }
@@ -264,7 +262,8 @@ export default function OrdersScreen() {
   };
 
   const renderOrderItem = ({ item }: { item: any }) => {
-    const isReviewed = !!reviewedOrders[Number(item.id)];
+    // Dùng ref để đọc review status ngay lập tức, tránh stale state
+    const isReviewed = !!reviewedOrdersRef.current[Number(item.id)];
     const firstItem =
       item.details && item.details.length > 0 ? item.details[0] : null;
     const costumeId = firstItem ? firstItem.costumeId : null;

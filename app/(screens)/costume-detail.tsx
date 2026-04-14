@@ -29,6 +29,8 @@ export default function CostumeDetailScreen() {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistId, setWishlistId] = useState<number | null>(null);
   const [isProcessingWishlist, setIsProcessingWishlist] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   useEffect(() => {
     if (id) fetchCostumeDetail();
@@ -36,6 +38,7 @@ export default function CostumeDetailScreen() {
 
   useEffect(() => {
     if (id) checkWishlistStatus();
+    if (id) fetchReviews(Number(id));
   }, [id]);
 
   const checkWishlistStatus = async () => {
@@ -104,7 +107,6 @@ export default function CostumeDetailScreen() {
 
   const fetchCostumeDetail = async () => {
     try {
-      // Chỉ hiện loading ở lần đầu tiên để tránh lỗi nhảy trang
       if (!costume) setIsLoading(true);
 
       const response = await axiosClient.get(`/costumes/${id}`);
@@ -113,17 +115,18 @@ export default function CostumeDetailScreen() {
         const costumeData = response.data.result;
         setCostume(costumeData);
 
-        // 🚩 SỬ DỤNG ENDPOINT MỚI: /api/providers/id/{providerId}
         if (costumeData.providerId) {
           const shopRes = await axiosClient.get(
             `/providers/id/${costumeData.providerId}`,
           );
 
           if (shopRes.data.code === 0) {
-            // Kết quả trả về chứa đầy đủ shopName, bio và quan trọng nhất là userId
             setProvider(shopRes.data.result);
           }
         }
+
+        // Lấy danh sách đánh giá của trang phục này
+        fetchReviews(costumeData.id);
       }
     } catch (error) {
       console.error("Lỗi tải thông tin chi tiết:", error);
@@ -137,6 +140,99 @@ export default function CostumeDetailScreen() {
       style: "currency",
       currency: "VND",
     }).format(price || 0);
+  };
+
+  const fetchReviews = async (costumeId: number) => {
+    try {
+      const res = await axiosClient.get(`/reviews/costume/${costumeId}`);
+      console.log(
+        "[CostumeDetail] Reviews API response:",
+        JSON.stringify(res.data),
+      );
+      if (res.data.code === 0 && Array.isArray(res.data.result)) {
+        setReviews(res.data.result);
+      }
+    } catch (err) {
+      console.error("Lỗi lấy đánh giá:", err);
+    }
+  };
+
+  const renderStars = (rating: number) => {
+    return (
+      <View style={styles.starsRow}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Ionicons
+            key={star}
+            name={star <= rating ? "star" : "star-outline"}
+            size={14}
+            color="#FFD700"
+          />
+        ))}
+      </View>
+    );
+  };
+
+  const renderReviewItem = ({ item }: { item: any }) => {
+    const avatarUrl = item.avatarUrl || item.user?.avatarUrl;
+    const userName = item.userName || item.user?.fullName || "Người dùng";
+
+    return (
+      <View style={styles.reviewCard}>
+        <View style={styles.reviewHeader}>
+          <View style={styles.reviewerAvatar}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+            ) : (
+              <Ionicons name="person" size={18} color="#B59DFF" />
+            )}
+          </View>
+          <View style={styles.reviewerInfo}>
+            <Text style={styles.reviewerName}>{userName}</Text>
+            {renderStars(item.rating || 0)}
+          </View>
+          <Text style={styles.reviewDate}>
+            {item.createdAt
+              ? new Date(item.createdAt).toLocaleDateString("vi-VN")
+              : ""}
+          </Text>
+        </View>
+        {item.comment && (
+          <Text style={styles.reviewComment}>{item.comment}</Text>
+        )}
+        {item.images && item.images.length > 0 && (
+          <FlatList
+            data={item.images}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(img: any) =>
+              img.id?.toString() || Math.random().toString()
+            }
+            renderItem={({ item: img }: any) => (
+              <Image
+                source={{ uri: img.url || img }}
+                style={styles.reviewImage}
+              />
+            )}
+            style={{ marginTop: 10 }}
+          />
+        )}
+      </View>
+    );
+  };
+
+  const renderAverageRating = () => {
+    if (reviews.length === 0) return null;
+    const avg =
+      reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length;
+    return (
+      <View style={styles.avgRatingRow}>
+        <View style={styles.avgRatingLeft}>
+          <Text style={styles.avgRatingNumber}>{avg.toFixed(1)}</Text>
+          {renderStars(Math.round(avg))}
+          <Text style={styles.reviewCount}>{reviews.length} đánh giá</Text>
+        </View>
+      </View>
+    );
   };
 
   const onScroll = (event: any) => {
@@ -329,6 +425,50 @@ export default function CostumeDetailScreen() {
             {costume.description ||
               "Hiện chưa có mô tả chi tiết cho trang phục này."}
           </Text>
+        </View>
+
+        {/* --- PHẦN 3: ĐÁNH GIÁ --- */}
+        <View style={[styles.section, { borderBottomWidth: 0 }]}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="star-outline" size={20} color="#B59DFF" />
+            <Text style={styles.sectionTitle}>Đánh giá</Text>
+            <Text style={styles.reviewCountBadge}>
+              {reviews.length} đánh giá
+            </Text>
+          </View>
+
+          {renderAverageRating()}
+
+          {reviews.length === 0 ? (
+            <Text style={styles.noReviewText}>
+              Chưa có đánh giá nào cho trang phục này.
+            </Text>
+          ) : (
+            <View>
+              {/* Hiển thị 1 đánh giá mới nhất */}
+              {renderReviewItem({ item: reviews[0] })}
+              {/* Nút Xem thêm */}
+              {reviews.length > 1 && (
+                <TouchableOpacity
+                  style={styles.viewMoreBtn}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(screens)/all-reviews" as any,
+                      params: {
+                        costumeId: costume.id,
+                        costumeName: costume.name,
+                      },
+                    })
+                  }
+                >
+                  <Text style={styles.viewMoreBtnText}>
+                    Xem toàn bộ {reviews.length} đánh giá
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color="#B59DFF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -558,5 +698,95 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
+  },
+  starsRow: { flexDirection: "row", marginTop: 3 },
+  reviewCard: {
+    backgroundColor: "#F9F9FF",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+  },
+  reviewHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  reviewerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F4F1FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+    overflow: "hidden",
+  },
+  reviewerInfo: { flex: 1 },
+  reviewerName: { fontSize: 14, fontWeight: "bold", color: "#333" },
+  reviewDate: { fontSize: 11, color: "#999" },
+  reviewComment: {
+    fontSize: 13,
+    color: "#555",
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  reviewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  avgRatingRow: {
+    backgroundColor: "#FFF9F0",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  avgRatingLeft: { flexDirection: "row", alignItems: "center" },
+  avgRatingNumber: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#333",
+    marginRight: 8,
+  },
+  reviewCountBadge: {
+    marginLeft: 8,
+    fontSize: 12,
+    color: "#888",
+    backgroundColor: "#F4F1FF",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  reviewCount: {
+    fontSize: 12,
+    color: "#888",
+    marginLeft: 6,
+  },
+  viewMoreBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: "#F4F1FF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewMoreBtnText: {
+    color: "#1E3A8A",
+    fontSize: 14,
+    fontWeight: "600",
+    marginRight: 8,
+  },
+  noReviewText: {
+    textAlign: "center",
+    color: "#B0A8C4",
+    fontSize: 14,
+    fontStyle: "italic",
+    marginTop: 10,
+    marginBottom: 10,
   },
 });
