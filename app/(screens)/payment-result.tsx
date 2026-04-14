@@ -17,32 +17,43 @@ type PaymentType = "order" | "topup";
 
 export default function PaymentResultScreen() {
   const params = useLocalSearchParams();
+
+  // 🔍 DEBUG: log tất cả params nhận được từ VNPay redirect
+  console.log("[PaymentResult] All params:", JSON.stringify(params));
+
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentType, setPaymentType] = useState<PaymentType>("order");
   const [orderData, setOrderData] = useState<any>(null);
   const [topupData, setTopupData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Computed fresh on each render — NOT inside useCallback to avoid stale closure
   const vnpaySuccess =
     params.vnp_ResponseCode === "00" ||
     params.resultCode === "0" ||
     params.status === "success";
 
-  // Phân biệt luồng top-up hay order dựa trên params
-  // Top-up: có vnp_TxnRef, vnp_Amount, không có orderId
-  // Order: có orderId
-  const isTopupFlow =
-    !params.orderId &&
-    !params.order_id &&
-    (!!params.vnp_TxnRef || !!params.txnRef);
-
   const fetchPaymentResult = useCallback(async () => {
+    // Luôn compute fresh từ params để tránh stale closure
+    const currentParams = params;
+    const currentVnpaySuccess =
+      currentParams.vnp_ResponseCode === "00" ||
+      currentParams.resultCode === "0" ||
+      currentParams.status === "success";
+    const currentIsTopupFlow =
+      !currentParams.orderId &&
+      !currentParams.order_id &&
+      (!!currentParams.vnp_TxnRef || !!currentParams.txnRef);
+
+    console.log("[PaymentResult] fetchPaymentResult called | params:", JSON.stringify(currentParams));
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
-      if (!token) { setIsLoading(false); return; }
+      if (!token) { console.log("[PaymentResult] No token"); setIsLoading(false); return; }
       jwtDecode(token);
 
-      if (isTopupFlow) {
+      console.log("[PaymentResult] isTopupFlow:", currentIsTopupFlow);
+
+      if (currentIsTopupFlow) {
         // ====== LUỒNG NẠP TIỀN ======
         setPaymentType("topup");
 
@@ -76,19 +87,35 @@ export default function PaymentResultScreen() {
         }
 
         const orderRes = await axiosClient.get(`/orders/${orderId}`);
+        console.log("[PaymentResult] orderRes:", JSON.stringify(orderRes.data));
         if (orderRes.data.code === 0) {
           const order = orderRes.data.result;
           setOrderData(order);
 
           const dbStatus = order.status;
+          console.log("[PaymentResult] dbStatus:", dbStatus, "| currentVnpaySuccess:", currentVnpaySuccess);
           if (dbStatus === "PAID") {
+            console.log("[PaymentResult] Status PAID -> setSuccess");
             setIsSuccess(true);
           } else if (dbStatus === "UNPAID") {
-            try {
-              await axiosClient.post(`/orders/${orderId}/confirm-payment`);
+            console.log("[PaymentResult] Status UNPAID -> calling confirm-payment");
+            let confirmed = false;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              try {
+                console.log(`[PaymentResult] confirm attempt ${attempt + 1}/3`);
+                await axiosClient.post(`/orders/${orderId}/confirm-payment`);
+                console.log("[PaymentResult] confirm SUCCESS");
+                confirmed = true;
+                break;
+              } catch (err: any) {
+                console.log(`[PaymentResult] confirm attempt ${attempt + 1} FAILED:`, err?.response?.data || err?.message);
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              }
+            }
+            console.log("[PaymentResult] confirmed:", confirmed, "| currentVnpaySuccess:", currentVnpaySuccess);
+            if (confirmed || currentVnpaySuccess) {
+              console.log("[PaymentResult] setSuccess(true)");
               setIsSuccess(true);
-            } catch {
-              // Backend sẽ tự xử lý qua IPN
             }
           }
         }
@@ -98,16 +125,16 @@ export default function PaymentResultScreen() {
     } finally {
       setIsLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [params]);
 
   useEffect(() => {
     if (vnpaySuccess) {
+      console.log("[PaymentResult] vnpaySuccess=true -> setSuccess immediately");
       setIsSuccess(true);
     }
     fetchPaymentResult();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Chỉ chạy 1 lần khi mount; fetchPaymentResult tự phụ thuộc params
 
   const formatPrice = (price: any) => {
     return new Intl.NumberFormat("vi-VN", {

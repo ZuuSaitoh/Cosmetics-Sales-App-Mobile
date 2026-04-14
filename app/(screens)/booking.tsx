@@ -1,21 +1,23 @@
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { router, useLocalSearchParams } from "expo-router";
 import * as Linking from "expo-linking";
+import { router, useLocalSearchParams } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import axiosClient from "../api/axiosClient";
 
@@ -26,8 +28,17 @@ export default function BookingScreen() {
   const [isBooking, setIsBooking] = useState(false); // Loading khi bấm thuê
 
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
-  const [selectedAccessoryIds, setSelectedAccessoryIds] = useState<number[]>([]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [selectedAccessoryIds, setSelectedAccessoryIds] = useState<number[]>(
+    [],
+  );
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
+    string | null
+  >(null);
+
+  // Địa chỉ giao hàng
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
 
   const paymentMethods = [
     { id: "VNPAY", label: "Ví điện tử VNPAY", icon: "credit-card" as const },
@@ -56,6 +67,22 @@ export default function BookingScreen() {
       setIsLoading(true);
       const res = await axiosClient.get(`/costumes/${id}`);
       if (res.data.code === 0) setCostume(res.data.result);
+
+      // Fetch danh sách địa chỉ của user
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (token) {
+        const decoded: any = jwtDecode(token);
+        const userId = Number(decoded.sub);
+        const addrRes = await axiosClient.get(`/users/${userId}/addresses`);
+        if (addrRes.data.code === 0) {
+          const addrList = addrRes.data.result;
+          setAddresses(addrList);
+          // Tự động chọn địa chỉ mặc định đầu tiên
+          if (addrList.length > 0 && !selectedAddress) {
+            setSelectedAddress(addrList[0]);
+          }
+        }
+      }
     } catch (err) {
       console.error("Lỗi lấy data costume:", err);
     } finally {
@@ -102,7 +129,8 @@ export default function BookingScreen() {
         ?.filter((a: any) => selectedAccessoryIds.includes(a.id))
         .reduce((sum: number, a: any) => sum + a.price, 0) || 0;
     const surchargesPrice =
-      costume.surcharges?.reduce((sum: number, s: any) => sum + s.price, 0) || 0;
+      costume.surcharges?.reduce((sum: number, s: any) => sum + s.price, 0) ||
+      0;
     const deposit = costume.depositAmount || 0;
 
     return {
@@ -111,7 +139,8 @@ export default function BookingScreen() {
       accessories: accessoriesPrice,
       surcharges: surchargesPrice,
       deposit: deposit,
-      total: baseRent + optionPrice + accessoriesPrice + surchargesPrice + deposit,
+      total:
+        baseRent + optionPrice + accessoriesPrice + surchargesPrice + deposit,
     };
   };
 
@@ -124,6 +153,10 @@ export default function BookingScreen() {
   };
 
   const handleBooking = async () => {
+    if (!selectedAddress) {
+      Alert.alert("Thông báo", "Vui lòng chọn địa chỉ giao hàng!");
+      return;
+    }
     if (!selectedPaymentMethod) {
       Alert.alert("Thông báo", "Vui lòng chọn phương thức thanh toán!");
       return;
@@ -142,36 +175,43 @@ export default function BookingScreen() {
         rentDay: actualNumDays,
         rentStart: rentStartDate.toISOString(),
         paymentMethod: selectedPaymentMethod,
-        cosplayerAddressId: 1, // TODO: cho user chọn địa chỉ thật
+        cosplayerAddressId: selectedAddress.id,
         selectedAccessoryIds: selectedAccessoryIds,
         selectedRentalOptionId: selectedOptionId || null,
       };
 
-      const res = await axiosClient.post(`/orders?cosplayerId=${cosplayerId}`, payload);
+      const res = await axiosClient.post(
+        `/orders?cosplayerId=${cosplayerId}`,
+        payload,
+      );
 
       if (res.data.code === 0) {
         const orderId = res.data.result.id;
-        const totalAmount = prices.total;
 
         // BƯỚC 2: Xử lý theo phương thức thanh toán
         if (selectedPaymentMethod === "VNPAY") {
-          // Tạo link thanh toán VNPAY
-          const SERVER_IP = "192.168.101.107";
-          const returnUrl = `exp://${SERVER_IP}:8081/--/payment-result`;
+          const SERVER_IP = "10.88.54.16";
+          // ✅ Sửa: redirect qua backend để backend xử lý IPN trước, rồi mới redirect về app
+          const returnUrl = `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`;
 
-          const paymentRes = await axiosClient.post("/payment/api/vnpay/create", null, {
-            params: {
-              userId: cosplayerId,
-              amount: totalAmount,
-              returnUrl: returnUrl,
-              orderId: orderId,
+          // ✅ API đúng: POST /api/orders/{orderId}/pay
+          const paymentRes = await axiosClient.post(
+            `/orders/${orderId}/pay`,
+            null,
+            {
+              params: {
+                cosplayerId: cosplayerId,
+                paymentMethod: "VNPAY",
+                returnUrl: returnUrl,
+              },
             },
-          });
+          );
 
           if (paymentRes.data.code === 0) {
-            const url = paymentRes.data.result.paymentUrl || paymentRes.data.result;
-            await Linking.openURL(url); // Mở trình duyệt thanh toán
-            router.replace("/(tabs)/profile" as any); // Đẩy về profile đợi kết quả
+            const paymentUrl = paymentRes.data.result?.paymentUrl || paymentRes.data.result;
+            console.log("[Booking] paymentUrl:", paymentUrl);
+            await Linking.openURL(paymentUrl);
+            router.replace("/(tabs)/profile" as any);
           }
         } else {
           // COD hoặc WALLET (Backend tự trừ tiền nếu chọn WALLET)
@@ -202,6 +242,25 @@ export default function BookingScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 15 }}>
+        {/* ĐỊA CHỈ GIAO HÀNG */}
+        <Text style={styles.label}>Địa chỉ giao hàng</Text>
+        <TouchableOpacity
+          style={styles.addressBtn}
+          onPress={() => setIsAddressModalVisible(true)}
+        >
+          {selectedAddress ? (
+            <View style={{ flex: 1 }}>
+              <Text style={styles.addressName}>
+                {selectedAddress.name} · {selectedAddress.phone}
+              </Text>
+              <Text style={styles.addressText}>{selectedAddress.address}</Text>
+            </View>
+          ) : (
+            <Text style={styles.addressPlaceholder}>Chưa có địa chỉ nào</Text>
+          )}
+          <Feather name="chevron-right" size={20} color="#B59DFF" />
+        </TouchableOpacity>
+
         {/* CHỌN GÓI THUÊ */}
         <Text style={styles.label}>Gói thuê</Text>
         <View style={styles.chipContainer}>
@@ -275,7 +334,11 @@ export default function BookingScreen() {
             onPress={() => handleToggleAccessory(acc.id)}
           >
             <Feather
-              name={selectedAccessoryIds.includes(acc.id) ? "check-square" : "square"}
+              name={
+                selectedAccessoryIds.includes(acc.id)
+                  ? "check-square"
+                  : "square"
+              }
               size={20}
               color="#B59DFF"
             />
@@ -325,7 +388,9 @@ export default function BookingScreen() {
               {method.label}
             </Text>
             <Feather
-              name={selectedPaymentMethod === method.id ? "check-circle" : "circle"}
+              name={
+                selectedPaymentMethod === method.id ? "check-circle" : "circle"
+              }
               size={18}
               color={selectedPaymentMethod === method.id ? "#B59DFF" : "#DDD"}
             />
@@ -348,7 +413,11 @@ export default function BookingScreen() {
           <View style={styles.priceLine}>
             <Text>Phụ kiện & Phí</Text>
             <Text>
-              +{new Intl.NumberFormat("vi-VN").format(prices.accessories + prices.surcharges)}đ
+              +
+              {new Intl.NumberFormat("vi-VN").format(
+                prices.accessories + prices.surcharges,
+              )}
+              đ
             </Text>
           </View>
           <View style={styles.priceLine}>
@@ -377,6 +446,75 @@ export default function BookingScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* MODAL CHỌN ĐỊA CHỈ */}
+      <Modal
+        visible={isAddressModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsAddressModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn địa chỉ giao hàng</Text>
+              <TouchableOpacity onPress={() => setIsAddressModalVisible(false)}>
+                <Feather name="x" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={addresses}
+              keyExtractor={(item: any) => item.id.toString()}
+              style={{ maxHeight: 400 }}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>
+                  Bạn chưa có địa chỉ nào.{'\n'}Hãy thêm địa chỉ trong Sổ địa chỉ nhé!
+                </Text>
+              }
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.addressCard,
+                    selectedAddress?.id === item.id && styles.addressCardActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedAddress(item);
+                    setIsAddressModalVisible(false);
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.addressCardName}>{item.name}</Text>
+                    <Text style={styles.addressCardPhone}>{item.phone}</Text>
+                    <Text style={styles.addressCardAddr}>{item.address}</Text>
+                  </View>
+                  {selectedAddress?.id === item.id && (
+                    <Feather name="check-circle" size={22} color="#B59DFF" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+
+            <TouchableOpacity
+              style={styles.addAddressBtn}
+              onPress={() => {
+                setIsAddressModalVisible(false);
+                router.push("/(screens)/address-book" as any);
+              }}
+            >
+              <Feather name="plus" size={18} color="#B59DFF" />
+              <Text style={styles.addAddressBtnText}>Quản lý sổ địa chỉ</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.closeModalBtn}
+              onPress={() => setIsAddressModalVisible(false)}
+            >
+              <Text style={styles.closeModalBtnText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -465,6 +603,73 @@ const styles = StyleSheet.create({
   checkLabel: { flex: 1, marginLeft: 10, fontSize: 14, color: "#444" },
   checkLabelActive: { color: "#B59DFF", fontWeight: "bold" },
   checkPrice: { fontWeight: "bold", color: "#444" },
+
+  addressBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FAF9FF",
+    borderWidth: 1,
+    borderColor: "#E0D7FF",
+    borderRadius: 12,
+    padding: 15,
+    gap: 10,
+  },
+  addressName: { fontSize: 14, fontWeight: "bold", color: "#4A3B6B", marginBottom: 4 },
+  addressText: { fontSize: 13, color: "#8E7AB5" },
+  addressPlaceholder: { color: "#A090C5", flex: 1 },
+
+  // Modal chọn địa chỉ
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  modalTitle: { fontSize: 17, fontWeight: "bold", color: "#4A3B6B" },
+  addressCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9F9FF",
+    borderWidth: 1,
+    borderColor: "#E0D7FF",
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    gap: 10,
+  },
+  addressCardActive: {
+    backgroundColor: "#F4F1FF",
+    borderColor: "#B59DFF",
+  },
+  addressCardName: { fontSize: 14, fontWeight: "bold", color: "#4A3B6B", marginBottom: 3 },
+  addressCardPhone: { fontSize: 13, color: "#666", marginBottom: 3 },
+  addressCardAddr: { fontSize: 12, color: "#8E7AB5" },
+  emptyText: { textAlign: "center", color: "#999", paddingVertical: 30, lineHeight: 20 },
+  addAddressBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderColor: "#F0EFFF",
+    marginTop: 10,
+    gap: 6,
+  },
+  addAddressBtnText: { color: "#B59DFF", fontWeight: "bold", fontSize: 14 },
+  closeModalBtn: { paddingVertical: 12, alignItems: "center", marginTop: 5 },
+  closeModalBtnText: { color: "#999", fontSize: 14 },
 
   summaryBox: {
     marginTop: 30,

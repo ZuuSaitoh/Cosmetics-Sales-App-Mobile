@@ -4,18 +4,18 @@ import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import axiosClient from "../api/axiosClient";
 
@@ -70,7 +70,7 @@ export default function AddressBookScreen() {
     fetchProvinces();
   }, []);
 
-  // 2. Khi sếp chọn Tỉnh -> Gọi lấy Phường/Xã
+  // 2. Khi bạn chọn Tỉnh -> Gọi lấy Phường/Xã
   const handleSelectProvince = async (pCode: number, pName: string) => {
     setFormData({ ...formData, city: pName, ward: "", detailAddress: "" }); // Reset cấp dưới
     setWards([]);
@@ -124,13 +124,13 @@ export default function AddressBookScreen() {
     if (!formData.receiverName || !formData.phone || !formData.detailAddress) {
       Alert.alert(
         "Thông báo",
-        "Vui lòng điền đủ các trường có dấu (*) nha sếp!",
+        "Vui lòng điền đủ các trường có dấu (*) nha bạn!",
       );
       return;
     }
 
     try {
-      // Gộp các thông tin địa chỉ thành một chuỗi hoặc gửi object tùy API Backend của sếp
+      // Gộp các thông tin địa chỉ thành một chuỗi hoặc gửi object tùy API Backend của bạn
       const payload = {
         ...formData,
         address: `${formData.detailAddress}, ${formData.ward}, ${formData.city}`,
@@ -156,7 +156,7 @@ export default function AddressBookScreen() {
   };
 
   const handleDelete = (id: number) => {
-    Alert.alert("Xác nhận", "Xóa địa chỉ này nhé sếp?", [
+    Alert.alert("Xác nhận", "Xóa địa chỉ này nhé bạn?", [
       { text: "Hủy", style: "cancel" },
       {
         text: "Xóa",
@@ -198,7 +198,7 @@ export default function AddressBookScreen() {
         renderItem={renderAddressItem}
         contentContainerStyle={{ padding: 15 }}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>Chưa có địa chỉ nào đâu sếp!</Text>
+          <Text style={styles.emptyText}>Chưa có địa chỉ nào đâu bạn!</Text>
         }
       />
 
