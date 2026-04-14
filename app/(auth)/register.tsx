@@ -50,6 +50,10 @@ const ROLES = [
   },
 ];
 
+const isValidEmail = (email: string) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
 export default function RegisterScreen() {
   const [step, setStep] = useState<"role" | "form">("role");
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
@@ -60,16 +64,45 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState<{
+    fullName?: string;
+    email?: string;
+    username?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
+
+  const validate = () => {
+    const newErrors: typeof errors = {};
+    if (!fullName.trim()) {
+      newErrors.fullName = "Vui lòng nhập họ và tên!";
+    }
+    if (!email.trim()) {
+      newErrors.email = "Vui lòng nhập email!";
+    } else if (!isValidEmail(email)) {
+      newErrors.email = "Email không hợp lệ!";
+    }
+    if (!username.trim()) {
+      newErrors.username = "Vui lòng nhập tên đăng nhập!";
+    }
+    if (!password) {
+      newErrors.password = "Vui lòng nhập mật khẩu!";
+    } else if (password.length < 6) {
+      newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự!";
+    }
+    if (!confirmPassword) {
+      newErrors.confirmPassword = "Vui lòng xác nhận mật khẩu!";
+    } else if (confirmPassword !== password) {
+      newErrors.confirmPassword = "Mật khẩu xác nhận không khớp!";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleRegister = async () => {
-    if (!fullName || !email || !username || !password || !confirmPassword) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin!");
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp!");
-      return;
-    }
+    if (!validate()) return;
     if (!selectedRole) {
       Alert.alert("Lỗi", "Vui lòng chọn vai trò!");
       return;
@@ -221,46 +254,108 @@ export default function RegisterScreen() {
               ) : null;
             })()}
 
-            <TextInput
-              style={styles.input}
-              placeholder="Họ và tên"
-              placeholderTextColor="#A090C5"
-              value={fullName}
-              onChangeText={setFullName}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#A090C5"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Tên đăng nhập"
-              placeholderTextColor="#A090C5"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Mật khẩu"
-              placeholderTextColor="#A090C5"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Xác nhận mật khẩu"
-              placeholderTextColor="#A090C5"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-            />
+            <View>
+              <TextInput
+                style={[styles.input, errors.fullName && styles.inputError]}
+                placeholder="Họ và tên"
+                placeholderTextColor="#A090C5"
+                value={fullName}
+                onChangeText={(text) => {
+                  setFullName(text);
+                  if (errors.fullName) setErrors((e) => ({ ...e, fullName: undefined }));
+                }}
+              />
+              {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
+            </View>
+
+            <View>
+              <TextInput
+                style={[styles.input, errors.email && styles.inputError]}
+                placeholder="Email"
+                placeholderTextColor="#A090C5"
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (errors.email) setErrors((e) => ({ ...e, email: undefined }));
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+            </View>
+
+            <View>
+              <TextInput
+                style={[styles.input, errors.username && styles.inputError]}
+                placeholder="Tên đăng nhập"
+                placeholderTextColor="#A090C5"
+                value={username}
+                onChangeText={(text) => {
+                  setUsername(text);
+                  if (errors.username) setErrors((e) => ({ ...e, username: undefined }));
+                }}
+                autoCapitalize="none"
+              />
+              {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
+            </View>
+
+            <View>
+              <View style={styles.passwordWrapper}>
+                <TextInput
+                  style={[styles.passwordInput, errors.password && styles.inputError]}
+                  placeholder="Mật khẩu"
+                  placeholderTextColor="#A090C5"
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
+                  }}
+                  secureTextEntry={!showPassword}
+                />
+                <View style={styles.eyeBtn}>
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      size={22}
+                      color="#A090C5"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+            </View>
+
+            <View>
+              <View style={styles.passwordWrapper}>
+                <TextInput
+                  style={[styles.passwordInput, errors.confirmPassword && styles.inputError]}
+                  placeholder="Xác nhận mật khẩu"
+                  placeholderTextColor="#A090C5"
+                  value={confirmPassword}
+                  onChangeText={(text) => {
+                    setConfirmPassword(text);
+                    if (errors.confirmPassword) setErrors((e) => ({ ...e, confirmPassword: undefined }));
+                  }}
+                  secureTextEntry={!showConfirmPassword}
+                />
+                <View style={styles.eyeBtn}>
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons
+                      name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                      size={22}
+                      color="#A090C5"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+            </View>
 
             <TouchableOpacity
               style={[styles.registerBtn, isLoading && styles.registerBtnDisabled]}
@@ -371,7 +466,40 @@ const styles = StyleSheet.create({
     color: "#4A3B6B",
     borderWidth: 1,
     borderColor: "#E0D7FF",
-    marginBottom: 12,
+    marginBottom: 4,
+  },
+  inputError: {
+    borderColor: "#FF5252",
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#FF5252",
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  passwordWrapper: {
+    position: "relative",
+  },
+  passwordInput: {
+    backgroundColor: "#fff",
+    height: 52,
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingRight: 50,
+    fontSize: 15,
+    color: "#4A3B6B",
+    borderWidth: 1,
+    borderColor: "#E0D7FF",
+    marginBottom: 4,
+  },
+  eyeBtn: {
+    position: "absolute",
+    right: 12,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    justifyContent: "center",
+    alignItems: "center",
   },
   registerBtn: {
     backgroundColor: "#B59DFF",
