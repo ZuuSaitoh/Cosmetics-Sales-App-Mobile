@@ -143,7 +143,7 @@ export default function OrdersScreen() {
             });
 
             if (res.data.code === 0) {
-              Alert.alert("Thành công", "Đã hủy đơn hàng thành công! 🫡");
+              Alert.alert("Thành công", "Đã hủy đơn hàng thành công!");
               fetchOrders(); // Load lại danh sách để cập nhật UI
             }
           } catch (err) {
@@ -447,7 +447,7 @@ export default function OrdersScreen() {
         </ScrollView>
       </View>
       <FlatList
-        data={filteredOrders} // Luôn là filteredOrders sếp nhé!
+        data={filteredOrders} // Luôn là filteredOrders bạn nhé!
         keyExtractor={(item: any) => item.id.toString()}
         renderItem={renderOrderItem}
         contentContainerStyle={styles.listContainer}
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#fff",
     padding: 20,
-    // Xóa borderBottomWidth ở đây nếu sếp muốn Header và Tab Bar dính liền nhau
+    // Xóa borderBottomWidth ở đây nếu bạn muốn Header và Tab Bar dính liền nhau
   },
   mainTitle: {
     fontSize: 22,

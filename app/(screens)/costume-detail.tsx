@@ -86,7 +86,7 @@ export default function CostumeDetailScreen() {
         }
       } else {
         // 🚩 POST: Thêm vào yêu thích
-        // Truyền costumeId vào body theo đúng yêu cầu API của sếp
+        // Truyền costumeId vào body theo đúng yêu cầu API của bạn
         const res = await axiosClient.post(`/users/${userId}/wishlist`, {
           costumeId: Number(id),
         });
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#F0F0F0",
-    // Đổ bóng nhẹ cho sang sếp nhé
+    // Đổ bóng nhẹ cho sang bạn nhé
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   wishlistBtn: {
-    // Kế thừa style của backBtn sếp đã viết
+    // Kế thừa style của backBtn bạn đã viết
     width: 40,
     height: 40,
     borderRadius: 20,
