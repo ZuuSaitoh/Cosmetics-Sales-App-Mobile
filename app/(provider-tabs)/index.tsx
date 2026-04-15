@@ -480,7 +480,7 @@ export default function OrderManagementScreen() {
                     style={styles.btnOutline}
                     onPress={() =>
                       router.push({
-                        pathname: "/(screens)/provider-order-detail" as any,
+                        pathname: "/(screens)/(order)/provider-order-detail" as any,
                         params: { id: item.id },
                       })
                     }

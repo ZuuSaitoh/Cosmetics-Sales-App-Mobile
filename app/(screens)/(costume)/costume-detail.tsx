@@ -372,7 +372,7 @@ export default function CostumeDetailScreen() {
             onPress={() => {
               if (costume?.providerId) {
                 router.push({
-                  pathname: "/(screens)/provider-rental-shop" as any,
+                  pathname: "/(screens)/(order)/provider-rental-shop" as any,
                   params: { providerId: costume.providerId }, // Chuyển sang dùng providerId
                 });
               }
