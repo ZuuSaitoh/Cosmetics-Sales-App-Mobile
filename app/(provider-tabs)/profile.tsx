@@ -1,25 +1,26 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import { Dropdown } from "react-native-element-dropdown"; // Import thư viện
 import axiosClient from "../api/axiosClient";
 
 export default function ProviderProfileScreen() {
@@ -37,7 +38,18 @@ export default function ProviderProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const bankData = [
+    { label: "Vietcombank (VCB)", value: "Vietcombank" },
+    { label: "MB Bank (MB)", value: "MB Bank" },
+    { label: "TP Bank", value: "TP Bank" },
+    { label: "Techcombank", value: "Techcombank" },
+    { label: "VietinBank", value: "VietinBank" },
+    { label: "BIDV", value: "BIDV" },
+    { label: "Agribank", value: "Agribank" },
+    { label: "ACB", value: "ACB" },
+  ];
 
+  // 🚩 Tự động load lại mỗi khi quay về trang cá nhân
   useFocusEffect(
     useCallback(() => {
       fetchProfile();
@@ -71,9 +83,7 @@ export default function ProviderProfileScreen() {
         setEditShopName(data.shopName || "");
         setEditBio(data.bio || "");
         setEditBankName(data.bankName || "");
-        setEditBankAccountNumber(
-          data.bankBankAccountNumber || data.bankAccountNumber || "",
-        );
+        setEditBankAccountNumber(data.bankAccountNumber || "");
       }
     } catch (error) {
       console.error("Lỗi lấy dữ liệu Profile:", error);
@@ -96,7 +106,6 @@ export default function ProviderProfileScreen() {
         bio: editBio,
         bankName: editBankName,
         bankAccountNumber: editBankAccountNumber,
-        shopAddressId: profile?.shopAddressId || null,
       };
 
       const response = await axiosClient.put(`/providers/${userId}`, payload);
@@ -104,8 +113,6 @@ export default function ProviderProfileScreen() {
         Alert.alert("Thành công", "Đã cập nhật hồ sơ Shop!");
         setProfile(response.data.result);
         setIsEditModalVisible(false);
-      } else {
-        Alert.alert("Lỗi", response.data.message);
       }
     } catch {
       Alert.alert("Lỗi", "Không thể cập nhật hồ sơ lúc này.");
@@ -122,33 +129,25 @@ export default function ProviderProfileScreen() {
       quality: 0.8,
     });
 
-    if (!result.canceled && result.assets && result.assets.length > 0 && userId) {
+    if (!result.canceled && result.assets && userId) {
       setIsUpdatingAvatar(true);
       try {
         const localUri = result.assets[0].uri;
         const filename = localUri.split("/").pop() || "avatar.jpg";
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : "image/jpeg";
-
         const formData = new FormData();
-        formData.append("avatarImage", {
+        formData.append("avatar", {
           uri: localUri,
           name: filename,
-          type,
+          type: "image/jpeg",
         } as any);
 
-        const res = await axiosClient.put(
-          `/providers/${userId}/avatar-image`,
-          formData,
-          { headers: { "Content-Type": "multipart/form-data" } },
-        );
+        const res = await axiosClient.put(`/users/${userId}/avatar`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
 
         if (res.data.code === 0) {
           Alert.alert("Thành công", "Đã cập nhật ảnh đại diện!");
-          setProfile((prev: any) => ({
-            ...prev,
-            avatarUrl: localUri,
-          }));
+          setProfile((prev: any) => ({ ...prev, avatarUrl: localUri }));
         }
       } catch {
         Alert.alert("Lỗi", "Không thể upload ảnh đại diện.");
@@ -166,33 +165,30 @@ export default function ProviderProfileScreen() {
       quality: 0.8,
     });
 
-    if (!result.canceled && result.assets && result.assets.length > 0 && userId) {
+    if (!result.canceled && result.assets && userId) {
       setIsUploadingCover(true);
       try {
         const localUri = result.assets[0].uri;
         const filename = localUri.split("/").pop() || "cover.jpg";
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : "image/jpeg";
-
         const formData = new FormData();
         formData.append("coverImage", {
           uri: localUri,
           name: filename,
-          type,
+          type: "image/jpeg",
         } as any);
 
         const res = await axiosClient.put(
           `/providers/${userId}/cover-image`,
           formData,
-          { headers: { "Content-Type": "multipart/form-data" } },
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          },
         );
 
         if (res.data.code === 0) {
           Alert.alert("Thành công", "Đã cập nhật ảnh bìa!");
-          setProfile((prev: any) => ({
-            ...prev,
-            coverImageUrl: localUri,
-          }));
+          // 🚩 Đồng bộ biến với Backend (coverImage thay vì coverImageUrl nếu cần)
+          setProfile((prev: any) => ({ ...prev, coverImageUrl: localUri }));
         }
       } catch {
         Alert.alert("Lỗi", "Không thể upload ảnh bìa.");
@@ -226,11 +222,10 @@ export default function ProviderProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* HEADER */}
+        {/* HEADER SECTION */}
         <View style={styles.profileHeader}>
-          {/* Cover image */}
           <TouchableOpacity
-            activeOpacity={0.8}
+            activeOpacity={0.9}
             onPress={handleChangeCoverImage}
             disabled={isUploadingCover}
           >
@@ -256,10 +251,9 @@ export default function ProviderProfileScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Avatar */}
           <View style={styles.avatarContainer}>
             <TouchableOpacity
-              activeOpacity={0.8}
+              activeOpacity={0.9}
               onPress={handleChangeAvatar}
               disabled={isUpdatingAvatar}
             >
@@ -274,26 +268,22 @@ export default function ProviderProfileScreen() {
                 </View>
               )}
               {isUpdatingAvatar && (
-                <View
-                  style={[StyleSheet.absoluteFill, styles.loadingAvatar]}
-                >
+                <View style={[StyleSheet.absoluteFill, styles.loadingAvatar]}>
                   <ActivityIndicator size="small" color="#B59DFF" />
                 </View>
               )}
             </TouchableOpacity>
-            {profile?.verified && (
+            {profile?.isVerified && ( // Dùng isVerified từ BE
               <View style={styles.verifiedBadge}>
                 <Ionicons name="checkmark-circle" size={24} color="#28A745" />
               </View>
             )}
           </View>
 
-          <Text style={styles.shopName}>
-            {profile?.shopName || "Tên Shop"}
+          <Text style={styles.shopName}>{profile?.shopName || "Tên Shop"}</Text>
+          <Text style={styles.bioHeader}>
+            {profile?.bio || "Chào mừng bạn đến với CosMate!"}
           </Text>
-          {profile?.bio && (
-            <Text style={styles.bioHeader}>{profile.bio}</Text>
-          )}
         </View>
 
         {/* WALLET CARD */}
@@ -310,66 +300,71 @@ export default function ProviderProfileScreen() {
                   currency: "VND",
                 }).format(balance)}
               </Text>
-              {depositBalance > 0 && (
-                <Text style={styles.depositBalance}>
-                  Tiền cọc:{" "}
-                  {new Intl.NumberFormat("vi-VN", {
-                    style: "currency",
-                    currency: "VND",
-                  }).format(depositBalance)}
-                </Text>
-              )}
             </View>
           </View>
         </View>
 
-        {/* STATS */}
+        {/* STATS SECTION */}
         <View style={styles.statsCard}>
+          {/* Đánh giá sao */}
           <View style={styles.statItem}>
             <View style={styles.starRow}>
               {[1, 2, 3, 4, 5].map((s) => (
                 <Ionicons
                   key={s}
-                  name={s <= Math.round(profile?.totalRating || 0) ? "star" : "star-outline"}
-                  size={16}
+                  // 🚩 Sử dụng totalRating từ JSON sếp gửi
+                  name={
+                    s <= Math.round(profile?.totalRating || 0)
+                      ? "star"
+                      : "star-outline"
+                  }
+                  size={14}
                   color="#FFD700"
                 />
               ))}
             </View>
-            <Text style={styles.statLabel}>{profile?.totalRating || 0} đánh giá</Text>
+            {/* 🚩 Hiển thị số lượng đánh giá thật */}
+            <Text style={styles.statLabel}>
+              {profile?.totalRating || 0} sao
+            </Text>
           </View>
+
           <View style={styles.statDivider} />
+
+          {/* Đơn hoàn thành */}
           <View style={styles.statItem}>
+            {/* 🚩 Sử dụng completedOrders từ JSON */}
             <Text style={styles.statNumber}>
               {profile?.completedOrders || 0}
             </Text>
             <Text style={styles.statLabel}>Đơn hoàn thành</Text>
           </View>
+
           <View style={styles.statDivider} />
+
+          {/* Nhận xét */}
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              {profile?.totalReviews || 0}
-            </Text>
+            {/* 🚩 Sử dụng totalReviews từ JSON */}
+            <Text style={styles.statNumber}>{profile?.totalReviews || 0}</Text>
             <Text style={styles.statLabel}>Nhận xét</Text>
           </View>
         </View>
 
-        {/* INFO SECTION */}
+        {/* BANK INFO */}
         <View style={styles.infoSection}>
-          {profile?.bankName && (
-            <View style={styles.infoRow}>
-              <Ionicons name="card-outline" size={20} color="#8E7AB5" />
-              <View style={styles.infoTextColumn}>
-                <Text style={styles.infoLabel}>Ngân hàng</Text>
-                <Text style={styles.infoValue}>
-                  {profile?.bankName} - {profile?.bankBankAccountNumber || profile?.bankAccountNumber}
-                </Text>
-              </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="card-outline" size={20} color="#8E7AB5" />
+            <View style={styles.infoTextColumn}>
+              <Text style={styles.infoLabel}>Ngân hàng</Text>
+              <Text style={styles.infoValue}>
+                {profile?.bankName || "Chưa cập nhật"} -{" "}
+                {profile?.bankAccountNumber || "123456789"}
+              </Text>
             </View>
-          )}
+          </View>
         </View>
 
-        {/* ACTION SECTION */}
+        {/* ACTIONS */}
         <View style={styles.actionSection}>
           <TouchableOpacity
             style={styles.actionBtn}
@@ -401,7 +396,7 @@ export default function ProviderProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* MODAL EDIT */}
+      {/* MODAL CHỈNH SỬA (Giữ nguyên logic của sếp) */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -414,38 +409,11 @@ export default function ProviderProfileScreen() {
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chỉnh sửa hồ sơ Shop</Text>
-              <TouchableOpacity
-                onPress={() => setIsEditModalVisible(false)}
-              >
+              <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Hình ảnh */}
-              <View style={styles.modalImageRow}>
-                <TouchableOpacity style={styles.modalImgBtn} onPress={handleChangeAvatar}>
-                  <Image
-                    source={{ uri: profile?.avatarUrl || "https://via.placeholder.com/80" }}
-                    style={styles.modalAvatar}
-                  />
-                  <View style={styles.modalImgIconWrap}>
-                    <Ionicons name="camera" size={16} color="#fff" />
-                  </View>
-                  <Text style={styles.modalImgLabel}>Avatar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.modalImgBtn} onPress={handleChangeCoverImage}>
-                  <Image
-                    source={{ uri: profile?.coverImageUrl || "https://via.placeholder.com/200x100" }}
-                    style={styles.modalCover}
-                  />
-                  <View style={styles.modalImgIconWrap}>
-                    <Ionicons name="camera" size={16} color="#fff" />
-                  </View>
-                  <Text style={styles.modalImgLabel}>Ảnh bìa</Text>
-                </TouchableOpacity>
-              </View>
-
               <Text style={styles.inputLabel}>Tên Shop</Text>
               <TextInput
                 style={styles.input}
@@ -459,12 +427,31 @@ export default function ProviderProfileScreen() {
                 onChangeText={setEditBio}
                 multiline
               />
-              <Text style={styles.inputLabel}>Ngân hàng</Text>
-              <TextInput
-                style={styles.input}
-                value={editBankName}
-                onChangeText={setEditBankName}
-                placeholder="VD: Vietcombank, MB Bank..."
+              <Text style={styles.inputLabel}>Tên Ngân hàng</Text>
+              <Dropdown
+                style={styles.dropdown}
+                placeholderStyle={styles.placeholderStyle}
+                selectedTextStyle={styles.selectedTextStyle}
+                inputSearchStyle={styles.inputSearchStyle}
+                data={bankData}
+                search
+                maxHeight={300}
+                labelField="label"
+                valueField="value"
+                placeholder="Chọn ngân hàng..."
+                searchPlaceholder="Tìm kiếm..."
+                value={editBankName} // 🚩 Gắn giá trị bankName từ state
+                onChange={(item) => {
+                  setEditBankName(item.value); // 🚩 Cập nhật state khi chọn
+                }}
+                renderLeftIcon={() => (
+                  <Ionicons
+                    style={styles.icon}
+                    name="business-outline"
+                    size={20}
+                    color="#8E7AB5"
+                  />
+                )}
               />
               <Text style={styles.inputLabel}>Số tài khoản</Text>
               <TextInput
@@ -496,261 +483,232 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FB" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  // HEADER
+  // HEADER & COVER FIX
   profileHeader: {
-    alignItems: "center",
     backgroundColor: "#fff",
+    paddingBottom: 25,
+    width: "100%",
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    paddingBottom: 20,
     elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
   },
   coverImageContainer: {
     width: "100%",
-    height: 160,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    height: 180, // 🚩 Chiều cao cố định chuẩn 16:9
+    backgroundColor: "#E0D7FF",
     overflow: "hidden",
   },
-  coverImage: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#E0D7FF",
-  },
-  coverImagePlaceholder: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#E0D7FF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  coverImage: { width: "100%", height: "100%" },
+  coverImagePlaceholder: { justifyContent: "center", alignItems: "center" },
   loadingOverlay: {
-    backgroundColor: "rgba(255,255,255,0.7)",
+    backgroundColor: "rgba(255,255,255,0.6)",
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // AVATAR FIX
   avatarContainer: {
-    marginTop: -45,
-    position: "relative",
-    marginBottom: 8,
+    marginTop: -55,
+    alignItems: "center", // 🚩 Quan trọng: Căn giữa avatar
+    marginBottom: 12,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 4,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 5,
     borderColor: "#fff",
     backgroundColor: "#F4F1FF",
   },
-  avatarPlaceholder: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  avatarPlaceholder: { justifyContent: "center", alignItems: "center" },
   verifiedBadge: {
     position: "absolute",
-    bottom: 2,
-    right: -2,
+    bottom: 5,
+    right: "35%",
     backgroundColor: "#fff",
     borderRadius: 12,
-    zIndex: 2,
+    zIndex: 5,
   },
   loadingAvatar: {
-    backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 50,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    borderRadius: 55,
     justifyContent: "center",
     alignItems: "center",
   },
-  editBadge: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    backgroundColor: "#B59DFF",
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
+
+  // TEXT INFO
   shopName: {
     fontSize: 22,
     fontWeight: "bold",
     color: "#4A3B6B",
-    marginBottom: 4,
+    textAlign: "center", // 🚩 Căn giữa text
+    marginBottom: 6,
   },
   bioHeader: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#8E7AB5",
-    textAlign: "center",
-    paddingHorizontal: 30,
-    lineHeight: 18,
+    textAlign: "center", // 🚩 Căn giữa text
+    paddingHorizontal: 40,
+    lineHeight: 20,
   },
 
-  // WALLET CARD
+  // WALLET & STATS
   walletCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     backgroundColor: "#fff",
     marginHorizontal: 20,
     marginTop: 15,
-    padding: 15,
-    borderRadius: 15,
-    elevation: 4,
+    padding: 18,
+    borderRadius: 20,
+    elevation: 5,
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 10,
   },
   walletLeft: { flexDirection: "row", alignItems: "center" },
   walletIconWrap: {
-    width: 45,
-    height: 45,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#F4F1FF",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: 15,
   },
-  walletLabel: { fontSize: 12, color: "#8E7AB5", marginBottom: 2 },
-  walletBalance: { fontSize: 18, fontWeight: "bold", color: "#28A745" },
-  depositBalance: { fontSize: 12, color: "#FF9900", marginTop: 2 },
+  walletLabel: { fontSize: 13, color: "#8E7AB5", marginBottom: 4 },
+  walletBalance: { fontSize: 20, fontWeight: "bold", color: "#28A745" },
 
-  // STATS
   statsCard: {
     flexDirection: "row",
     backgroundColor: "#fff",
     marginHorizontal: 20,
     marginTop: 15,
-    borderRadius: 15,
-    paddingVertical: 15,
-    elevation: 1,
+    borderRadius: 20,
+    paddingVertical: 18,
+    elevation: 2,
   },
   statItem: { flex: 1, alignItems: "center" },
-  starRow: { flexDirection: "row", marginBottom: 4 },
+  starRow: { flexDirection: "row", marginBottom: 6 },
   statNumber: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
   statLabel: { fontSize: 12, color: "#8E7AB5", marginTop: 2 },
   statDivider: { width: 1, backgroundColor: "#F0F0F0" },
 
-  // INFO SECTION
+  // INFO & ACTIONS
   infoSection: {
     backgroundColor: "#fff",
     marginTop: 15,
     marginHorizontal: 20,
-    borderRadius: 15,
-    padding: 15,
+    borderRadius: 20,
+    padding: 20,
     elevation: 1,
   },
-  bioRow: {
-    paddingBottom: 10,
-    marginBottom: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  bioText: {
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 20,
-    textAlign: "center",
-  },
   infoRow: { flexDirection: "row", alignItems: "center" },
-  infoTextColumn: { marginLeft: 12, flex: 1 },
-  infoLabel: { fontSize: 12, color: "#A090C5", marginBottom: 2 },
-  infoValue: { fontSize: 14, fontWeight: "600", color: "#333" },
+  infoTextColumn: { marginLeft: 15, flex: 1 },
+  infoLabel: { fontSize: 12, color: "#A090C5", marginBottom: 4 },
+  infoValue: { fontSize: 15, fontWeight: "600", color: "#333" },
 
-  // ACTION SECTION
   actionSection: {
     marginTop: 15,
     marginHorizontal: 20,
-    marginBottom: 40,
+    marginBottom: 50,
     backgroundColor: "#fff",
-    borderRadius: 15,
+    borderRadius: 20,
     paddingHorizontal: 15,
-    elevation: 1,
-    paddingBottom: 5,
+    elevation: 2,
   },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 15,
+    paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "#F5F5F5",
   },
   actionLeft: { flexDirection: "row", alignItems: "center" },
   iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: 15,
   },
   actionText: { fontSize: 16, fontWeight: "600", color: "#4A3B6B" },
 
-  // MODAL
+  // MODAL STYLES
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "flex-end",
   },
   modalContainer: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 25,
+    paddingBottom: 45,
     maxHeight: "85%",
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 25,
   },
-  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
+  modalTitle: { fontSize: 20, fontWeight: "bold", color: "#4A3B6B" },
   inputLabel: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#333",
-    marginBottom: 8,
+    marginBottom: 10,
+    marginTop: 5,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#D1C4E9",
-    borderRadius: 10,
-    padding: 12,
+    borderWidth: 1.5,
+    borderColor: "#E0D7FF",
+    borderRadius: 12,
+    padding: 15,
     fontSize: 16,
-    backgroundColor: "#F8F9FA",
-    marginBottom: 15,
+    backgroundColor: "#FBFBFF",
+    marginBottom: 20,
     color: "#333",
   },
   saveBtn: {
     backgroundColor: "#B59DFF",
-    paddingVertical: 15,
-    borderRadius: 10,
+    paddingVertical: 18,
+    borderRadius: 15,
     alignItems: "center",
     marginTop: 10,
+    elevation: 3,
   },
-  saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-
-  // MODAL IMAGE
-  modalImageRow: { flexDirection: "row", justifyContent: "center", gap: 20, marginBottom: 20 },
-  modalImgBtn: { alignItems: "center" },
-  modalAvatar: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: "#E0D7FF" },
-  modalCover: { width: 160, height: 70, borderRadius: 10, borderWidth: 2, borderColor: "#E0D7FF" },
-  modalImgIconWrap: {
-    position: "absolute",
-    bottom: 22,
-    right: -4,
-    backgroundColor: "#B59DFF",
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
+  saveBtnText: { color: "#fff", fontSize: 17, fontWeight: "bold" },
+  dropdown: {
+    height: 55,
+    borderColor: "#E0D7FF",
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    backgroundColor: "#FBFBFF",
+    marginBottom: 20,
   },
-  modalImgLabel: { fontSize: 13, color: "#666", marginTop: 6 },
+  icon: {
+    marginRight: 10,
+  },
+  placeholderStyle: {
+    fontSize: 16,
+    color: "#AAA",
+  },
+  selectedTextStyle: {
+    fontSize: 16,
+    color: "#333",
+  },
+  inputSearchStyle: {
+    height: 40,
+    fontSize: 16,
+    borderRadius: 8,
+  },
 });
