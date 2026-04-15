@@ -323,7 +323,29 @@ export default function OrderDetailScreen() {
           )}
         </View>
 
-        {/* ... Các phần Địa chỉ, Sản phẩm, Đánh giá giữ nguyên như cũ ... */}
+        {/* KHIẾU NẠI */}
+        {order.status === "DISPUTE" && (
+          <TouchableOpacity
+            style={styles.disputeCard}
+            onPress={() =>
+              router.push({
+                pathname: "/(screens)/dispute-detail",
+                params: { orderId: order.id },
+              } as any)
+            }
+          >
+            <View style={styles.disputeCardLeft}>
+              <View style={styles.disputeIconWrap}>
+                <Ionicons name="warning" size={22} color="#FF9800" />
+              </View>
+              <View>
+                <Text style={styles.disputeTitle}>Khiếu nại đang xử lý</Text>
+                <Text style={styles.disputeSub}>Xem chi tiết</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+          </TouchableOpacity>
+        )}
 
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -803,4 +825,31 @@ const styles = StyleSheet.create({
   stepLabelActive: { color: "#B59DFF", fontWeight: "bold" },
   stepLabelRed: { color: "#DC3545", fontWeight: "bold" },
   stepCurrent: { fontSize: 12, color: "#B59DFF", marginTop: 2 },
+
+  // Dispute card
+  disputeCard: {
+    backgroundColor: "#fff",
+    marginHorizontal: 10,
+    marginTop: 12,
+    padding: 15,
+    borderRadius: 12,
+    elevation: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF9800",
+  },
+  disputeCardLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
+  disputeIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FFF3E0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  disputeTitle: { fontSize: 15, fontWeight: "bold", color: "#333" },
+  disputeSub: { fontSize: 13, color: "#999", marginTop: 2 },
 });

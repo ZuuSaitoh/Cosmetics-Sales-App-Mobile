@@ -169,81 +169,70 @@ export default function BookingScreen() {
       const decoded: any = jwtDecode(token);
       const cosplayerId = Number(decoded.sub);
 
-      // BƯỚC 1: Tạo đơn hàng trước
+      // 🚩 Ghi chú: Đảm bảo IP này khớp với IP máy chạy Backend của sếp nhé
+      const SERVER_IP = "10.88.54.16";
+
+      // Xây dựng returnUrl chuẩn để Backend xử lý Redirect sau thanh toán
+      const returnUrl =
+        selectedPaymentMethod === "VNPAY"
+          ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
+          : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
+
+      // Payload được đóng gói đúng theo Request Body của Swagger
       const payload = {
         costumeId: Number(id),
         rentDay: actualNumDays,
         rentStart: rentStartDate.toISOString(),
         paymentMethod: selectedPaymentMethod,
+        returnUrl: returnUrl,
         cosplayerAddressId: selectedAddress.id,
         selectedAccessoryIds: selectedAccessoryIds,
         selectedRentalOptionId: selectedOptionId || null,
       };
 
+      // Gọi API POST /api/orders với tham số cosplayerId trên Query String
       const res = await axiosClient.post(
         `/orders?cosplayerId=${cosplayerId}`,
         payload,
       );
 
       if (res.data.code === 0) {
-        const orderId = res.data.result.id;
+        // 🚩 Lấy dữ liệu từ object 'result' theo đúng sơ đồ mới
+        const orderData = res.data.result;
 
-        // BƯỚC 2: Xử lý theo phương thức thanh toán
+        // Xử lý luồng thanh toán qua cổng VNPAY hoặc MOMO
         if (
           selectedPaymentMethod === "VNPAY" ||
           selectedPaymentMethod === "MOMO"
         ) {
-          const SERVER_IP = "10.88.54.16";
-          const returnUrl =
-            selectedPaymentMethod === "VNPAY"
-              ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
-              : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
+          // 🚩 Lấy trực tiếp trường 'paymentUrl' từ Backend trả về
+          const paymentUrl = orderData.paymentUrl;
 
-          const paymentRes = await axiosClient.post(
-            `/orders/${orderId}/pay`,
-            null,
-            {
-              params: {
-                cosplayerId: cosplayerId,
-                paymentMethod: selectedPaymentMethod,
-                returnUrl: returnUrl,
-              },
-            },
-          );
+          if (paymentUrl && typeof paymentUrl === "string") {
+            console.log("[Booking] Mở liên kết thanh toán:", paymentUrl);
 
-          if (paymentRes.data.code === 0) {
-            const result = paymentRes.data.result;
-            let paymentUrl: string | null = null;
+            // Mở trình duyệt để khách thực hiện thanh toán
+            await Linking.openURL(paymentUrl);
 
-            if (typeof result === "string") {
-              paymentUrl = result;
-            } else if (typeof result === "object") {
-              paymentUrl =
-                result.url ||
-                result.paymentUrl ||
-                result.deeplink ||
-                result.payUrl ||
-                result;
-            }
-
-            if (paymentUrl && typeof paymentUrl === "string") {
-              console.log("[Booking] paymentUrl:", paymentUrl);
-              await Linking.openURL(paymentUrl);
-              router.replace("/(tabs)/profile" as any);
-            } else {
-              Alert.alert("Lỗi", "Không lấy được URL thanh toán.");
-            }
+            // Chuyển hướng user về trang cá nhân để theo dõi trạng thái đơn
+            router.replace("/(tabs)/profile" as any);
+          } else {
+            Alert.alert(
+              "Lỗi",
+              "Hệ thống không nhận được link thanh toán từ Backend.",
+            );
           }
         } else {
-          // WALLET: Backend tự trừ tiền
+          // Trường hợp dùng ví nội bộ WALLET (thanh toán thành công ngay)
           Alert.alert(
             "Thành công",
-            "Đã chốt đơn thành công! Chúc bạn cosplay vui vẻ!",
+            "Đã thanh toán đơn hàng thành công qua ví CosMate!",
             [{ text: "Đã hiểu", onPress: () => router.replace("/(tabs)") }],
           );
         }
       }
     } catch (err: any) {
+      console.error("Lỗi đặt đơn hàng:", err);
       Alert.alert("Lỗi", err.response?.data?.message || "Đặt đồ thất bại.");
     } finally {
       setIsBooking(false);
