@@ -212,7 +212,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.depositBtn}
-            onPress={() => router.push("/(screens)/top-up" as any)}
+            onPress={() => router.push("/(screens)/(payment)/top-up" as any)}
           >
             <Text style={styles.depositBtnText}>Nạp tiền</Text>
           </TouchableOpacity>
@@ -268,7 +268,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.actionBtn}
-            onPress={() => router.push("/(screens)/address-book" as any)}
+            onPress={() => router.push("/(screens)/(user)/address-book" as any)}
           >
             <View style={styles.actionLeft}>
               <View style={[styles.iconWrap, { backgroundColor: "#E8F5E9" }]}>
@@ -343,8 +343,10 @@ export default function ProfileScreen() {
               onPress={() => {
                 setIsEditModalVisible(false);
                 router.push({
-                  pathname: "/(screens)/reset-password",
-                  params: { identifier: profile?.email || profile?.username || "" },
+                  pathname: "/(screens)/(auth)/reset-password",
+                  params: {
+                    identifier: profile?.email || profile?.username || "",
+                  },
                 });
               }}
             >

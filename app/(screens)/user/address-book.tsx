@@ -17,7 +17,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import axiosClient from "../../api/axiosClient";
 
 export default function AddressBookScreen() {
   const [addresses, setAddresses] = useState([]);

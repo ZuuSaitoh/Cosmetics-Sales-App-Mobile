@@ -86,7 +86,7 @@ export default function ProviderItemsScreen() {
             <TouchableOpacity 
               style={styles.btnEdit}
               onPress={() => router.push({ 
-                pathname: "/(screens)/edit-costume" as any, 
+                pathname: "/(screens)/(costume)/edit-costume" as any, 
                 params: { id: item.id } 
               })}
             >

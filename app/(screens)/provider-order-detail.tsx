@@ -242,7 +242,7 @@ export default function ProviderOrderDetailScreen() {
                 style={[styles.btnRed, { flex: 1 }]}
                 onPress={() =>
                   router.push({
-                    pathname: "/(screens)/create-dispute",
+                    pathname: "/(screens)/(dispute)/create-dispute",
                     params: { orderId: order.id },
                   } as any)
                 }

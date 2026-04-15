@@ -19,7 +19,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import axiosClient from "../../api/axiosClient";
 
 export default function BookingScreen() {
   const { id } = useLocalSearchParams();
@@ -511,7 +511,7 @@ export default function BookingScreen() {
               style={styles.addAddressBtn}
               onPress={() => {
                 setIsAddressModalVisible(false);
-                router.push("/(screens)/address-book" as any);
+                router.push("/(screens)/(user)/address-book" as any);
               }}
             >
               <Feather name="plus" size={18} color="#B59DFF" />
