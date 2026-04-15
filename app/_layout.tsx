@@ -1,9 +1,10 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function RootLayout() {
   return (
-    <>
+    <SafeAreaProvider>
       {/* Luôn hiển thị chữ đen trên thanh trạng thái (pin, wifi, đồng hồ) */}
       <StatusBar style="dark" backgroundColor="#ffffff" />
 
@@ -14,6 +15,6 @@ export default function RootLayout() {
         <Stack.Screen name="(provider-tabs)" />
         <Stack.Screen name="(provider-service-tabs)" />
       </Stack>
-    </>
+    </SafeAreaProvider>
   );
 }

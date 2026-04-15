@@ -6,13 +6,13 @@ import {
   FlatList,
   Image,
   RefreshControl,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import axiosClient from "../api/axiosClient";
 
 // 🚩 1. Định nghĩa Interface để tránh lỗi 'never'
