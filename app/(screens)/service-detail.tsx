@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import axiosClient from "../api/axiosClient";
 
 export default function ServiceDetailScreen() {
@@ -278,6 +278,37 @@ export default function ServiceDetailScreen() {
           <Text style={styles.btnSubmitText}>Đặt dịch vụ</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* BOTTOM BAR */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={styles.chatButton}
+          onPress={() => {
+            if (!service?.providerId) {
+              Alert.alert("Thông báo", "Không tìm thấy thông tin nhà cung cấp.");
+              return;
+            }
+            router.push({
+              pathname: "/(screens)/chat-detail" as any,
+              params: {
+                partnerId: service.providerId,
+                partnerName: service.shopName || service.cosplayerName || "Nhà cung cấp",
+              },
+            });
+          }}
+        >
+          <Ionicons
+            name="chatbubble-ellipses-outline"
+            size={24}
+            color="#B59DFF"
+          />
+          <Text style={styles.chatText}>Chat</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.rentButton} onPress={handleBooking}>
+          <Text style={styles.rentButtonText}>Đặt dịch vụ</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -329,4 +360,34 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 18, fontWeight: "bold", color: "#B59DFF" },
   btnSubmit: { backgroundColor: "#B59DFF", padding: 18, borderRadius: 30, alignItems: "center", marginTop: 30, marginBottom: 20 },
   btnSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  bottomBar: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#EEE",
+    alignItems: "center",
+    paddingBottom: 25,
+  },
+  chatButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#E0D7FF",
+    backgroundColor: "#fff",
+    marginRight: 12,
+  },
+  chatText: { fontSize: 11, color: "#B59DFF", marginTop: 2, fontWeight: "600" },
+  rentButton: {
+    flex: 1,
+    backgroundColor: "#B59DFF",
+    paddingVertical: 14,
+    borderRadius: 30,
+    alignItems: "center",
+  },
+  rentButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });

@@ -1,6 +1,26 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons'; 
-import { Platform } from 'react-native'; // Import thêm để check máy
+import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { Platform, View, Text, StyleSheet } from "react-native";
+import { useUnreadChatCount } from "../../hooks/useUnreadChatCount";
+
+function ChatTabIcon({ color, focused }: { color: string; focused: boolean }) {
+  const { count } = useUnreadChatCount();
+
+  return (
+    <View style={{ position: "relative" }}>
+      <Ionicons
+        name={focused ? "chatbubbles" : "chatbubbles-outline"}
+        size={24}
+        color={color}
+      />
+      {count > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{count > 99 ? "99+" : count}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function TabsLayout() {
   return (
@@ -8,24 +28,16 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: '#B59DFF',
-        tabBarInactiveTintColor: '#C4B9DF',
-        
-        // --- ĐÃ CẬP NHẬT: STYLE CHÂN DÀI BÁM ĐÁY ---
+        tabBarActiveTintColor: "#B59DFF",
+        tabBarInactiveTintColor: "#C4B9DF",
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: "#FFFFFF",
           borderTopWidth: 1,
-          borderTopColor: '#F2F2F2',
-          
-          // Chiều cao cực đại để đẩy icon lên
-          height: Platform.OS === 'ios' ? 100 : 80, 
-          
-          // Lực đẩy từ dưới lên
-          paddingBottom: Platform.OS === 'ios' ? 40 : 25, 
+          borderTopColor: "#F2F2F2",
+          height: Platform.OS === "ios" ? 100 : 80,
+          paddingBottom: Platform.OS === "ios" ? 40 : 25,
           paddingTop: 12,
-          
-          // Xóa bỏ các thuộc tính float cũ
-          position: 'relative',
+          position: "relative",
           bottom: 0,
           left: 0,
           right: 0,
@@ -35,22 +47,21 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: 'bold',
+          fontWeight: "bold",
           marginTop: 4,
-        }
+        },
       }}
     >
-
       {/* NÚT : TRANG CHỦ */}
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Trang chủ',
+          title: "Trang chủ",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? "home" : "home-outline"} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
             />
           ),
         }}
@@ -60,56 +71,53 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Đơn hàng',
+          title: "Đơn hàng",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? "receipt" : "receipt-outline"} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? "receipt" : "receipt-outline"}
+              size={24}
+              color={color}
             />
           ),
         }}
       />
-        {/* NÚT : THÔNG BÁO */}
-        <Tabs.Screen
-  name="notifications"
-  options={{
-    title: 'Thông báo',
-    tabBarIcon: ({ color, focused }) => (
-      <Ionicons 
-        name={focused ? "notifications" : "notifications-outline"} 
-        size={24} 
-        color={color} 
-      />
-    ),
-  }}
-/>
 
-{/* NÚT : TIN NHẮN */}
-        <Tabs.Screen
-          name="chats"
-          options={{
-            title: 'Tin nhắn',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons 
-                name={focused ? "chatbubbles" : "chatbubbles-outline"} 
-                size={24} 
-                color={color} 
-              />
-            ),
-          }}
-        />
+      {/* NÚT : THÔNG BÁO */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Thông báo",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "notifications" : "notifications-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      {/* NÚT : TIN NHẮN */}
+      <Tabs.Screen
+        name="chats"
+        options={{
+          title: "Tin nhắn",
+          tabBarIcon: ({ color, focused }) => (
+            <ChatTabIcon color={color} focused={focused} />
+          ),
+        }}
+      />
 
       {/* NÚT : TRANG CÁ NHÂN */}
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Cá nhân',
+          title: "Cá nhân",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? "person" : "person-outline"} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={24}
+              color={color}
             />
           ),
         }}
@@ -117,3 +125,23 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    backgroundColor: "#FF6B6B",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+});
