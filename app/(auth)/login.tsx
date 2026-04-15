@@ -1,5 +1,5 @@
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import axiosClient from "../api/axiosClient";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useState } from "react";
@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import axiosClient from "../api/axiosClient";
 
 const isValidEmail = (email: string) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -25,7 +25,9 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
+    {},
+  );
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -73,11 +75,17 @@ export default function LoginScreen() {
           Alert.alert("Lỗi phân quyền", "Tài khoản không hợp lệ!");
         }
       } else {
-        Alert.alert("Đăng nhập thất bại", response.data.message || "Sai thông tin.");
+        Alert.alert(
+          "Đăng nhập thất bại",
+          response.data.message || "Sai thông tin.",
+        );
       }
     } catch (error: any) {
       if (error.response) {
-        Alert.alert("Lỗi", error.response.data?.message || "Sai tài khoản hoặc mật khẩu.");
+        Alert.alert(
+          "Lỗi",
+          error.response.data?.message || "Sai tài khoản hoặc mật khẩu.",
+        );
       } else {
         Alert.alert("Lỗi kết nối", "Không thể kết nối đến máy chủ.");
       }
@@ -113,13 +121,17 @@ export default function LoginScreen() {
         <View>
           <View style={styles.passwordWrapper}>
             <TextInput
-              style={[styles.passwordInput, errors.password && styles.inputError]}
+              style={[
+                styles.passwordInput,
+                errors.password && styles.inputError,
+              ]}
               placeholder="Mật khẩu"
               placeholderTextColor="#A090C5"
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
-                if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
+                if (errors.password)
+                  setErrors((e) => ({ ...e, password: undefined }));
               }}
               secureTextEntry={!showPassword}
             />
@@ -136,7 +148,9 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+          {errors.password && (
+            <Text style={styles.errorText}>{errors.password}</Text>
+          )}
         </View>
 
         <TouchableOpacity
@@ -172,8 +186,19 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FA", justifyContent: "center" },
   formContainer: { paddingHorizontal: 30 },
-  title: { fontSize: 40, fontWeight: "900", color: "#4A3B6B", textAlign: "center", marginBottom: 5 },
-  subtitle: { fontSize: 16, color: "#8E7AB5", textAlign: "center", marginBottom: 40 },
+  title: {
+    fontSize: 40,
+    fontWeight: "900",
+    color: "#4A3B6B",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#8E7AB5",
+    textAlign: "center",
+    marginBottom: 40,
+  },
   input: {
     backgroundColor: "#FFFFFF",
     height: 55,

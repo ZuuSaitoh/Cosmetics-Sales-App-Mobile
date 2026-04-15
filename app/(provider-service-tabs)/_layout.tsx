@@ -1,6 +1,26 @@
-import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Platform } from "react-native";
+import { Tabs } from "expo-router";
+import { Platform, StyleSheet, Text, View } from "react-native";
+import { useUnreadChatCount } from "../../hooks/useUnreadChatCount";
+
+function ChatTabIcon({ color, focused }: { color: string; focused: boolean }) {
+  const { count } = useUnreadChatCount();
+
+  return (
+    <View style={{ position: "relative" }}>
+      <Ionicons
+        name={focused ? "chatbubbles" : "chatbubbles-outline"}
+        size={24}
+        color={color}
+      />
+      {count > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{count > 99 ? "99+" : count}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function ProviderServiceTabLayout() {
   return (
@@ -8,7 +28,7 @@ export default function ProviderServiceTabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: "#B59DFF",
-        tabBarInactiveTintColor: "#999",
+        tabBarInactiveTintColor: "#C4B9DF",
         tabBarStyle: {
           backgroundColor: "#ffffff",
           borderTopWidth: 1,
@@ -16,16 +36,18 @@ export default function ProviderServiceTabLayout() {
           height: Platform.OS === "ios" ? 100 : 80,
           paddingBottom: Platform.OS === "ios" ? 40 : 25,
           paddingTop: 12,
+          position: "relative",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          borderRadius: 0,
           elevation: 0,
           shadowOpacity: 0,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: "600",
+          fontWeight: "bold",
           marginTop: 4,
-        },
-        tabBarIconStyle: {
-          marginBottom: 0,
         },
       }}
     >
@@ -56,6 +78,28 @@ export default function ProviderServiceTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Thông báo",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "notifications" : "notifications-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="chats"
+        options={{
+          title: "Tin nhắn",
+          tabBarIcon: ({ color, focused }) => (
+            <ChatTabIcon color={color} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Cá nhân",
@@ -71,3 +115,23 @@ export default function ProviderServiceTabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    backgroundColor: "#FF6B6B",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+});

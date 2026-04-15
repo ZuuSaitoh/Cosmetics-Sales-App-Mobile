@@ -15,19 +15,27 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import axiosClient from "../api/axiosClient";
 
-// 🚩 1. Định nghĩa Interface để tránh lỗi 'never'
-interface Service {
+// Interface cho Provider (từ /providers/role/{roleName})
+interface Provider {
   id: number;
-  serviceType: string;
-  description: string;
-  pricePerSlot: number;
-  imageUrls: string[];
+  userId: number;
+  shopName: string;
+  shopAddressId: number;
+  avatarUrl: string;
+  coverImageUrl: string;
+  bio: string;
+  socialAccount: string;
+  bankName: string;
+  verified: boolean;
+  completedOrders: number;
+  totalRating: number;
+  totalReviews: number;
 }
 
 export default function UserHomeScreen() {
   const [costumes, setCostumes] = useState<any[]>([]);
-  const [photographers, setPhotographers] = useState<Service[]>([]); // 🚩 State thợ ảnh
-  const [staffs, setStaffs] = useState<Service[]>([]); // 🚩 State staff
+  const [photographers, setPhotographers] = useState<Provider[]>([]); // State thợ ảnh
+  const [staffs, setStaffs] = useState<Provider[]>([]); // State staff
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,21 +44,21 @@ export default function UserHomeScreen() {
     fetchData();
   }, []);
 
-  // 🚩 2. Cập nhật hàm lấy dữ liệu để lấy cả dịch vụ
+  // Gọi API đúng: /providers/role/PROVIDER_PHOTOGRAPHER và PROVIDER_EVENT_STAFF
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      // Gọi song song để tối ưu tốc độ
       const [costumeRes, photoRes, staffRes] = await Promise.all([
         axiosClient.get("/costumes"),
-        axiosClient.get("/services/type/PHOTOGRAPHER"),
-        axiosClient.get("/services/type/EVENT_STAFF"),
+        axiosClient.get("/providers/role/PROVIDER_PHOTOGRAPHER"),
+        axiosClient.get("/providers/role/PROVIDER_EVENT_STAFF"),
       ]);
 
       if (costumeRes.data.code === 0) setCostumes(costumeRes.data.result || []);
       if (photoRes.data.code === 0)
         setPhotographers(photoRes.data.result || []);
-      if (staffRes.data.code === 0) setStaffs(staffRes.data.result || []);
+      if (staffRes.data.code === 0)
+        setStaffs(staffRes.data.result || []);
     } catch (error) {
       console.error("Lỗi tải dữ liệu Home:", error);
     } finally {
@@ -84,30 +92,42 @@ export default function UserHomeScreen() {
     }).format(price || 0);
   };
 
-  // 🚩 3. UI cho từng ô Dịch vụ (Photographer/Staff)
-  const renderServiceItem = ({ item }: { item: Service }) => (
+  // UI hiển thị Provider (thợ ảnh / staff)
+  const renderServiceItem = ({ item }: { item: Provider }) => (
     <TouchableOpacity
       style={styles.serviceCard}
       onPress={() =>
         router.push({
-          pathname: "/(screens)/service-detail" as any,
-          params: { id: item.id },
+          pathname: "/(provider-service-tabs)/photographer" as any,
+          params: { providerId: item.id },
         })
       }
     >
       <Image
         source={{
-          uri: item.imageUrls?.[0] || "https://via.placeholder.com/150",
+          uri: item.coverImageUrl || item.avatarUrl || "https://via.placeholder.com/150",
         }}
         style={styles.serviceImage}
       />
       <View style={styles.serviceInfo}>
-        <Text style={styles.serviceName} numberOfLines={1}>
-          {item.description}
+        <View style={styles.serviceNameRow}>
+          <Text style={styles.serviceName} numberOfLines={1}>
+            {item.shopName}
+          </Text>
+          {item.verified && (
+            <Ionicons name="checkmark-circle" size={14} color="#28A745" style={{ marginLeft: 4 }} />
+          )}
+        </View>
+        <Text style={styles.serviceMeta}>
+          {item.completedOrders} đơn hoàn thành
         </Text>
-        <Text style={styles.servicePrice}>
-          {formatPrice(item.pricePerSlot)}
-        </Text>
+        <View style={styles.ratingRow}>
+          <Ionicons name="star" size={12} color="#FFD700" />
+          <Text style={styles.ratingText}>
+            {item.totalRating > 0 ? item.totalRating.toFixed(1) : "Mới"}
+            {item.totalReviews > 0 ? ` (${item.totalReviews})` : ""}
+          </Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -159,7 +179,7 @@ export default function UserHomeScreen() {
         <Text style={styles.sectionTitle}>Thợ ảnh nổi bật</Text>
         <TouchableOpacity
           onPress={() =>
-            router.push("/(provider-service-tabs)/photographer" as any)
+            router.push("/(screens)/all-photographers" as any)
           }
         >
           <Text style={styles.seeAllText}>Xem tất cả</Text>
@@ -299,7 +319,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
   },
   serviceInfo: { padding: 8 },
-  serviceName: { fontSize: 13, fontWeight: "600", color: "#333" },
+  serviceNameRow: { flexDirection: "row", alignItems: "center" },
+  serviceName: { fontSize: 13, fontWeight: "600", color: "#333", flex: 1 },
+  serviceMeta: { fontSize: 11, color: "#888", marginTop: 2 },
+  ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 2, gap: 3 },
+  ratingText: { fontSize: 11, color: "#666" },
   servicePrice: {
     fontSize: 13,
     color: "#B59DFF",
