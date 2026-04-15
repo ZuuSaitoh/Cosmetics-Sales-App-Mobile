@@ -82,7 +82,7 @@ export default function CreateDisputeScreen() {
     try {
       const res = await axiosClient.post(`/disputes?orderId=${orderId}`, {
         reason,
-        images,
+        files,
       });
 
       if (res.data.code === 0) {
