@@ -23,8 +23,41 @@ export default function OrderDetailScreen() {
   const [order, setOrder] = useState<any>(null);
   const [trackings, setTrackings] = useState<any[]>([]); // 🚩 State mới cho tracking
   const [isLoading, setIsLoading] = useState(true);
+
+  // === TIMELINE CỐ ĐỊNH THEO FLOW ĐƠN HÀNG ===
+  const ORDER_STEPS = [
+    { key: "UNPAID", label: "Chờ thanh toán" },
+    { key: "PAID", label: "Đã thanh toán" },
+    { key: "PREPARING", label: "Đang chuẩn bị" },
+    { key: "SHIPPING_OUT", label: "Đang giao đi" },
+    { key: "DELIVERY_OUT", label: "Đã giao hàng" },
+    { key: "IN_USE", label: "Đang sử dụng" },
+    { key: "SHIPPING_BACK", label: "Đang trả hàng" },
+    { key: "COMPLETED", label: "Hoàn thành" },
+  ];
+
+  const getStepStatus = (stepKey: string): "completed" | "active" | "pending" => {
+    if (!order) return "pending";
+    const currentStatus = order.status;
+    // CANCELLED → highlight dispute path
+    if (currentStatus === "CANCELLED") {
+      if (["UNPAID", "PAID"].includes(stepKey)) return "completed";
+      return "pending";
+    }
+    // DISPUTE
+    if (currentStatus === "DISPUTE") {
+      if (["UNPAID", "PAID", "PREPARING", "SHIPPING_OUT", "DELIVERY_OUT"].includes(stepKey)) return "completed";
+      return "pending";
+    }
+    const stepIndex = ORDER_STEPS.findIndex((s) => s.key === stepKey);
+    const currentIndex = ORDER_STEPS.findIndex((s) => s.key === currentStatus);
+    if (stepIndex < currentIndex) return "completed";
+    if (stepIndex === currentIndex) return "active";
+    return "pending";
+  };
   const [initialIndex, setInitialIndex] = useState(0);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
   const { width: screenWidth } = Dimensions.get("window");
   const [review, setReview] = useState<any>(null);
   const reviewImages = Array.isArray(review?.images) ? review.images : [];
@@ -193,54 +226,101 @@ export default function OrderDetailScreen() {
           <Ionicons name="cube-outline" size={40} color="#fff" />
         </View>
 
-        {/* 1. TIMELINE TRACKING (Đã cập nhật state mới) */}
+        {/* 1. TIMELINE TRACKING */}
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
+          <View
+            style={styles.cardHeaderClickable}
+            onTouchEnd={() => setIsTimelineExpanded(!isTimelineExpanded)}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Ionicons name="navigate-circle-outline" size={20} color="#B59DFF" />
+              <Text style={styles.cardTitle}>Lịch sử đơn hàng</Text>
+            </View>
             <Ionicons
-              name="navigate-circle-outline"
+              name={isTimelineExpanded ? "chevron-up" : "chevron-down"}
               size={20}
-              color="#B59DFF"
+              color="#999"
             />
-            <Text style={styles.cardTitle}>Lịch sử đơn hàng</Text>
           </View>
 
-          <View style={styles.trackingContainer}>
-            {trackings && trackings.length > 0 ? (
-              trackings.map((track: any, index: number) => {
-                const isFirst = index === 0;
+          {/* THU GỌN: chỉ hiện bước hiện tại */}
+          {!isTimelineExpanded && (
+            <View style={styles.timelineCollapsed}>
+              {(() => {
+                const currentStep = ORDER_STEPS.find((s) => s.key === order.status) || ORDER_STEPS[0];
                 return (
-                  <View key={track.id} style={styles.trackingRow}>
-                    <View style={styles.timelineColumn}>
-                      <View
-                        style={[
-                          styles.dot,
-                          isFirst ? styles.dotActive : styles.dotInactive,
-                        ]}
-                      />
-                      {index !== trackings.length - 1 && (
-                        <View style={styles.line} />
-                      )}
+                  <View style={styles.stepRow}>
+                    <View style={styles.stepLine}>
+                      <View style={[styles.stepDot, styles.stepDotActive]} />
                     </View>
-                    <View style={styles.trackingContent}>
-                      <Text
-                        style={[
-                          styles.trackStage,
-                          isFirst && styles.textActive,
-                        ]}
-                      >
-                        {track.stage || track.trackingStatus}
-                      </Text>
-                      <Text style={styles.trackTime}>
-                        {formatDate(track.createdAt)}
+                    <View style={styles.stepContent}>
+                      <Text style={[styles.stepLabel, styles.stepLabelActive]}>
+                        {currentStep.label}
                       </Text>
                     </View>
                   </View>
                 );
-              })
-            ) : (
-              <Text style={styles.emptyText}>Chưa có thông tin tracking</Text>
-            )}
-          </View>
+              })()}
+            </View>
+          )}
+
+          {/* MỞ RỘNG: hiện tất cả bước */}
+          {isTimelineExpanded && (
+            <View style={styles.timelineSteps}>
+              {ORDER_STEPS.map((step, index) => {
+                const status = getStepStatus(step.key);
+                const isLast = index === ORDER_STEPS.length - 1;
+                return (
+                  <View key={step.key} style={styles.stepRow}>
+                    <View style={styles.stepLine}>
+                      <View
+                        style={[
+                          styles.stepDot,
+                          status === "completed" && styles.stepDotDone,
+                          status === "active" && styles.stepDotActive,
+                          status === "pending" && styles.stepDotPending,
+                        ]}
+                      />
+                      {!isLast && (
+                        <View
+                          style={[
+                            styles.stepConnector,
+                            status === "completed" && styles.stepConnectorDone,
+                            status === "pending" && styles.stepConnectorPending,
+                            status === "active" && styles.stepConnectorDone,
+                          ]}
+                        />
+                      )}
+                    </View>
+                    <View style={styles.stepContent}>
+                      <Text
+                        style={[
+                          styles.stepLabel,
+                          status === "completed" && styles.stepLabelDone,
+                          status === "active" && styles.stepLabelActive,
+                        ]}
+                      >
+                        {step.label}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+
+              {(order.status === "CANCELLED" || order.status === "DISPUTE") && (
+                <View style={styles.stepRow}>
+                  <View style={styles.stepLine}>
+                    <View style={[styles.stepDot, styles.stepDotRed]} />
+                  </View>
+                  <View style={styles.stepContent}>
+                    <Text style={[styles.stepLabel, styles.stepLabelRed]}>
+                      {order.status === "CANCELLED" ? "Đơn đã hủy" : "Khiếu nại"}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
         {/* ... Các phần Địa chỉ, Sản phẩm, Đánh giá giữ nguyên như cũ ... */}
@@ -505,6 +585,12 @@ const styles = StyleSheet.create({
   statusSubText: { color: "#E0D7FF", fontSize: 14 },
   card: { backgroundColor: "#fff", marginTop: 10, padding: 15 },
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 15 },
+  cardHeaderClickable: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
   cardTitle: {
     fontSize: 16,
     fontWeight: "bold",
@@ -685,4 +771,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   confirmSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+
+  // === TIMELINE STYLES ===
+  timelineSteps: { paddingLeft: 10, paddingTop: 5 },
+  timelineCollapsed: { paddingLeft: 10, paddingTop: 5 },
+  stepRow: { flexDirection: "row", minHeight: 45 },
+  stepLine: { alignItems: "center", width: 24, marginRight: 12 },
+  stepDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginTop: 3,
+    zIndex: 2,
+  },
+  stepDotDone: { backgroundColor: "#28A745" },
+  stepDotActive: { backgroundColor: "#B59DFF", borderWidth: 3, borderColor: "#E0D7FF" },
+  stepDotPending: { backgroundColor: "#D1D1D1" },
+  stepDotRed: { backgroundColor: "#DC3545" },
+  stepConnector: {
+    width: 2,
+    flex: 1,
+    marginTop: -1,
+    marginBottom: -1,
+    minHeight: 28,
+  },
+  stepConnectorDone: { backgroundColor: "#28A745" },
+  stepConnectorPending: { backgroundColor: "#D1D1D1" },
+  stepContent: { flex: 1, paddingBottom: 22, marginTop: -2 },
+  stepLabel: { fontSize: 15, fontWeight: "600", color: "#999" },
+  stepLabelDone: { color: "#666" },
+  stepLabelActive: { color: "#B59DFF", fontWeight: "bold" },
+  stepLabelRed: { color: "#DC3545", fontWeight: "bold" },
+  stepCurrent: { fontSize: 12, color: "#B59DFF", marginTop: 2 },
 });
