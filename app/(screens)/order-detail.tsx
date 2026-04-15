@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -27,6 +28,10 @@ export default function OrderDetailScreen() {
   const { width: screenWidth } = Dimensions.get("window");
   const [review, setReview] = useState<any>(null);
   const reviewImages = Array.isArray(review?.images) ? review.images : [];
+
+  // --- STATE CHO MODAL XÁC NHẬN NHẬN ĐỒ ---
+  const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
+  const [confirmImage, setConfirmImage] = useState<any>(null);
 
   useEffect(() => {
     if (id) {
@@ -108,6 +113,52 @@ export default function OrderDetailScreen() {
       pathname: "/(screens)/chat-detail" as any,
       params: { partnerId, partnerName },
     });
+  };
+
+  const openConfirmModal = () => {
+    setConfirmImage(null);
+    setIsConfirmModalVisible(true);
+  };
+
+  const pickConfirmImage = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Quyền truy cập", "Cần cấp quyền camera.");
+      return;
+    }
+    let result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.7,
+    });
+    if (!result.canceled) setConfirmImage(result.assets[0]);
+  };
+
+  const submitConfirmDelivery = async () => {
+    if (!confirmImage) {
+      Alert.alert("Thông báo", "Vui lòng chụp ảnh tình trạng đồ.");
+      return;
+    }
+    try {
+      const formData = new FormData();
+      const localUri = confirmImage.uri;
+      const filename = localUri.split("/").pop() || "image.jpg";
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
+      formData.append("images", { uri: localUri, name: filename, type } as any);
+      const res = await axiosClient.post(
+        `/orders/${id}/confirm-delivery`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+      if (res.data.code === 0) {
+        Alert.alert("Thành công", "Đã xác nhận nhận hàng!");
+        setIsConfirmModalVisible(false);
+        fetchOrderDetail();
+      }
+    } catch {
+      Alert.alert("Lỗi", "Không thể gửi xác nhận lúc này.");
+    }
   };
 
   if (isLoading)
@@ -304,23 +355,42 @@ export default function OrderDetailScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.btnAction} onPress={handleContactShop}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons
-              name="chatbubble-ellipses"
-              size={20}
-              color="#fff"
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.btnActionText}>Liên hệ cửa hàng</Text>
+        <View style={styles.btnRow}>
+          <TouchableOpacity style={[styles.btnAction, { flex: 1, marginRight: 8 }]} onPress={handleContactShop}>
+            <View style={styles.btnRowCenter}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.btnActionText}>Liên hệ cửa hàng</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {order.status === "DELIVERY_OUT" && (
+          <View style={styles.btnRow}>
+            <TouchableOpacity
+              style={[styles.btnGreen, { flex: 1, marginRight: 8 }]}
+              onPress={openConfirmModal}
+            >
+              <View style={styles.btnRowCenter}>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={styles.btnGreenText}>Đã nhận đồ</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btnRed, { flex: 1 }]}
+              onPress={() =>
+                router.push({
+                  pathname: "/(screens)/create-dispute",
+                  params: { orderId: id },
+                } as any)
+              }
+            >
+              <View style={styles.btnRowCenter}>
+                <Ionicons name="warning" size={20} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={styles.btnRedText}>Khiếu nại</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* MODAL GALLERY GIỮ NGUYÊN NHƯ CŨ */}
@@ -364,6 +434,41 @@ export default function OrderDetailScreen() {
               </View>
             )}
           />
+        </View>
+      </Modal>
+
+      {/* MODAL XÁC NHẬN NHẬN ĐỒ */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isConfirmModalVisible}
+        onRequestClose={() => setIsConfirmModalVisible(false)}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <View style={styles.confirmModalContainer}>
+            <View style={styles.confirmModalHeader}>
+              <Text style={styles.confirmModalTitle}>Xác nhận nhận đồ</Text>
+              <TouchableOpacity onPress={() => setIsConfirmModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.confirmModalSub}>
+              Vui lòng chụp ảnh tình trạng đồ lúc nhận để làm bằng chứng bảo vệ bạn nhé!
+            </Text>
+            <TouchableOpacity style={styles.confirmUploadBox} onPress={pickConfirmImage}>
+              {confirmImage ? (
+                <Image source={{ uri: confirmImage.uri }} style={styles.confirmPreviewImage} />
+              ) : (
+                <View style={{ alignItems: "center" }}>
+                  <Ionicons name="camera-outline" size={40} color="#A090C5" />
+                  <Text style={{ marginTop: 8, color: "#8E7AB5" }}>Bấm để mở Camera</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.confirmSubmitBtn} onPress={submitConfirmDelivery}>
+              <Text style={styles.confirmSubmitText}>Gửi xác nhận</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -466,6 +571,8 @@ const styles = StyleSheet.create({
   depositPrice: { fontSize: 14, color: "#FF9900" },
   totalLabelBold: { fontSize: 16, fontWeight: "bold", color: "#333" },
   totalPriceBold: { fontSize: 18, fontWeight: "bold", color: "#B59DFF" },
+  btnRow: { flexDirection: "row", marginHorizontal: 20, marginBottom: 50 },
+  btnRowCenter: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
   btnAction: {
     backgroundColor: "#4A3B6B",
     margin: 20,
@@ -475,6 +582,15 @@ const styles = StyleSheet.create({
     marginBottom: 50,
   },
   btnActionText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  btnDispute: {
+    backgroundColor: "#FF9800",
+    marginHorizontal: 20,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 50,
+  },
+  btnDisputeText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   emptyText: { color: "#999", fontStyle: "italic", paddingLeft: 10 },
   reviewCard: {
     backgroundColor: "#fff",
@@ -509,4 +625,64 @@ const styles = StyleSheet.create({
   },
   fullImage: { width: "100%", height: "80%" },
   closePreview: { position: "absolute", top: 50, right: 20, zIndex: 99 },
+  btnGreen: {
+    backgroundColor: "#28A745",
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  btnGreenText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  btnRed: {
+    backgroundColor: "#DC3545",
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  btnRedText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  confirmModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  confirmModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+  },
+  confirmModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  confirmModalTitle: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
+  confirmModalSub: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  confirmUploadBox: {
+    height: 160,
+    borderWidth: 1,
+    borderColor: "#D1C4E9",
+    borderStyle: "dashed",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    backgroundColor: "#FAF9FF",
+    overflow: "hidden",
+  },
+  confirmPreviewImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  confirmSubmitBtn: {
+    backgroundColor: "#28A745",
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  confirmSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });

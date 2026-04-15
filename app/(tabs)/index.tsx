@@ -388,6 +388,24 @@ export default function OrdersScreen() {
               </Text>
             </TouchableOpacity>
           )}
+          {item.status === "IN_USE" && (
+            <TouchableOpacity
+              style={[
+                styles.btnOutline,
+                { borderColor: "#FF9800", backgroundColor: "#FFF3E0" },
+              ]}
+              onPress={() =>
+                router.push({
+                  pathname: "/(screens)/create-dispute",
+                  params: { orderId: item.id },
+                } as any)
+              }
+            >
+              <Text style={[styles.btnOutlineText, { color: "#FF9800" }]}>
+                Khiếu nại
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.btnOutline}

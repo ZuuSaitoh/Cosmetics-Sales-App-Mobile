@@ -226,14 +226,33 @@ export default function ProviderOrderDetailScreen() {
             </TouchableOpacity>
           )}
           {order.status === "SHIPPING_BACK" && (
-            <TouchableOpacity
-              style={[styles.btnPrimary, { backgroundColor: "#28A745" }]}
-              onPress={() =>
-                updateStatus("COMPLETED", "Xác nhận nhận đồ & Hoàn cọc?")
-              }
-            >
-              <Text style={styles.btnText}>Xác nhận nhận đồ & Hoàn cọc</Text>
-            </TouchableOpacity>
+            <View style={styles.btnRow}>
+              <TouchableOpacity
+                style={[styles.btnGreen, { flex: 1, marginRight: 8 }]}
+                onPress={() =>
+                  updateStatus("COMPLETED", "Xác nhận nhận đồ & Hoàn cọc?")
+                }
+              >
+                <View style={styles.btnRowCenter}>
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.btnGreenText}>Hoàn tất đơn hàng</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnRed, { flex: 1 }]}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(screens)/create-dispute",
+                    params: { orderId: order.id },
+                  } as any)
+                }
+              >
+                <View style={styles.btnRowCenter}>
+                  <Ionicons name="warning" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.btnRedText}>Báo cáo hư hỏng</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           )}
           <TouchableOpacity
             style={styles.btnChat}
@@ -367,6 +386,8 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 14, color: "#666" },
   totalPriceBold: { fontSize: 18, fontWeight: "bold", color: "#B59DFF" },
   actionBox: { padding: 20, gap: 12 },
+  btnRow: { flexDirection: "row" },
+  btnRowCenter: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
   btnPrimary: {
     backgroundColor: "#B59DFF",
     padding: 16,
@@ -375,6 +396,20 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   btnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  btnGreen: {
+    backgroundColor: "#28A745",
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  btnGreenText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  btnRed: {
+    backgroundColor: "#DC3545",
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  btnRedText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   btnChat: {
     flexDirection: "row",
     borderWidth: 1,
