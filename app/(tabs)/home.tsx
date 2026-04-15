@@ -50,15 +50,14 @@ export default function UserHomeScreen() {
       setIsLoading(true);
       const [costumeRes, photoRes, staffRes] = await Promise.all([
         axiosClient.get("/costumes"),
-        axiosClient.get("/providers/role/PROVIDER_PHOTOGRAPHER"),
+        axiosClient.get("/providers/role/PROVIDER_PHOTOGRAPH"),
         axiosClient.get("/providers/role/PROVIDER_EVENT_STAFF"),
       ]);
 
       if (costumeRes.data.code === 0) setCostumes(costumeRes.data.result || []);
       if (photoRes.data.code === 0)
         setPhotographers(photoRes.data.result || []);
-      if (staffRes.data.code === 0)
-        setStaffs(staffRes.data.result || []);
+      if (staffRes.data.code === 0) setStaffs(staffRes.data.result || []);
     } catch (error) {
       console.error("Lỗi tải dữ liệu Home:", error);
     } finally {
@@ -98,14 +97,17 @@ export default function UserHomeScreen() {
       style={styles.serviceCard}
       onPress={() =>
         router.push({
-          pathname: "/(provider-service-tabs)/photographer" as any,
+          pathname: "/(screens)/photographer" as any,
           params: { providerId: item.id },
         })
       }
     >
       <Image
         source={{
-          uri: item.coverImageUrl || item.avatarUrl || "https://via.placeholder.com/150",
+          uri:
+            item.coverImageUrl ||
+            item.avatarUrl ||
+            "https://via.placeholder.com/150",
         }}
         style={styles.serviceImage}
       />
@@ -115,7 +117,12 @@ export default function UserHomeScreen() {
             {item.shopName}
           </Text>
           {item.verified && (
-            <Ionicons name="checkmark-circle" size={14} color="#28A745" style={{ marginLeft: 4 }} />
+            <Ionicons
+              name="checkmark-circle"
+              size={14}
+              color="#28A745"
+              style={{ marginLeft: 4 }}
+            />
           )}
         </View>
         <Text style={styles.serviceMeta}>
@@ -178,9 +185,7 @@ export default function UserHomeScreen() {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Thợ ảnh nổi bật</Text>
         <TouchableOpacity
-          onPress={() =>
-            router.push("/(screens)/all-photographers" as any)
-          }
+          onPress={() => router.push("/(screens)/all-photographers" as any)}
         >
           <Text style={styles.seeAllText}>Xem tất cả</Text>
         </TouchableOpacity>
@@ -198,9 +203,7 @@ export default function UserHomeScreen() {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Staff sự kiện</Text>
         <TouchableOpacity
-          onPress={() =>
-            router.push("/(provider-service-tabs)/event-staff" as any)
-          }
+          onPress={() => router.push("/(screens)/all-event-staff" as any)}
         >
           <Text style={styles.seeAllText}>Xem tất cả</Text>
         </TouchableOpacity>
@@ -322,7 +325,12 @@ const styles = StyleSheet.create({
   serviceNameRow: { flexDirection: "row", alignItems: "center" },
   serviceName: { fontSize: 13, fontWeight: "600", color: "#333", flex: 1 },
   serviceMeta: { fontSize: 11, color: "#888", marginTop: 2 },
-  ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 2, gap: 3 },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+    gap: 3,
+  },
   ratingText: { fontSize: 11, color: "#666" },
   servicePrice: {
     fontSize: 13,
