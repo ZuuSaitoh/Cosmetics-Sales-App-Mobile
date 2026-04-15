@@ -7,7 +7,6 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import axiosClient from "../api/axiosClient";
 
 const PRESET_AMOUNTS = [50000, 100000, 200000, 500000, 1000000];

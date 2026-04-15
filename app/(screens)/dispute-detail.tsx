@@ -9,13 +9,13 @@ import {
   FlatList,
   Image,
   Modal,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import axiosClient from "../api/axiosClient";
 
 const { width: screenWidth } = Dimensions.get("window");
