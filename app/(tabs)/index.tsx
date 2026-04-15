@@ -1,6 +1,8 @@
+import { Feather } from "@expo/vector-icons";
 import { Ionicons } from "@expo/vector-icons"; // Thêm icon cho đẹp
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import * as Linking from "expo-linking";
 import { useFocusEffect, useRouter } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
@@ -194,6 +196,78 @@ export default function OrdersScreen() {
     });
   };
 
+  // === STATE CHO MODAL THANH TOÁN LẠI ===
+  const [isRepayModalVisible, setIsRepayModalVisible] = useState(false);
+  const [repayOrderId, setRepayOrderId] = useState<number | null>(null);
+  const [selectedRepayMethod, setSelectedRepayMethod] = useState<string | null>(null);
+  const [isRepaying, setIsRepaying] = useState(false);
+
+  const repayMethods = [
+    { id: "VNPAY", label: "Ví VNPAY", icon: "credit-card" as const },
+    { id: "MOMO", label: "Ví MoMo", icon: "phone-portrait" as const },
+    { id: "WALLET", label: "Ví CosMate", icon: "pocket" as const },
+  ];
+
+  const openRepayModal = (orderId: number) => {
+    setRepayOrderId(orderId);
+    setSelectedRepayMethod(null);
+    setIsRepayModalVisible(true);
+  };
+
+  const handleRepay = async () => {
+    if (!selectedRepayMethod) {
+      Alert.alert("Thông báo", "Vui lòng chọn phương thức thanh toán!");
+      return;
+    }
+    if (!repayOrderId) return;
+
+    try {
+      setIsRepaying(true);
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (!token) {
+        Alert.alert("Lỗi", "Phiên đăng nhập hết hạn.");
+        setIsRepaying(false);
+        return;
+      }
+      const decoded: any = jwtDecode(token);
+      const cosplayerId = decoded.sub;
+      const SERVER_IP = "10.88.54.16";
+      const returnUrl =
+        selectedRepayMethod === "VNPAY"
+          ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
+          : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
+
+      const res = await axiosClient.post(
+        `/orders/${repayOrderId}/pay?cosplayerId=${cosplayerId}&paymentMethod=${selectedRepayMethod}&returnUrl=${encodeURIComponent(returnUrl)}`,
+      );
+
+      if (res.data.code === 0) {
+        const orderData = res.data.result || res.data;
+        const paymentUrl =
+          orderData.paymentUrl || orderData.url || orderData.payUrl || orderData.deeplink;
+
+        if (paymentUrl && typeof paymentUrl === "string") {
+          setIsRepayModalVisible(false);
+          await Linking.openURL(paymentUrl);
+          router.replace("/(tabs)/profile" as any);
+        } else if (selectedRepayMethod === "WALLET") {
+          setIsRepayModalVisible(false);
+          Alert.alert("Thành công", "Thanh toán thành công qua ví CosMate!");
+          fetchOrders();
+        } else {
+          console.log("[Repay] result:", JSON.stringify(orderData));
+          Alert.alert("Lỗi", "Không nhận được link thanh toán từ Backend.");
+        }
+      } else {
+        Alert.alert("Lỗi", res.data.message || "Thanh toán thất bại.");
+      }
+    } catch (err: any) {
+      Alert.alert("Lỗi", err.response?.data?.message || "Không thể thanh toán lại lúc này.");
+    } finally {
+      setIsRepaying(false);
+    }
+  };
+
   const openConfirmModal = (orderId: number) => {
     setConfirmOrderId(orderId);
     setConfirmImage(null);
@@ -301,6 +375,20 @@ export default function OrdersScreen() {
         </View>
 
         <View style={styles.actionRow}>
+          {/* NÚT THANH TOÁN LẠI: CHỈ HIỆN KHI ĐƠN CHƯA THANH TOÁN */}
+          {item.status === "UNPAID" && (
+            <TouchableOpacity
+              style={[
+                styles.btnOutline,
+                { borderColor: "#28A745", backgroundColor: "#F0FFF4" },
+              ]}
+              onPress={() => openRepayModal(item.id)}
+            >
+              <Text style={[styles.btnOutlineText, { color: "#28A745" }]}>
+                Thanh toán lại
+              </Text>
+            </TouchableOpacity>
+          )}
           {/* NÚT HỦY ĐƠN: CHỈ HIỆN KHI NGƯỜI BÁN CHƯA GỬI HÀNG */}
           {(item.status === "UNPAID" ||
             item.status === "PAID" ||
@@ -520,6 +608,67 @@ export default function OrdersScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* MODAL CHỌN PHƯƠNG THỨC THANH TOÁN LẠI */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isRepayModalVisible}
+        onRequestClose={() => setIsRepayModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn phương thức thanh toán</Text>
+              <TouchableOpacity onPress={() => setIsRepayModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 10, marginBottom: 20 }}>
+              {repayMethods.map((method) => (
+                <TouchableOpacity
+                  key={method.id}
+                  style={[
+                    styles.repayMethodRow,
+                    selectedRepayMethod === method.id && styles.repayMethodRowActive,
+                  ]}
+                  onPress={() => setSelectedRepayMethod(method.id)}
+                >
+                  <Feather
+                    name={method.icon as any}
+                    size={22}
+                    color={selectedRepayMethod === method.id ? "#B59DFF" : "#888"}
+                  />
+                  <Text
+                    style={[
+                      styles.repayMethodText,
+                      selectedRepayMethod === method.id && styles.repayMethodTextActive,
+                    ]}
+                  >
+                    {method.label}
+                  </Text>
+                  <Feather
+                    name={selectedRepayMethod === method.id ? "check-circle" : "circle"}
+                    size={20}
+                    color={selectedRepayMethod === method.id ? "#B59DFF" : "#DDD"}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.modalSubmitBtn, isRepaying && { opacity: 0.7 }]}
+              onPress={handleRepay}
+              disabled={isRepaying}
+            >
+              <Text style={styles.modalSubmitText}>
+                {isRepaying ? "Đang xử lý..." : "Thanh toán ngay"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -684,5 +833,29 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
     color: "#4A3B6B", // Màu tím đậm đặc trưng của CosMate
+  },
+  repayMethodRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E0D7FF",
+    backgroundColor: "#FAF9FF",
+    gap: 12,
+  },
+  repayMethodRowActive: {
+    borderColor: "#B59DFF",
+    backgroundColor: "#F4F1FF",
+  },
+  repayMethodText: {
+    flex: 1,
+    fontSize: 15,
+    color: "#666",
+    fontWeight: "500",
+  },
+  repayMethodTextActive: {
+    color: "#B59DFF",
+    fontWeight: "bold",
   },
 });
