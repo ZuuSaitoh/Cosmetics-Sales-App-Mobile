@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../../api/axiosClient";
+import axiosClient from "../api/axiosClient";
 
 const { width } = Dimensions.get("window");
 
@@ -453,7 +453,7 @@ export default function CostumeDetailScreen() {
                   style={styles.viewMoreBtn}
                   onPress={() =>
                     router.push({
-                      pathname: "/(screens)/(review)/all-reviews" as any,
+                      pathname: "/(screens)/all-reviews" as any,
                       params: {
                         costumeId: costume.id,
                         costumeName: costume.name,
@@ -503,7 +503,7 @@ export default function CostumeDetailScreen() {
           onPress={() => {
             // THAY CÁI alert BẰNG LỆNH NÀY:
             router.push({
-              pathname: "/(screens)/(order)/booking" as any,
+              pathname: "/(screens)/booking" as any,
               params: {
                 id: costume.id, // Truyền ID sang để trang Booking gọi API lấy lại data
               },

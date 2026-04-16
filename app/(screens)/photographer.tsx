@@ -11,7 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import axiosClient from "../../api/axiosClient";
+import axiosClient from "../api/axiosClient";
 
 // 🛠️ Định nghĩa Interface chuẩn theo dữ liệu Swagger
 interface ProviderDetail {

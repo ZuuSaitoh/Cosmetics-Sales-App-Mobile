@@ -145,7 +145,7 @@ export default function ProviderRentalShopScreen() {
               style={styles.costumeCard}
               onPress={() =>
                 router.push({
-                  pathname: "/(screens)/(costume)/costume-detail",
+                  pathname: "/(screens)/costume-detail",
                   params: { id: item.id },
                 } as any)
               }

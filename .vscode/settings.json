@@ -3,12 +3,5 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  },
-  "python-envs.pythonProjects": [
-    {
-      "path": "app/(screens)/(order)",
-      "envManager": "ms-python.python:venv",
-      "packageManager": "ms-python.python:pip"
-    }
-  ]
+  }
 }
