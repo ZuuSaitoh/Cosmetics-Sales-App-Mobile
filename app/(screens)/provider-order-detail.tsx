@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../../api/axiosClient";
+import axiosClient from "../api/axiosClient";
 
 const { width: screenWidth } = Dimensions.get("window");
 
