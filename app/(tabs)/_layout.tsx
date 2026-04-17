@@ -99,7 +99,7 @@ export default function TabsLayout() {
 
       {/* NÚT : TIN NHẮN */}
       <Tabs.Screen
-        name="chats"
+        name="chat"
         options={{
           title: "Tin nhắn",
           tabBarIcon: ({ color, focused }) => (
