@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../../api/axiosClient";
+import axiosClient from "../api/axiosClient";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -242,7 +242,7 @@ export default function ProviderOrderDetailScreen() {
                 style={[styles.btnRed, { flex: 1 }]}
                 onPress={() =>
                   router.push({
-                    pathname: "/(screens)/(dispute)/create-dispute",
+                    pathname: "/(screens)/create-dispute",
                     params: { orderId: order.id },
                   } as any)
                 }

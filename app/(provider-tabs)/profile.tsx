@@ -27,6 +27,7 @@ export default function ProviderProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<number | null>(null);
+  const [providerId, setProviderId] = useState<number | null>(null);
   const [balance, setBalance] = useState<number>(0);
   const [depositBalance, setDepositBalance] = useState<number>(0);
 
@@ -38,23 +39,28 @@ export default function ProviderProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const bankData = [
-    { label: "Vietcombank (VCB)", value: "Vietcombank" },
-    { label: "MB Bank (MB)", value: "MB Bank" },
-    { label: "TP Bank", value: "TP Bank" },
-    { label: "Techcombank", value: "Techcombank" },
-    { label: "VietinBank", value: "VietinBank" },
-    { label: "BIDV", value: "BIDV" },
-    { label: "Agribank", value: "Agribank" },
-    { label: "ACB", value: "ACB" },
-  ];
+  const [banks, setBanks] = useState<any[]>([]);
 
   // 🚩 Tự động load lại mỗi khi quay về trang cá nhân
   useFocusEffect(
     useCallback(() => {
       fetchProfile();
+      fetchBanks();
     }, []),
   );
+
+  const fetchBanks = async () => {
+    try {
+      const res = await axiosClient.get(
+        "https://api.vietqr.io/v2/banks",
+      );
+      if (res.data.code === "00") {
+        setBanks(res.data.data);
+      }
+    } catch (error) {
+      console.error("Lỗi lấy danh sách ngân hàng:", error);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -80,6 +86,7 @@ export default function ProviderProfileScreen() {
       if (providerRes.data.code === 0 && providerRes.data.result) {
         const data = providerRes.data.result;
         setProfile(data);
+        setProviderId(data.id);
         setEditShopName(data.shopName || "");
         setEditBio(data.bio || "");
         setEditBankName(data.bankName || "");
@@ -97,7 +104,7 @@ export default function ProviderProfileScreen() {
       Alert.alert("Lỗi", "Tên Shop không được để trống!");
       return;
     }
-    if (!userId) return;
+    if (!providerId) return;
 
     setIsSaving(true);
     try {
@@ -108,14 +115,18 @@ export default function ProviderProfileScreen() {
         bankAccountNumber: editBankAccountNumber,
       };
 
-      const response = await axiosClient.put(`/providers/${userId}`, payload);
+      const response = await axiosClient.put(`/providers/${providerId}`, payload);
       if (response.data.code === 0) {
         Alert.alert("Thành công", "Đã cập nhật hồ sơ Shop!");
         setProfile(response.data.result);
         setIsEditModalVisible(false);
       }
-    } catch {
-      Alert.alert("Lỗi", "Không thể cập nhật hồ sơ lúc này.");
+    } catch (error: any) {
+      console.error("Lỗi cập nhật profile:", error?.response?.data || error);
+      Alert.alert(
+        "Lỗi",
+        error?.response?.data?.message || "Không thể cập nhật hồ sơ lúc này.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -178,7 +189,7 @@ export default function ProviderProfileScreen() {
         } as any);
 
         const res = await axiosClient.put(
-          `/providers/${userId}/cover-image`,
+          `/providers/${providerId}/cover-image`,
           formData,
           {
             headers: { "Content-Type": "multipart/form-data" },
@@ -433,16 +444,16 @@ export default function ProviderProfileScreen() {
                 placeholderStyle={styles.placeholderStyle}
                 selectedTextStyle={styles.selectedTextStyle}
                 inputSearchStyle={styles.inputSearchStyle}
-                data={bankData}
+                data={banks}
                 search
                 maxHeight={300}
-                labelField="label"
-                valueField="value"
+                labelField="shortName"
+                valueField="shortName"
                 placeholder="Chọn ngân hàng..."
                 searchPlaceholder="Tìm kiếm..."
-                value={editBankName} // 🚩 Gắn giá trị bankName từ state
+                value={editBankName}
                 onChange={(item) => {
-                  setEditBankName(item.value); // 🚩 Cập nhật state khi chọn
+                  setEditBankName(item.shortName);
                 }}
                 renderLeftIcon={() => (
                   <Ionicons
@@ -451,6 +462,18 @@ export default function ProviderProfileScreen() {
                     size={20}
                     color="#8E7AB5"
                   />
+                )}
+                renderItem={(item: any) => (
+                  <View style={styles.bankItem}>
+                    <Image
+                      source={{ uri: item.logo }}
+                      style={styles.bankLogo}
+                    />
+                    <View style={styles.bankInfo}>
+                      <Text style={styles.bankName}>{item.shortName}</Text>
+                      <Text style={styles.bankCode}>{item.name}</Text>
+                    </View>
+                  </View>
                 )}
               />
               <Text style={styles.inputLabel}>Số tài khoản</Text>
@@ -711,4 +734,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderRadius: 8,
   },
+  bankItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  bankLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    marginRight: 12,
+    backgroundColor: "#F8F8F8",
+  },
+  bankInfo: { flex: 1 },
+  bankName: { fontSize: 15, fontWeight: "600", color: "#333" },
+  bankCode: { fontSize: 12, color: "#8E7AB5", marginTop: 2 },
 });

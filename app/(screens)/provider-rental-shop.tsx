@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../../api/axiosClient";
+import axiosClient from "../api/axiosClient";
 
 const { width } = Dimensions.get("window");
 const COLUMN_WIDTH = (width - 45) / 2;
@@ -145,7 +145,7 @@ export default function ProviderRentalShopScreen() {
               style={styles.costumeCard}
               onPress={() =>
                 router.push({
-                  pathname: "/(screens)/(costume)/costume-detail",
+                  pathname: "/(screens)/costume-detail",
                   params: { id: item.id },
                 } as any)
               }

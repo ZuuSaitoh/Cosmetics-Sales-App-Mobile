@@ -1,4 +1,5 @@
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons"; // Thêm icon cho đẹp
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
@@ -198,9 +199,7 @@ export default function OrdersScreen() {
   // === STATE CHO MODAL THANH TOÁN LẠI ===
   const [isRepayModalVisible, setIsRepayModalVisible] = useState(false);
   const [repayOrderId, setRepayOrderId] = useState<number | null>(null);
-  const [selectedRepayMethod, setSelectedRepayMethod] = useState<string | null>(
-    null,
-  );
+  const [selectedRepayMethod, setSelectedRepayMethod] = useState<string | null>(null);
   const [isRepaying, setIsRepaying] = useState(false);
 
   const repayMethods = [
@@ -245,10 +244,7 @@ export default function OrdersScreen() {
       if (res.data.code === 0) {
         const orderData = res.data.result || res.data;
         const paymentUrl =
-          orderData.paymentUrl ||
-          orderData.url ||
-          orderData.payUrl ||
-          orderData.deeplink;
+          orderData.paymentUrl || orderData.url || orderData.payUrl || orderData.deeplink;
 
         if (paymentUrl && typeof paymentUrl === "string") {
           setIsRepayModalVisible(false);
@@ -266,10 +262,7 @@ export default function OrdersScreen() {
         Alert.alert("Lỗi", res.data.message || "Thanh toán thất bại.");
       }
     } catch (err: any) {
-      Alert.alert(
-        "Lỗi",
-        err.response?.data?.message || "Không thể thanh toán lại lúc này.",
-      );
+      Alert.alert("Lỗi", err.response?.data?.message || "Không thể thanh toán lại lúc này.");
     } finally {
       setIsRepaying(false);
     }
@@ -424,7 +417,7 @@ export default function OrdersScreen() {
               onPress={() => {
                 if (!isReviewed) {
                   router.push({
-                    pathname: "/(screens)/(review)/review" as any,
+                    pathname: "/(screens)/review" as any,
                     params: { orderId: item.id, cosplayerId: item.cosplayerId },
                   } as any);
                 }
@@ -491,7 +484,7 @@ export default function OrdersScreen() {
               ]}
               onPress={() =>
                 router.push({
-                  pathname: "/(screens)/(dispute)/create-dispute",
+                  pathname: "/(screens)/create-dispute",
                   params: { orderId: item.id },
                 } as any)
               }
@@ -506,7 +499,7 @@ export default function OrdersScreen() {
             style={styles.btnOutline}
             onPress={() =>
               router.push({
-                pathname: "/(screens)/(order)/order-detail" as any,
+                pathname: "/(screens)/order-detail" as any,
                 params: { id: item.id },
               })
             }
@@ -638,37 +631,27 @@ export default function OrdersScreen() {
                   key={method.id}
                   style={[
                     styles.repayMethodRow,
-                    selectedRepayMethod === method.id &&
-                      styles.repayMethodRowActive,
+                    selectedRepayMethod === method.id && styles.repayMethodRowActive,
                   ]}
                   onPress={() => setSelectedRepayMethod(method.id)}
                 >
                   <Feather
                     name={method.icon as any}
                     size={22}
-                    color={
-                      selectedRepayMethod === method.id ? "#B59DFF" : "#888"
-                    }
+                    color={selectedRepayMethod === method.id ? "#B59DFF" : "#888"}
                   />
                   <Text
                     style={[
                       styles.repayMethodText,
-                      selectedRepayMethod === method.id &&
-                        styles.repayMethodTextActive,
+                      selectedRepayMethod === method.id && styles.repayMethodTextActive,
                     ]}
                   >
                     {method.label}
                   </Text>
                   <Feather
-                    name={
-                      selectedRepayMethod === method.id
-                        ? "check-circle"
-                        : "circle"
-                    }
+                    name={selectedRepayMethod === method.id ? "check-circle" : "circle"}
                     size={20}
-                    color={
-                      selectedRepayMethod === method.id ? "#B59DFF" : "#DDD"
-                    }
+                    color={selectedRepayMethod === method.id ? "#B59DFF" : "#DDD"}
                   />
                 </TouchableOpacity>
               ))}

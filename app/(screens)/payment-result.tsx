@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../../api/axiosClient";
+import axiosClient from "../api/axiosClient";
 
 type PaymentType = "order" | "topup";
 
@@ -362,7 +362,7 @@ export default function PaymentResultScreen() {
             onPress={() =>
               router.replace(
                 paymentType === "topup"
-                  ? ("/(screens)/(payment)/top-up" as any)
+                  ? ("/(screens)/top-up" as any)
                   : ("/(tabs)" as any),
               )
             }

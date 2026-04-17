@@ -11,7 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import axiosClient from "../../api/axiosClient"; // Sếp check lại đường dẫn này cho chuẩn folder nhé
+import axiosClient from "../api/axiosClient"; // Sếp check lại đường dẫn này cho chuẩn folder nhé
 
 // 🛠️ Định nghĩa Interface để không còn lỗi "never"
 interface Provider {
@@ -26,24 +26,24 @@ interface Provider {
   bio: string | null;
 }
 
-export default function AllPhotographersScreen() {
+export default function AllEventStaffScreen() {
   const [list, setList] = useState<Provider[]>([]); // 🚩 Fix lỗi 'never' ở đây
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchPhotographers();
+    fetchEventStaff();
   }, []);
 
-  const fetchPhotographers = async () => {
+  const fetchEventStaff = async () => {
     try {
       setIsLoading(true);
-      // 🚩 Dùng đúng endpoint PROVIDER_PHOTOGRAPH sếp đã test trên Swagger
-      const res = await axiosClient.get("/providers/role/PROVIDER_PHOTOGRAPH");
+      // 🚩 Dùng đúng endpoint PROVIDER_EVENT_STAFF sếp đã test trên Swagger
+      const res = await axiosClient.get("/providers/role/PROVIDER_EVENT_STAFF");
       if (res.data.code === 0) {
         setList(res.data.result || []);
       }
     } catch (error) {
-      console.error("Lỗi lấy danh sách thợ ảnh:", error);
+      console.error("Lỗi lấy danh sách hỗ trợ:", error);
     } finally {
       setIsLoading(false);
     }
@@ -54,7 +54,7 @@ export default function AllPhotographersScreen() {
       style={styles.card}
       onPress={() =>
         router.push({
-          pathname: "/(screens)/(service)/photographer" as any,
+          pathname: "/(provider-service-tabs)/photographer" as any,
           params: { providerId: item.id },
         })
       }
@@ -74,7 +74,7 @@ export default function AllPhotographersScreen() {
         <View style={styles.nameRow}>
           {/* Xử lý shopName bị null */}
           <Text style={styles.shopName} numberOfLines={1}>
-            {item.shopName || `Thợ ảnh #${item.id}`}
+            {item.shopName || `Hỗ trợ #${item.id}`}
           </Text>
           {item.verified && (
             <Ionicons
@@ -88,7 +88,7 @@ export default function AllPhotographersScreen() {
 
         {/* Bio ngắn gọn */}
         <Text style={styles.bioText} numberOfLines={1}>
-          {item.bio || "Chưa có giới thiệu về thợ ảnh này."}
+          {item.bio || "Chưa có giới thiệu về Hỗ trợ này."}
         </Text>
 
         <View style={styles.statsRow}>
@@ -118,7 +118,7 @@ export default function AllPhotographersScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#4A3B6B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tất cả thợ ảnh</Text>
+        <Text style={styles.headerTitle}>Tất cả Hỗ trợ</Text>
       </View>
 
       {isLoading ? (
@@ -133,7 +133,7 @@ export default function AllPhotographersScreen() {
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <Text style={styles.emptyText}>
-              Hiện chưa có thợ ảnh nào khả dụng.
+              Hiện chưa có Hỗ trợ nào khả dụng.
             </Text>
           }
         />

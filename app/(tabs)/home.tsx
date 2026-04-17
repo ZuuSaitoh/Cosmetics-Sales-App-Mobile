@@ -149,7 +149,7 @@ export default function UserHomeScreen() {
         style={styles.card}
         onPress={() =>
           router.push({
-            pathname: "/(screens)/(costume)/costume-detail" as any,
+            pathname: "/(screens)/costume-detail" as any,
             params: { id: item.id },
           })
         }
@@ -185,7 +185,7 @@ export default function UserHomeScreen() {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Thợ ảnh nổi bật</Text>
         <TouchableOpacity
-          onPress={() => router.push("/(screens)/(service)/all-photographers" as any)}
+          onPress={() => router.push("/(screens)/all-photographers" as any)}
         >
           <Text style={styles.seeAllText}>Xem tất cả</Text>
         </TouchableOpacity>
@@ -203,7 +203,7 @@ export default function UserHomeScreen() {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Staff sự kiện</Text>
         <TouchableOpacity
-          onPress={() => router.push("/(screens)/(service)/all-event-staff" as any)}
+          onPress={() => router.push("/(screens)/all-event-staff" as any)}
         >
           <Text style={styles.seeAllText}>Xem tất cả</Text>
         </TouchableOpacity>
