@@ -13,7 +13,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +21,8 @@ import {
 } from "react-native";
 import { API_BASE_URL, WS_BASE_URL } from "@/src/api/axiosClient";
 import { chatService } from "@/src/services/chatService";
+import { SafeAreaView } from "react-native-safe-area-context";
+
 
 const textEncoding = require("text-encoding");
 (global as typeof globalThis & { TextEncoder: typeof textEncoding.TextEncoder }).TextEncoder =
@@ -426,40 +427,40 @@ export default function ChatRoomScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
-          <Ionicons name="arrow-back" size={22} color="#2E2446" />
-        </Pressable>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
+            <Ionicons name="arrow-back" size={22} color="#2E2446" />
+          </Pressable>
 
-        <View style={styles.headerUser}>
-          {partner.avatarUrl ? (
-            <Image source={{ uri: partner.avatarUrl }} style={styles.headerAvatar} />
-          ) : (
-            <View style={styles.headerAvatarFallback}>
-              <Ionicons name="person" size={18} color="#8E7AB5" />
+          <View style={styles.headerUser}>
+            {partner.avatarUrl ? (
+              <Image source={{ uri: partner.avatarUrl }} style={styles.headerAvatar} />
+            ) : (
+              <View style={styles.headerAvatarFallback}>
+                <Ionicons name="person" size={18} color="#8E7AB5" />
+              </View>
+            )}
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.title} numberOfLines={1}>
+                {partner.name || `Phòng ${roomKey}`}
+              </Text>
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {partner.role || "Nhấn vào để xem hồ sơ"}
+              </Text>
             </View>
-          )}
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.title} numberOfLines={1}>
-              {partner.name || `Phòng ${roomKey}`}
-            </Text>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {partner.role || "Nhấn vào để xem hồ sơ"}
-            </Text>
           </View>
         </View>
-      </View>
 
-      {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#B59DFF" />
-        </View>
-      ) : (
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={100}
-        >
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#B59DFF" />
+          </View>
+        ) : (
           <FlatList
             ref={flatListRef}
             inverted={true}
@@ -467,9 +468,12 @@ export default function ChatRoomScreen() {
             keyExtractor={(item, index) => String(item.id ?? index)}
             renderItem={renderItem}
             contentContainerStyle={messages.length === 0 ? styles.emptyContent : styles.listContent}
+            keyboardShouldPersistTaps="handled"
             ListEmptyComponent={<Text style={styles.emptyText}>Chưa có tin nhắn nào.</Text>}
           />
+        )}
 
+        {loading ? null : (
           <View style={styles.inputBar}>
             <Pressable style={styles.mediaBtn} onPress={handlePickAndSendImage}>
               <Ionicons name="camera" size={20} color="#8E7AB5" />
@@ -490,8 +494,8 @@ export default function ChatRoomScreen() {
               <Ionicons name="send" size={18} color="#FFFFFF" />
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
-      )}
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

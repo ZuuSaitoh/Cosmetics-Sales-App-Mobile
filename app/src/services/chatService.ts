@@ -4,8 +4,8 @@ export const chatService = {
   getRooms: (userId: number) =>
     axiosClient.get(`/chat/rooms/user/${userId}`),
 
-  getOrCreateRoom: (params: { userId: number; providerId: number } | { user1Id: number; user2Id: number }) =>
-    axiosClient.get("/chat/room", { params: { userId: (params as any).userId ?? (params as any).user1Id, providerId: (params as any).providerId ?? (params as any).user2Id } }),
+  getOrCreateRoom: (user1Id: number, user2Id: number) =>
+    axiosClient.get("/chat/room", { params: { user1Id, user2Id } }),
 
   getMessages: (roomId: number) =>
     axiosClient.get(`/chat/messages/${roomId}`),

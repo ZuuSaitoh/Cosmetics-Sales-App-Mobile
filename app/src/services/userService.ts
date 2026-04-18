@@ -32,4 +32,7 @@ export const userService = {
 
   searchUsers: (keyword: string) =>
     axiosClient.get("/users/search", { params: { keyword } }),
+
+  getBankList: () =>
+    axiosClient.get("https://api.vietqr.io/v2/banks"),
 };

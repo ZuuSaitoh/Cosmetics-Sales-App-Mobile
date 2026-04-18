@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -15,11 +16,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { chatService } from "@/src/services/chatService";
 import { userService } from "@/src/services/userService";
 import { costumeService } from "@/src/services/costumeService";
 import { providerService } from "@/src/services/providerService";
 import { reviewService } from "@/src/services/reviewService";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -33,15 +35,13 @@ export default function CostumeDetailScreen() {
   const [wishlistId, setWishlistId] = useState<number | null>(null);
   const [isProcessingWishlist, setIsProcessingWishlist] = useState(false);
   const [reviews, setReviews] = useState<any[]>([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
 
   useEffect(() => {
-    if (id) fetchCostumeDetail();
-  }, [id]);
-
-  useEffect(() => {
-    if (id) checkWishlistStatus();
-    if (id) fetchReviews(Number(id));
+    if (!id) return;
+    void fetchCostumeDetail();
+    void checkWishlistStatus();
+    void fetchReviews(Number(id));
   }, [id]);
 
   const checkWishlistStatus = async () => {
@@ -101,6 +101,62 @@ export default function CostumeDetailScreen() {
       console.error("Lỗi toggle wishlist:", error);
     } finally {
       setIsProcessingWishlist(false);
+    }
+  };
+
+  const getCurrentUserId = async (): Promise<number | null> => {
+    const token = await AsyncStorage.getItem("cosmate_token");
+    if (!token) return null;
+    try {
+      const decoded: any = jwtDecode(token);
+      const id = decoded.sub ?? decoded.userId ?? decoded.id;
+      return id != null ? Number(id) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleOpenChat = async () => {
+    if (openingChat) return;
+    setOpeningChat(true);
+    try {
+      const currentUserId = await getCurrentUserId();
+      if (!currentUserId) {
+        router.push("/(auth)/login");
+        return;
+      }
+      if (!costume?.providerId) {
+        Alert.alert("Lỗi", "Không có thông tin cửa hàng để liên hệ.");
+        return;
+      }
+      const providerRes = await providerService.getById(costume.providerId);
+      const providerUserId = providerRes.data?.result?.userId;
+      if (!providerUserId) {
+        Alert.alert("Lỗi", "Không tìm thấy tài khoản cửa hàng.");
+        return;
+      }
+      const response = await chatService.getOrCreateRoom(
+        Number(currentUserId),
+        Number(providerUserId),
+      );
+      const roomId = response.data?.result?.id ?? response.data?.id;
+      if (!roomId) {
+        Alert.alert("Lỗi", "Không thể tạo phòng chat.");
+        return;
+      }
+      router.push({
+        pathname: "/chat/[roomId]",
+        params: {
+          roomId: String(roomId),
+          partnerId: String(providerUserId),
+          partnerName: provider?.shopName || costume?.shopName || "Cửa hàng Cosplay",
+          partnerAvatar: provider?.avatarUrl || "",
+        },
+      });
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể mở cuộc trò chuyện. Vui lòng thử lại.");
+    } finally {
+      setOpeningChat(false);
     }
   };
 
@@ -197,8 +253,8 @@ export default function CostumeDetailScreen() {
             data={item.images}
             horizontal
             showsHorizontalScrollIndicator={false}
-            keyExtractor={(img: any) =>
-              img.id?.toString() || Math.random().toString()
+            keyExtractor={(img: any, idx: number) =>
+              img.id?.toString() ?? String(idx)
             }
             renderItem={({ item: img }: any) => (
               <Image
@@ -282,7 +338,7 @@ export default function CostumeDetailScreen() {
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             onScroll={onScroll}
-            keyExtractor={(item, index) => index.toString()}
+            keyExtractor={(_, index) => index.toString()}
             renderItem={({ item }) => (
               <Image
                 source={{ uri: item }}
@@ -469,22 +525,21 @@ export default function CostumeDetailScreen() {
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.chatButton}
-          onPress={() =>
-            router.push({
-              pathname: "/(screens)/chat-detail" as any,
-              params: {
-                partnerId: costume.providerId,
-                partnerName: costume.shopName || "Cửa hàng Cosplay",
-              },
-            })
-          }
+          onPress={handleOpenChat}
+          disabled={openingChat}
         >
-          <Ionicons
-            name="chatbubble-ellipses-outline"
-            size={24}
-            color="#B59DFF"
-          />
-          <Text style={styles.chatText}>Chat</Text>
+          {openingChat ? (
+            <ActivityIndicator size="small" color="#B59DFF" />
+          ) : (
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={24}
+              color="#B59DFF"
+            />
+          )}
+          <Text style={styles.chatText}>
+            {openingChat ? "Đang mở..." : "Chat"}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity

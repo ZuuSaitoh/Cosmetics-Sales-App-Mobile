@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,7 +18,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { chatService } from "@/src/services/chatService";
 import { orderService } from "@/src/services/orderService";
+import { providerService } from "@/src/services/providerService";
 import { reviewService } from "@/src/services/reviewService";
 
 export default function OrderDetailScreen() {
@@ -121,6 +125,67 @@ export default function OrderDetailScreen() {
     }
   };
 
+  // Lấy userId của provider (User B) từ providerId rồi mở phòng chat
+  const handleOpenChat = async () => {
+    if (!order) return;
+    const providerId = order.providerId;
+    console.log(">>> [handleOpenChat] providerId:", providerId);
+    if (!providerId) {
+      Alert.alert("Thông báo", "Không có thông tin cửa hàng để liên hệ.");
+      return;
+    }
+    try {
+      // 1. Lấy userId của provider (User B) từ providerId
+      const providerRes = await providerService.getById(providerId);
+      console.log(">>> [handleOpenChat] providerRes:", providerRes?.data);
+      const providerUserId = providerRes.data?.result?.userId;
+      console.log(">>> [handleOpenChat] providerUserId (User B):", providerUserId);
+      if (!providerUserId) {
+        Alert.alert("Lỗi", "Không tìm thấy tài khoản cửa hàng.");
+        return;
+      }
+      // 2. Lấy userId của current user (User A) từ token
+      const token = await AsyncStorage.getItem("cosmate_token");
+      console.log(">>> [handleOpenChat] token:", token);
+      if (!token) {
+        router.push("/(auth)/login");
+        return;
+      }
+      const decoded: any = jwtDecode(token);
+      const currentUserId = decoded.sub ?? decoded.userId ?? decoded.id;
+      console.log(">>> [handleOpenChat] decoded token:", decoded);
+      console.log(">>> [handleOpenChat] currentUserId (User A):", currentUserId);
+      if (!currentUserId) {
+        Alert.alert("Lỗi", "Không xác định được tài khoản của bạn.");
+        return;
+      }
+      // 3. Tạo hoặc tìm phòng chat giữa User A và User B
+      console.log(">>> [handleOpenChat] calling getOrCreateRoom with:", {
+        user1Id: Number(currentUserId),
+        user2Id: Number(providerUserId),
+      });
+      const chatRes = await chatService.getOrCreateRoom(
+        Number(currentUserId),
+        Number(providerUserId),
+      );
+      console.log(">>> [handleOpenChat] chatRes:", chatRes?.data);
+      const roomId = chatRes.data?.result?.id ?? chatRes.data?.id;
+      console.log(">>> [handleOpenChat] roomId:", roomId);
+      // 4. Điều hướng sang phòng chat
+      router.push({
+        pathname: "/chat/[roomId]",
+        params: {
+          roomId: String(roomId),
+          partnerId: String(providerUserId),
+          partnerName: order.shopName || "Cửa hàng Cosplay",
+        },
+      });
+    } catch (err) {
+      console.error(">>> [handleOpenChat] ERROR:", err);
+      Alert.alert("Lỗi", "Không thể mở cuộc trò chuyện. Vui lòng thử lại.");
+    }
+  };
+
   const formatPrice = (price: number) =>
     new Intl.NumberFormat("vi-VN", {
       style: "currency",
@@ -133,21 +198,6 @@ export default function OrderDetailScreen() {
     return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}  |  ${d.getDate().toString().padStart(2, "0")}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getFullYear()}`;
   };
 
-  const handleContactShop = () => {
-    const partnerId =
-      order?.providerId || order?.providerUserId || order?.shopId;
-    const partnerName = order?.shopName || order?.providerName || "Cửa hàng";
-
-    if (!partnerId) {
-      Alert.alert("Thông báo", "Đang cập nhật thông tin cửa hàng!");
-      return;
-    }
-
-    router.push({
-      pathname: "/(screens)/chat-detail" as any,
-      params: { partnerId, partnerName },
-    });
-  };
 
   const openConfirmModal = () => {
     setConfirmImage(null);
@@ -455,7 +505,7 @@ export default function OrderDetailScreen() {
         )}
 
         <View style={styles.btnRow}>
-          <TouchableOpacity style={[styles.btnAction, { flex: 1, marginRight: 8 }]} onPress={handleContactShop}>
+          <TouchableOpacity style={[styles.btnAction, { flex: 1, marginRight: 8 }]} onPress={handleOpenChat}>
             <View style={styles.btnRowCenter}>
               <Ionicons name="chatbubble-ellipses" size={20} color="#fff" style={{ marginRight: 8 }} />
               <Text style={styles.btnActionText}>Liên hệ cửa hàng</Text>
