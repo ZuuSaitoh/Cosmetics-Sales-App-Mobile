@@ -1,5 +1,5 @@
-import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
 import { Platform, View, Text, StyleSheet } from "react-native";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 
@@ -52,7 +52,6 @@ export default function TabsLayout() {
         },
       }}
     >
-      {/* NÚT : TRANG CHỦ */}
       <Tabs.Screen
         name="home"
         options={{
@@ -67,7 +66,6 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* NÚT : THEO DÕI ĐƠN HÀNG */}
       <Tabs.Screen
         name="index"
         options={{
@@ -82,7 +80,20 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* NÚT : THÔNG BÁO */}
+      <Tabs.Screen
+        name="pose-battle"
+        options={{
+          title: "Pose Battle",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "body" : "body-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="notifications"
         options={{
@@ -97,28 +108,12 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* NÚT : TIN NHẮN */}
       <Tabs.Screen
         name="chat"
         options={{
           title: "Tin nhắn",
           tabBarIcon: ({ color, focused }) => (
             <ChatTabIcon color={color} focused={focused} />
-          ),
-        }}
-      />
-
-      {/* NÚT : TRANG CÁ NHÂN */}
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Cá nhân",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={24}
-              color={color}
-            />
           ),
         }}
       />
