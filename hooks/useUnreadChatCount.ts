@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { jwtDecode } from "jwt-decode";
 import axiosClient from "../app/api/axiosClient";
+import { DeviceEventEmitter } from "react-native";
 
 let cachedCount = 0;
 const listeners: Set<(count: number) => void> = new Set();
@@ -33,8 +34,15 @@ export const useUnreadChatCount = () => {
 
   useEffect(() => {
     fetchCount();
-    const interval = setInterval(fetchCount, 30000); // Poll mỗi 30s
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchCount, 30000); // Poll mỗi 30s để backup
+
+    // Lắng nghe sự kiện "đã đọc tin nhắn" để đếm lại ngay lập tức thay vì chờ 30s
+    const subscription = DeviceEventEmitter.addListener('refreshUnreadCount', fetchCount);
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove(); // Dọn dẹp bộ nhớ khi thoát
+    };
   }, [fetchCount]);
 
   return { count, refresh: fetchCount };
