@@ -194,7 +194,10 @@ export default function ProfileScreen() {
 
         {/* WALLET CARD - NƠI HIỂN THỊ SỐ DƯ */}
         <View style={styles.walletCard}>
-          <View style={styles.walletLeft}>
+          <TouchableOpacity
+            style={styles.walletLeft}
+            onPress={() => router.push("/(screens)/transaction-history" as any)}
+          >
             <View style={styles.walletIconWrap}>
               <Ionicons name="wallet-outline" size={24} color="#B59DFF" />
             </View>
@@ -207,7 +210,7 @@ export default function ProfileScreen() {
                 }).format(balance)}
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.depositBtn}

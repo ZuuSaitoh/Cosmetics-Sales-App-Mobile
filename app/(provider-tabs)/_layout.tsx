@@ -94,7 +94,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* NÚT : TIN NHẮN */}
+      {/* TAB : TIN NHẮN */}
       <Tabs.Screen
         name="chats"
         options={{

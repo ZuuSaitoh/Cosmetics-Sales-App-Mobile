@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { CameraView } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
@@ -20,8 +21,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { providerService } from "@/src/services/providerService";
 import { orderService } from "@/src/services/orderService";
+import { providerService } from "@/src/services/providerService";
 
 const RENTAL_STATUSES = [
   { key: "ALL", label: "Tất cả" },
@@ -48,6 +49,8 @@ export default function OrderManagementScreen() {
   const [shipOrderId, setShipOrderId] = useState<number | null>(null);
   const [trackingCode, setTrackingCode] = useState("");
   const [shipImage, setShipImage] = useState<any>(null);
+  const [isScannerVisible, setIsScannerVisible] = useState(false);
+  const [scannedCode, setScannedCode] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -136,8 +139,7 @@ export default function OrderManagementScreen() {
                 imgRes.data.result[0].imageUrl || imgRes.data.result[0];
               hasNewImages = true;
             }
-          } catch (err) {
-          }
+          } catch (err) {}
         }
       }
     }
@@ -196,6 +198,28 @@ export default function OrderManagementScreen() {
     setIsShipModalVisible(true);
   };
 
+  const handleOpenScanner = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Quyền truy cập", "Cần cấp quyền camera để quét mã QR.");
+      return;
+    }
+    setIsScannerVisible(true);
+  };
+
+  const handleBarcodeScanned = ({
+    type,
+    data,
+  }: {
+    type: string;
+    data: string;
+  }) => {
+    if (data) {
+      setTrackingCode(data.toUpperCase());
+      setIsScannerVisible(false);
+    }
+  };
+
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -230,7 +254,9 @@ export default function OrderManagementScreen() {
         } as any);
       }
 
-      const res = await orderService.shipOrder(Number(shipOrderId), { trackingNumber: trackingCode });
+      const res = await orderService.shipOrder(Number(shipOrderId), formData, {
+        trackingCode: trackingCode,
+      });
 
       if (res.data.code === 0) {
         setIsShipModalVisible(false);
@@ -507,13 +533,21 @@ export default function OrderManagementScreen() {
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Mã vận đơn..."
-              value={trackingCode}
-              onChangeText={setTrackingCode}
-              autoCapitalize="characters"
-            />
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Mã vận đơn..."
+                value={trackingCode}
+                onChangeText={setTrackingCode}
+                autoCapitalize="characters"
+              />
+              <TouchableOpacity
+                style={styles.qrScanBtn}
+                onPress={handleOpenScanner}
+              >
+                <Ionicons name="qr-code-outline" size={20} color="#B59DFF" />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
               {shipImage ? (
                 <Image
@@ -534,6 +568,35 @@ export default function OrderManagementScreen() {
               <Text style={styles.modalSubmitText}>Xác nhận Giao Hàng</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isScannerVisible}
+        animationType="slide"
+        onRequestClose={() => setIsScannerVisible(false)}
+      >
+        <View style={styles.scannerContainer}>
+          {/* 1. Camera độc lập hoàn toàn, bung full màn hình */}
+          <CameraView
+            style={StyleSheet.absoluteFillObject}
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+            onBarcodeScanned={handleBarcodeScanned}
+          />
+
+          {/* 2. Overlay đè lên trên camera (Nằm CÙNG CẤP với CameraView) */}
+          <View style={styles.scannerOverlay}>
+            <View style={styles.scanFrame} />
+            <Text style={styles.scannerHint}>Đưa mã QR vào khung để quét</Text>
+          </View>
+
+          {/* 3. Nút Close */}
+          <TouchableOpacity
+            style={styles.scannerCloseBtn}
+            onPress={() => setIsScannerVisible(false)}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
         </View>
       </Modal>
     </SafeAreaView>
@@ -682,14 +745,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
-  modalInput: {
+  modalInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#D1C4E9",
     borderRadius: 8,
+    backgroundColor: "#F8F9FA",
+    paddingRight: 4,
+    marginBottom: 15,
+  },
+  modalInput: {
+    flex: 1,
     padding: 15,
     fontSize: 16,
-    backgroundColor: "#F8F9FA",
-    marginBottom: 15,
     color: "#333",
   },
   uploadBox: {
@@ -713,4 +782,58 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  trackingInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  qrScanBtn: {
+    width: 42,
+    height: 42,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 4,
+  },
+  scannerOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    borderWidth: 2,
+    borderColor: "#B59DFF",
+    borderRadius: 12,
+    backgroundColor: "transparent",
+  },
+  scannerHint: {
+    textAlign: "center",
+    color: "#fff",
+    fontSize: 14,
+    marginTop: 20,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  scannerCloseBtn: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
 });

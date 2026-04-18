@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import { DeviceEventEmitter } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import React, {
   useCallback,
@@ -122,7 +121,7 @@ const formatTime = (value: string | null) => {
   });
 };
 
-export default function ProviderServiceChatScreen() {
+export default function ChatInboxScreen() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [rooms, setRooms] = useState<ChatRoomResponse[]>([]);
   const [searchText, setSearchText] = useState("");
@@ -177,11 +176,6 @@ export default function ProviderServiceChatScreen() {
 
         setCurrentUserId(userId);
         await loadRooms(userId);
-
-        // Reload unread count badge trên tab
-        if (active) {
-          DeviceEventEmitter.emit("refreshUnreadCount");
-        }
       };
 
       init();
@@ -339,7 +333,7 @@ export default function ProviderServiceChatScreen() {
         <View>
           <Text style={styles.title}>Chat</Text>
           <Text style={styles.subtitle}>
-            Nhắn tin realtime với cosplayer, staff
+            Nhắn tin realtime với cosplayer, provider, staff
           </Text>
         </View>
       </View>

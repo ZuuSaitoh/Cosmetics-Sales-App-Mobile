@@ -1,5 +1,6 @@
-import { Feather } from "@expo/vector-icons";
-import { Ionicons } from "@expo/vector-icons"; // Thêm icon cho đẹp
+import { orderService } from "@/src/services/orderService";
+import { reviewService } from "@/src/services/reviewService";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
@@ -19,8 +20,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { orderService } from "@/src/services/orderService";
-import { reviewService } from "@/src/services/reviewService";
 
 export default function OrdersScreen() {
   const router = useRouter();
@@ -68,7 +67,6 @@ export default function OrdersScreen() {
 
   const fetchOrders = async () => {
     setIsLoading(true);
-    reviewedOrdersRef.current = {};
 
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
@@ -84,9 +82,8 @@ export default function OrdersScreen() {
 
       if (response.data.code === 0) {
         const fetchedOrders = response.data.result;
-        setOrders(fetchedOrders);
-        fetchImagesForOrders(fetchedOrders);
 
+        // BƯỚC 1: Lấy trước toàn bộ trạng thái đánh giá của các đơn COMPLETED
         const reviewStatusMap: Record<number, boolean> = {};
         const completedOrders = fetchedOrders.filter(
           (o: any) => o.status === "COMPLETED",
@@ -96,7 +93,6 @@ export default function OrdersScreen() {
           completedOrders.map(async (order: any) => {
             try {
               const revRes = await reviewService.getByOrder(order.id);
-
               if (
                 revRes.data.code === 0 &&
                 revRes.data.result &&
@@ -110,7 +106,15 @@ export default function OrdersScreen() {
             }
           }),
         );
+
+        // BƯỚC 2: Cập nhật Ref trạng thái đánh giá
         reviewedOrdersRef.current = reviewStatusMap;
+
+        // BƯỚC 3: SAU KHI CÓ ĐỦ TRẠNG THÁI RỒI MỚI SET ORDERS ĐỂ HIỂN THỊ
+        setOrders(fetchedOrders);
+
+        // BƯỚC 4: Load ảnh chạy ngầm phía sau (không ảnh hưởng UI nút bấm)
+        fetchImagesForOrders(fetchedOrders);
       } else {
         Alert.alert("Lỗi dữ liệu", response.data.message);
       }
@@ -174,8 +178,7 @@ export default function OrdersScreen() {
                 imgRes.data.result[0].imageUrl || imgRes.data.result[0];
               hasNewImages = true;
             }
-          } catch (err) {
-          }
+          } catch (err) {}
         }
       }
     }
@@ -195,7 +198,9 @@ export default function OrdersScreen() {
   // === STATE CHO MODAL THANH TOÁN LẠI ===
   const [isRepayModalVisible, setIsRepayModalVisible] = useState(false);
   const [repayOrderId, setRepayOrderId] = useState<number | null>(null);
-  const [selectedRepayMethod, setSelectedRepayMethod] = useState<string | null>(null);
+  const [selectedRepayMethod, setSelectedRepayMethod] = useState<string | null>(
+    null,
+  );
   const [isRepaying, setIsRepaying] = useState(false);
 
   const repayMethods = [
@@ -242,7 +247,10 @@ export default function OrdersScreen() {
       if (res.data.code === 0) {
         const orderData = res.data.result || res.data;
         const paymentUrl =
-          orderData.paymentUrl || orderData.url || orderData.payUrl || orderData.deeplink;
+          orderData.paymentUrl ||
+          orderData.url ||
+          orderData.payUrl ||
+          orderData.deeplink;
 
         if (paymentUrl && typeof paymentUrl === "string") {
           setIsRepayModalVisible(false);
@@ -259,7 +267,10 @@ export default function OrdersScreen() {
         Alert.alert("Lỗi", res.data.message || "Thanh toán thất bại.");
       }
     } catch (err: any) {
-      Alert.alert("Lỗi", err.response?.data?.message || "Không thể thanh toán lại lúc này.");
+      Alert.alert(
+        "Lỗi",
+        err.response?.data?.message || "Không thể thanh toán lại lúc này.",
+      );
     } finally {
       setIsRepaying(false);
     }
@@ -308,7 +319,9 @@ export default function OrdersScreen() {
 
       formData.append("images", { uri: localUri, name: filename, type } as any);
 
-      const res = await orderService.confirmDelivery(confirmOrderId!, [{ uri: localUri, name: filename, type }]);
+      const res = await orderService.confirmDelivery(confirmOrderId!, [
+        { uri: localUri, name: filename, type },
+      ]);
 
       if (res.data.code === 0) {
         Alert.alert("Thành công", "Đã xác nhận nhận hàng!");
@@ -624,27 +637,37 @@ export default function OrdersScreen() {
                   key={method.id}
                   style={[
                     styles.repayMethodRow,
-                    selectedRepayMethod === method.id && styles.repayMethodRowActive,
+                    selectedRepayMethod === method.id &&
+                      styles.repayMethodRowActive,
                   ]}
                   onPress={() => setSelectedRepayMethod(method.id)}
                 >
                   <Feather
                     name={method.icon as any}
                     size={22}
-                    color={selectedRepayMethod === method.id ? "#B59DFF" : "#888"}
+                    color={
+                      selectedRepayMethod === method.id ? "#B59DFF" : "#888"
+                    }
                   />
                   <Text
                     style={[
                       styles.repayMethodText,
-                      selectedRepayMethod === method.id && styles.repayMethodTextActive,
+                      selectedRepayMethod === method.id &&
+                        styles.repayMethodTextActive,
                     ]}
                   >
                     {method.label}
                   </Text>
                   <Feather
-                    name={selectedRepayMethod === method.id ? "check-circle" : "circle"}
+                    name={
+                      selectedRepayMethod === method.id
+                        ? "check-circle"
+                        : "circle"
+                    }
                     size={20}
-                    color={selectedRepayMethod === method.id ? "#B59DFF" : "#DDD"}
+                    color={
+                      selectedRepayMethod === method.id ? "#B59DFF" : "#DDD"
+                    }
                   />
                 </TouchableOpacity>
               ))}
