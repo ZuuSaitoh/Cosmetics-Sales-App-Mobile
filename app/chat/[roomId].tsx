@@ -18,6 +18,7 @@ import {
   Text,
   TextInput,
   View,
+  DeviceEventEmitter,
 } from "react-native";
 import axiosClient, { API_BASE_URL, WS_BASE_URL } from "../api/axiosClient";
 
@@ -110,28 +111,74 @@ export default function ChatRoomScreen() {
   const stompClientRef = useRef<Client | null>(null);
   const pendingMessagesRef = useRef<ChatMessageRequest[]>([]);
   const flatListRef = useRef<FlatList<ChatMessageResponse>>(null);
+  const pollingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const roomKey = useMemo(() => parseNumber(roomId), [roomId]);
+
+  const mergeMessagesById = (prev: ChatMessageResponse[], next: ChatMessageResponse[]) => {
+    const merged = new Map<number, ChatMessageResponse>();
+    [...prev, ...next].forEach((message) => {
+      if (typeof message?.id === "number") merged.set(message.id, message);
+    });
+    return Array.from(merged.values()).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).reverse();
+  };
+
+  const markAsRead = async (targetRoomId: number) => {
+    try {
+      let uid = currentUserId;
+
+      // FIX LỖI REACT STATE BỊ TRỄ: 
+      // Nếu state chưa kịp cập nhật lúc mới vào phòng, tự moi Token ra lấy ID luôn cho chắc cú!
+      if (!uid) {
+        const token = await AsyncStorage.getItem("cosmate_token");
+        if (token) {
+          const decoded = jwtDecode<JwtPayload>(token);
+          uid = String(decoded.sub ?? decoded.userId ?? decoded.id);
+        }
+      }
+
+      // Nếu vẫn không có UID thì chịu
+      if (!uid) return;
+
+      // Gọi API xuống Backend báo Seen
+      await axiosClient.post(`/chat/room/${targetRoomId}/read`, null, {
+        params: { currentUserId: Number(uid) },
+      });
+      
+      // Bắn loa phường báo ra ngoài TabBar tắt số đỏ
+      DeviceEventEmitter.emit('refreshUnreadCount');
+    } catch (error) {
+      console.warn("markAsRead failed", error);
+    }
+  };
 
   const fetchChatHistory = async (targetRoomId: number) => {
     try {
       const response = await axiosClient.get(`/chat/messages/${targetRoomId}`);
       const result = response.data?.result ?? [];
       const content = Array.isArray(result) ? result : Array.isArray(result?.content) ? result.content : [];
-      setMessages(asChatMessageArray(content));
+      const fetchedMessages = asChatMessageArray(content);
+      setMessages((prev) => mergeMessagesById(prev, fetchedMessages));
+      if (fetchedMessages.length > 0) {
+        void markAsRead(targetRoomId);
+      }
     } catch (error) {
       console.warn("Load chat history failed", error);
-      setMessages([
-        {
-          id: -1,
-          roomId: targetRoomId,
-          senderId: 0,
-          messageType: "TEXT",
-          content: "Lỗi tải tin nhắn",
-          createdAt: new Date().toISOString(),
-          isRead: false,
-        },
-      ]);
+      setMessages((prev) =>
+        prev.length > 0
+          ? prev
+          : [
+              {
+                id: -1,
+                roomId: targetRoomId,
+                senderId: 0,
+                messageType: "TEXT",
+                content: "Lỗi tải tin nhắn",
+                createdAt: new Date().toISOString(),
+                isRead: false,
+              },
+            ],
+      );
     }
   };
 
@@ -156,6 +203,7 @@ export default function ChatRoomScreen() {
         if (roomKey === null) return;
 
         await fetchChatHistory(roomKey);
+        await markAsRead(roomKey);
       } catch (error) {
         console.warn("Init chat screen failed", error);
       } finally {
@@ -193,7 +241,8 @@ export default function ChatRoomScreen() {
             client?.subscribe(`/topic/room/${roomKey}`, (message: IMessage) => {
               try {
                 const payload = JSON.parse(message.body) as ChatMessageResponse;
-                setMessages((prev) => [payload, ...prev]);
+                setMessages((prev) => mergeMessagesById([payload], prev));
+                void markAsRead(roomKey);
               } catch (error) {
                 console.warn("Parse websocket message failed", error);
               }
@@ -212,6 +261,11 @@ export default function ChatRoomScreen() {
           },
         });
 
+        if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
+        pollingTimerRef.current = setInterval(() => {
+          void fetchChatHistory(roomKey);
+        }, 3000);
+
         stompClientRef.current = client;
         client.activate();
       } catch (error) {
@@ -223,6 +277,10 @@ export default function ChatRoomScreen() {
 
     return () => {
       mounted = false;
+      if (pollingTimerRef.current) {
+        clearInterval(pollingTimerRef.current);
+        pollingTimerRef.current = null;
+      }
       void client?.deactivate();
       stompClientRef.current = null;
     };
