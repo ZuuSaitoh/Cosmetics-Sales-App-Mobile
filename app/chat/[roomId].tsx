@@ -116,7 +116,6 @@ export default function ChatRoomScreen() {
   const fetchChatHistory = async (targetRoomId: number) => {
     try {
       const response = await axiosClient.get(`/chat/messages/${targetRoomId}`);
-      console.log("chat history response.data", response.data);
       const result = response.data?.result ?? [];
       const content = Array.isArray(result) ? result : Array.isArray(result?.content) ? result.content : [];
       setMessages(asChatMessageArray(content));

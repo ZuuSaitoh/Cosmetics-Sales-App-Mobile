@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import axiosClient from "../api/axiosClient";
 
-// 🛠️ Định nghĩa Interface chuẩn theo dữ liệu Swagger
+// Định nghĩa Interface cho Provider
 interface ProviderDetail {
   id: number;
   shopName: string | null;
@@ -40,7 +40,7 @@ export default function ProviderProfileScreen() {
   const fetchProviderDetails = async () => {
     try {
       setIsLoading(true);
-      // 🚩 Gọi đúng endpoint sếp vừa gửi trên Swagger
+      // Gọi API lấy thông tin thợ ảnh theo providerId
       const res = await axiosClient.get(`/providers/id/${providerId}`);
       if (res.data.code === 0) {
         setProvider(res.data.result);

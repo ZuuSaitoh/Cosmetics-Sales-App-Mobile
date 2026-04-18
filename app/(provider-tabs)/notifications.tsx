@@ -113,7 +113,7 @@ export default function NotificationsScreen() {
 
   // UI CHO TỪNG DÒNG THÔNG BÁO
   const renderItem = ({ item }: { item: any }) => {
-    // ⚠️ Chú ý: Cần check xem BE trả về thuộc tính là 'isRead' hay 'read'
+    // Xử lý cả hai thuộc tính isRead và read (tùy response BE)
     const isItemRead = item.isRead || item.read || false; 
 
     return (
@@ -127,7 +127,7 @@ export default function NotificationsScreen() {
         </View>
         
         <View style={styles.textContainer}>
-          {/* ⚠️ Chú ý: Cần check BE trả về title/message hay content */}
+          {/* Hỗ trợ cả title/message/content từ BE */}
           <Text style={[styles.title, !isItemRead && styles.unreadText]}>{item.title || "Thông báo hệ thống"}</Text>
           <Text style={styles.message} numberOfLines={2}>{item.message || item.content || item.body}</Text>
           <Text style={styles.time}>{item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : 'Vừa xong'}</Text>

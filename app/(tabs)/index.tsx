@@ -178,7 +178,6 @@ export default function OrdersScreen() {
               hasNewImages = true;
             }
           } catch (err) {
-            console.log(`Không thể lấy ảnh cho costume ${cId}`);
           }
         }
       }
@@ -231,7 +230,7 @@ export default function OrdersScreen() {
       }
       const decoded: any = jwtDecode(token);
       const cosplayerId = decoded.sub;
-      const SERVER_IP = "10.88.54.16";
+      const SERVER_IP = "115.77.242.120";
       const returnUrl =
         selectedRepayMethod === "VNPAY"
           ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
@@ -255,7 +254,6 @@ export default function OrdersScreen() {
           Alert.alert("Thành công", "Thanh toán thành công qua ví CosMate!");
           fetchOrders();
         } else {
-          console.log("[Repay] result:", JSON.stringify(orderData));
           Alert.alert("Lỗi", "Không nhận được link thanh toán từ Backend.");
         }
       } else {

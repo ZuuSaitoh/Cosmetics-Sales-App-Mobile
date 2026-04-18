@@ -169,9 +169,8 @@ export default function BookingScreen() {
       const decoded: any = jwtDecode(token);
       const cosplayerId = Number(decoded.sub);
 
-      // 🚩 Ghi chú: Đảm bảo IP này khớp với IP máy chạy Backend của sếp nhé
-      // const SERVER_IP = "10.88.54.16";
-      const SERVER_IP = "192.168.101.107";
+      // IP máy chủ Backend (xác nhận IP trước khi chạy)
+      const SERVER_IP = "115.77.242.120";
 
       // Xây dựng returnUrl chuẩn để Backend xử lý Redirect sau thanh toán
       const returnUrl =
@@ -210,8 +209,6 @@ export default function BookingScreen() {
           const paymentUrl = orderData.paymentUrl;
 
           if (paymentUrl && typeof paymentUrl === "string") {
-            console.log("[Booking] Mở liên kết thanh toán:", paymentUrl);
-
             // Mở trình duyệt để khách thực hiện thanh toán
             await Linking.openURL(paymentUrl);
 

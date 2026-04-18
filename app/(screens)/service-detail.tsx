@@ -85,7 +85,7 @@ export default function ServiceDetailScreen() {
 
         // Thanh toán online: VNPAY hoặc MOMO
         if (selectedPaymentMethod === "VNPAY" || selectedPaymentMethod === "MOMO") {
-          const SERVER_IP = "10.88.54.16";
+          const SERVER_IP = "115.77.242.120";
           const returnUrl =
             selectedPaymentMethod === "VNPAY"
               ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
@@ -115,7 +115,6 @@ export default function ServiceDetailScreen() {
             }
 
             if (paymentUrl && typeof paymentUrl === "string") {
-              console.log("[ServiceDetail] paymentUrl:", paymentUrl);
               await Linking.openURL(paymentUrl);
               router.replace("/(tabs)/profile" as any);
             } else {

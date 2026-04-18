@@ -46,7 +46,7 @@ export default function ReviewScreen() {
   // 2. GỬI ĐÁNH GIÁ (POST /api/reviews)
   const handleSubmitReview = async () => {
     if (!rating) {
-      Alert.alert("Lỗi", "Sếp chưa chọn số sao đánh giá kìa!");
+      Alert.alert("Lỗi", "Vui lòng chọn số sao đánh giá!");
       return;
     }
 
@@ -73,7 +73,7 @@ export default function ReviewScreen() {
       });
 
       if (res.data.code === 0) {
-        Alert.alert("Thành công", "Cảm ơn sếp đã đánh giá! 💜", [
+        Alert.alert("Thành công", "Cảm ơn bạn đã đánh giá!", [
           { text: "OK", onPress: () => router.back() },
         ]);
       }

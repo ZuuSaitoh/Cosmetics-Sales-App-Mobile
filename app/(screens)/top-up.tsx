@@ -56,17 +56,12 @@ export default function TopUpScreen() {
     }
 
     // 🚩 BƯỚC 2: Cấu hình Link Return dẫn về Backend
-    // Sếp nhớ kiểm tra IP máy tính có còn là 192.168.101.107 không nhé
-    // const SERVER_IP = "10.88.54.16";
-    const SERVER_IP = "192.168.101.107";
+    // IP máy chủ Backend (xác nhận IP trước khi chạy)
+    const SERVER_IP = "115.77.242.120";
     const backendReturnUrl =
       method === "vnpay"
         ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
         : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
-
-    console.log("--- DEBUG NẠP TIỀN ---");
-    console.log("UserId:", uId);
-    console.log("Backend Return URL:", backendReturnUrl);
 
     setIsLoading(true);
     try {
@@ -102,7 +97,6 @@ export default function TopUpScreen() {
         if (paymentUrl && typeof paymentUrl === "string") {
           await Linking.openURL(paymentUrl);
         } else {
-          console.log("[TopUp] result:", JSON.stringify(result));
           Alert.alert(
             "Lỗi",
             "Backend trả về định dạng không hợp lệ. Xem console để debug.",

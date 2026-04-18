@@ -160,7 +160,7 @@ export default function ProviderRentalShopScreen() {
                 <Text style={styles.costumeTitle} numberOfLines={1}>
                   {item.name}
                 </Text>
-                {/* Đổi sang pricePerDay để hiện đúng giá sếp nhé! */}
+                {/* Hiển thị giá theo ngày */}
                 <Text style={styles.costumePriceText}>
                   {formatPrice(item.pricePerDay)}
                 </Text>

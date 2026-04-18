@@ -145,10 +145,6 @@ export default function CostumeDetailScreen() {
   const fetchReviews = async (costumeId: number) => {
     try {
       const res = await axiosClient.get(`/reviews/costume/${costumeId}`);
-      console.log(
-        "[CostumeDetail] Reviews API response:",
-        JSON.stringify(res.data),
-      );
       if (res.data.code === 0 && Array.isArray(res.data.result)) {
         setReviews(res.data.result);
       }
@@ -649,7 +645,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#F0F0F0",
-    // Đổ bóng nhẹ cho sang bạn nhé
+    // Đổ bóng nhẹ để tạo chiều sâu
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,

@@ -11,9 +11,9 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import axiosClient from "../api/axiosClient"; // Sếp check lại đường dẫn này cho chuẩn folder nhé
+import axiosClient from "../api/axiosClient";
 
-// 🛠️ Định nghĩa Interface để không còn lỗi "never"
+// Định nghĩa Interface cho Provider
 interface Provider {
   id: number;
   shopName: string | null;
@@ -37,7 +37,7 @@ export default function AllPhotographersScreen() {
   const fetchPhotographers = async () => {
     try {
       setIsLoading(true);
-      // 🚩 Dùng đúng endpoint PROVIDER_PHOTOGRAPH sếp đã test trên Swagger
+      // Gọi API lấy danh sách thợ ảnh
       const res = await axiosClient.get("/providers/role/PROVIDER_PHOTOGRAPH");
       if (res.data.code === 0) {
         setList(res.data.result || []);

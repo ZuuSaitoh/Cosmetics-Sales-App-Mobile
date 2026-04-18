@@ -19,7 +19,6 @@ export default function PaymentResultScreen() {
   const params = useLocalSearchParams();
 
   // 🔍 DEBUG: log tất cả params nhận được từ VNPay redirect
-  console.log("[PaymentResult] All params:", JSON.stringify(params));
 
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentType, setPaymentType] = useState<PaymentType>("order");
@@ -45,25 +44,13 @@ export default function PaymentResultScreen() {
       ? false
       : !!currentParams.vnp_TxnRef || currentMomoSuccess;
 
-    console.log(
-      "[PaymentResult] fetchPaymentResult called | params:",
-      JSON.stringify(currentParams),
-    );
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
       if (!token) {
-        console.log("[PaymentResult] No token");
         setIsLoading(false);
         return;
       }
       jwtDecode(token);
-
-      console.log(
-        "[PaymentResult] isTopupFlow:",
-        isTopupFlow,
-        "| hasOrderId:",
-        hasOrderId,
-      );
 
       // ✅ Fallback: nếu backend redirect không có orderId, dùng transaction history để phân biệt
       // Kiểm tra transaction mới nhất trong ví — nếu có transaction liên quan đến order thì là luồng order
@@ -79,10 +66,6 @@ export default function PaymentResultScreen() {
           if (latestTx.orderId || latestTx.referenceOrderId) {
             const detectedOrderId =
               latestTx.orderId || latestTx.referenceOrderId;
-            console.log(
-              "[PaymentResult] Detected orderId from tx:",
-              detectedOrderId,
-            );
             // Gọi luồng order với orderId tìm được
             setPaymentType("order");
             const orderRes = await axiosClient.get(
@@ -138,46 +121,25 @@ export default function PaymentResultScreen() {
         }
 
         const orderRes = await axiosClient.get(`/orders/${orderId}`);
-        console.log("[PaymentResult] orderRes:", JSON.stringify(orderRes.data));
         if (orderRes.data.code === 0) {
           const order = orderRes.data.result;
           setOrderData(order);
 
           const dbStatus = order.status;
-          console.log("[PaymentResult] dbStatus:", dbStatus);
           if (dbStatus === "PAID") {
-            console.log("[PaymentResult] Status PAID -> setSuccess");
             setIsSuccess(true);
           } else if (dbStatus === "UNPAID") {
-            console.log(
-              "[PaymentResult] Status UNPAID -> calling confirm-payment",
-            );
             let confirmed = false;
             for (let attempt = 0; attempt < 3; attempt++) {
               try {
-                console.log(`[PaymentResult] confirm attempt ${attempt + 1}/3`);
                 await axiosClient.post(`/orders/${orderId}/confirm-payment`);
-                console.log("[PaymentResult] confirm SUCCESS");
                 confirmed = true;
                 break;
               } catch (err: any) {
-                console.log(
-                  `[PaymentResult] confirm attempt ${attempt + 1} FAILED:`,
-                  err?.response?.data || err?.message,
-                );
                 await new Promise((resolve) => setTimeout(resolve, 1000));
               }
             }
-            console.log(
-              "[PaymentResult] confirmed:",
-              confirmed,
-              "| currentVnpaySuccess:",
-              currentVnpaySuccess,
-              "| currentMomoSuccess:",
-              currentMomoSuccess,
-            );
             if (confirmed || currentVnpaySuccess || currentMomoSuccess) {
-              console.log("[PaymentResult] setSuccess(true)");
               setIsSuccess(true);
             }
           }
@@ -192,9 +154,6 @@ export default function PaymentResultScreen() {
 
   useEffect(() => {
     if (vnpaySuccess || momoSuccess) {
-      console.log(
-        "[PaymentResult] vnpaySuccess or momoSuccess=true -> setSuccess immediately",
-      );
       setIsSuccess(true);
     }
     fetchPaymentResult();

@@ -323,7 +323,7 @@ export default function ProviderProfileScreen() {
               {[1, 2, 3, 4, 5].map((s) => (
                 <Ionicons
                   key={s}
-                  // 🚩 Sử dụng totalRating từ JSON sếp gửi
+                  // Hiển thị sao đánh giá dựa trên totalRating
                   name={
                     s <= Math.round(profile?.totalRating || 0)
                       ? "star"
@@ -407,7 +407,7 @@ export default function ProviderProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* MODAL CHỈNH SỬA (Giữ nguyên logic của sếp) */}
+      {/* MODAL CHỈNH SỬA HỒ SƠ */}
       <Modal
         animationType="slide"
         transparent={true}

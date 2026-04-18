@@ -55,7 +55,6 @@ export default function WishlistScreen() {
         setWishlist(wishlist.filter((item: any) => item.id !== wishlistId));
       }
     } catch (err) {
-      console.log("Không thể xóa khỏi yêu thích");
     }
   };
 

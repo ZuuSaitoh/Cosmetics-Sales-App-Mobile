@@ -11,9 +11,9 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import axiosClient from "../api/axiosClient"; // Sếp check lại đường dẫn này cho chuẩn folder nhé
+import axiosClient from "../api/axiosClient";
 
-// 🛠️ Định nghĩa Interface để không còn lỗi "never"
+// Định nghĩa Interface cho Provider
 interface Provider {
   id: number;
   shopName: string | null;
@@ -37,7 +37,7 @@ export default function AllEventStaffScreen() {
   const fetchEventStaff = async () => {
     try {
       setIsLoading(true);
-      // 🚩 Dùng đúng endpoint PROVIDER_EVENT_STAFF sếp đã test trên Swagger
+      // Gọi API lấy danh sách nhân viên sự kiện
       const res = await axiosClient.get("/providers/role/PROVIDER_EVENT_STAFF");
       if (res.data.code === 0) {
         setList(res.data.result || []);

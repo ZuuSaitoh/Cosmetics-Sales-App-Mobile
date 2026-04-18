@@ -139,7 +139,7 @@ export default function UserHomeScreen() {
     </TouchableOpacity>
   );
 
-  // UI cho từng trang phục (Giữ nguyên của sếp)
+  // UI cho từng trang phục
   const renderCostumeItem = ({ item }: { item: any }) => {
     const coverImage = item.imageUrls?.[0] || "https://via.placeholder.com/200";
     const isAvailable = item.status !== "RENTED";

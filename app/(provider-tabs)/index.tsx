@@ -136,7 +136,6 @@ export default function OrderManagementScreen() {
               hasNewImages = true;
             }
           } catch (err) {
-            console.log(`Không thể lấy ảnh cho costume ${cId}`);
           }
         }
       }
