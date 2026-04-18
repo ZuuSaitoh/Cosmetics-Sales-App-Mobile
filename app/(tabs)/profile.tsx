@@ -344,7 +344,10 @@ export default function ProfileScreen() {
                 setIsEditModalVisible(false);
                 router.push({
                   pathname: "/(screens)/reset-password",
-                  params: { identifier: profile?.email || profile?.username || "" },
+                  params: {
+                    identifier: profile?.email || profile?.username || "",
+                    userId: userId,
+                  },
                 });
               }}
             >

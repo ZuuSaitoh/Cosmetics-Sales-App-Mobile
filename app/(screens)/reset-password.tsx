@@ -18,8 +18,11 @@ import { Ionicons } from "@expo/vector-icons";
 export default function ResetPasswordScreen() {
   const params = useLocalSearchParams();
   const token = (params.token as string) || "";
+  const userId = params.userId as string | undefined;
   // Nếu có token → quên mật khẩu (từ email). Không có token → đổi mật khẩu (từ profile)
   const isForgotPassword = !!token;
+  // Đổi mật khẩu từ profile cần có userId
+  const isChangePassword = !!userId && !token;
 
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -31,7 +34,7 @@ export default function ResetPasswordScreen() {
 
   const handleReset = async () => {
     // Xác minh mật khẩu cũ (chỉ khi đổi mật khẩu từ profile)
-    if (!isForgotPassword) {
+    if (isChangePassword) {
       if (!oldPassword) {
         Alert.alert("Lỗi", "Vui lòng nhập mật khẩu cũ!");
         return;
@@ -53,24 +56,24 @@ export default function ResetPasswordScreen() {
 
     setIsLoading(true);
     try {
-      // Đổi mật khẩu từ profile → xác minh mk cũ trước
-      if (!isForgotPassword) {
-        // Verify old password
-        const verifyRes = await axiosClient.post("/auth/login", {
-          usernameOrEmail: params.identifier as string || "",
-          password: oldPassword,
-        });
-        if (verifyRes.data.code !== 0) {
-          Alert.alert("Lỗi", "Mật khẩu cũ không đúng!");
-          setIsLoading(false);
-          return;
-        }
-      }
+      let response;
 
-      const response = await axiosClient.post("/auth/password-reset", {
-        token,
-        newPassword,
-      });
+      if (isChangePassword) {
+        // Đổi mật khẩu từ profile → dùng API change-password (xác minh mk cũ trong body)
+        response = await axiosClient.post(`/users/${userId}/change-password`, {
+          oldPassword,
+          newPassword,
+        });
+      } else if (isForgotPassword) {
+        // Quên mật khẩu (từ email) → dùng API password-reset
+        response = await axiosClient.post("/auth/password-reset", {
+          token,
+          newPassword,
+        });
+      } else {
+        setIsLoading(false);
+        return;
+      }
 
       if (response.data.code === 0) {
         Alert.alert(
@@ -121,12 +124,14 @@ export default function ResetPasswordScreen() {
           </View>
 
           <Text style={styles.title}>
-            {isForgotPassword ? "Đặt lại mật khẩu" : "Đổi mật khẩu"}
+            {isForgotPassword ? "Đặt lại mật khẩu" : isChangePassword ? "Đổi mật khẩu" : "Đặt lại mật khẩu"}
           </Text>
           <Text style={styles.subtitle}>
             {isForgotPassword
               ? "Nhập mật khẩu mới cho tài khoản của bạn."
-              : "Nhập mật khẩu cũ để xác minh, sau đó đặt mật khẩu mới."}
+              : isChangePassword
+              ? "Nhập mật khẩu cũ để xác minh, sau đó đặt mật khẩu mới."
+              : "Nhập mật khẩu mới cho tài khoản của bạn."}
           </Text>
 
           {/* Mật khẩu cũ — chỉ hiện khi đổi từ profile */}
@@ -218,7 +223,7 @@ export default function ResetPasswordScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.resetBtnText}>
-                {isForgotPassword ? "Đặt lại mật khẩu" : "Đổi mật khẩu"}
+                {isForgotPassword ? "Đặt lại mật khẩu" : isChangePassword ? "Đổi mật khẩu" : "Đặt lại mật khẩu"}
               </Text>
             )}
           </TouchableOpacity>
