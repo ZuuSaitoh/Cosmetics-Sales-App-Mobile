@@ -12,8 +12,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
 import { PickedImage, usePickedImage } from "../../hooks/usePickedImage";
+import axiosClient from "../src/api/axiosClient";
 
 type PoseScoreResult = {
   id?: number;
