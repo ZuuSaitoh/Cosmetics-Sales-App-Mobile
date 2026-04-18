@@ -2,8 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios, { InternalAxiosRequestConfig } from "axios";
 
 // Base URL cho API Backend
-export const API_BASE_URL = `http://115.77.242.120:8080/api`;
-export const WS_BASE_URL = `ws://115.77.242.120:8080/ws-mobile`;
+export const API_BASE_URL = `http://172.28.80.243:8080/api`;
+export const WS_BASE_URL = `ws://172.28.80.243:8080/ws-mobile`;
 
 // Khởi tạo Axios client
 const axiosClient = axios.create({
