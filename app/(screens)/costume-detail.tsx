@@ -16,7 +16,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { userService } from "@/src/services/userService";
+import { costumeService } from "@/src/services/costumeService";
+import { providerService } from "@/src/services/providerService";
+import { reviewService } from "@/src/services/reviewService";
 
 const { width } = Dimensions.get("window");
 
@@ -49,7 +52,7 @@ export default function CostumeDetailScreen() {
       const userId = decoded.sub;
 
       // Lấy danh sách yêu thích của user
-      const res = await axiosClient.get(`/users/${userId}/wishlist`);
+      const res = await userService.getWishlist(userId);
       if (res.data.code === 0) {
         // Tìm xem trang phục hiện tại (id) có trong danh sách không
         const item = res.data.result.find(
@@ -80,9 +83,7 @@ export default function CostumeDetailScreen() {
 
       if (isWishlisted && wishlistId) {
         // 🚩 DELETE: Bỏ yêu thích
-        const res = await axiosClient.delete(
-          `/users/${userId}/wishlist/${wishlistId}`,
-        );
+        const res = await userService.removeFromWishlist(userId, wishlistId);
         if (res.data.code === 0) {
           setIsWishlisted(false);
           setWishlistId(null);
@@ -90,9 +91,7 @@ export default function CostumeDetailScreen() {
       } else {
         // 🚩 POST: Thêm vào yêu thích
         // Truyền costumeId vào body theo đúng yêu cầu API của bạn
-        const res = await axiosClient.post(`/users/${userId}/wishlist`, {
-          costumeId: Number(id),
-        });
+        const res = await userService.addToWishlist(userId, Number(id));
         if (res.data.code === 0) {
           setIsWishlisted(true);
           setWishlistId(res.data.result.id);
@@ -109,16 +108,14 @@ export default function CostumeDetailScreen() {
     try {
       if (!costume) setIsLoading(true);
 
-      const response = await axiosClient.get(`/costumes/${id}`);
+      const response = await costumeService.getById(Number(id));
 
       if (response.data.code === 0) {
         const costumeData = response.data.result;
         setCostume(costumeData);
 
         if (costumeData.providerId) {
-          const shopRes = await axiosClient.get(
-            `/providers/id/${costumeData.providerId}`,
-          );
+          const shopRes = await providerService.getById(costumeData.providerId);
 
           if (shopRes.data.code === 0) {
             setProvider(shopRes.data.result);
@@ -144,7 +141,7 @@ export default function CostumeDetailScreen() {
 
   const fetchReviews = async (costumeId: number) => {
     try {
-      const res = await axiosClient.get(`/reviews/costume/${costumeId}`);
+      const res = await reviewService.getByCostume(costumeId);
       if (res.data.code === 0 && Array.isArray(res.data.result)) {
         setReviews(res.data.result);
       }

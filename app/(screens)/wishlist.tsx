@@ -13,7 +13,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { userService } from "@/src/services/userService";
 
 export default function WishlistScreen() {
   const [wishlist, setWishlist] = useState([]);
@@ -31,8 +31,7 @@ export default function WishlistScreen() {
       const decoded: any = jwtDecode(token);
       const userId = decoded.sub;
 
-      // 🚩 SỬ DỤNG API: GET /api/users/{userId}/wishlist
-      const response = await axiosClient.get(`/users/${userId}/wishlist`);
+      const response = await userService.getWishlist(userId);
       if (response.data.code === 0) {
         setWishlist(response.data.result);
       }
@@ -49,8 +48,7 @@ export default function WishlistScreen() {
       const decoded: any = jwtDecode(token || "");
       const userId = decoded.sub;
 
-      // 🚩 SỬ DỤNG API: DELETE /api/users/{userId}/wishlist/{id}
-      const res = await axiosClient.delete(`/users/${userId}/wishlist/${wishlistId}`);
+      const res = await userService.removeFromWishlist(userId, wishlistId);
       if (res.data.code === 0) {
         setWishlist(wishlist.filter((item: any) => item.id !== wishlistId));
       }

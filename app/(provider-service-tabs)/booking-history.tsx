@@ -17,7 +17,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { providerService } from "@/src/services/providerService";
+import { bookingService } from "@/src/services/bookingService";
 
 const BOOKING_STATUSES = [
   { key: "ALL", label: "Tất cả" },
@@ -70,14 +71,14 @@ export default function BookingHistoryScreen() {
       const decoded: any = jwtDecode(token);
       const userId = decoded.sub;
 
-      const providerRes = await axiosClient.get(`/providers/user/${userId}`);
+      const providerRes = await providerService.getByUser(userId);
       if (providerRes.data.code !== 0 || !providerRes.data.result) {
         setIsLoading(false);
         return;
       }
       const providerId = providerRes.data.result.id;
 
-      const res = await axiosClient.get(`/bookings/provider/${providerId}`);
+      const res = await bookingService.getByProvider(providerId);
       if (res.data.code === 0) {
         setBookings(res.data.result || []);
       }
@@ -106,7 +107,7 @@ export default function BookingHistoryScreen() {
         text: "Xác nhận",
         onPress: async () => {
           try {
-            const res = await axiosClient.post(`/bookings/${bookingId}/confirm`);
+            const res = await bookingService.confirm(bookingId);
             if (res.data.code === 0) {
               Alert.alert("Thành công", "Đã xác nhận đơn!");
               fetchBookings();
@@ -129,7 +130,7 @@ export default function BookingHistoryScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            const res = await axiosClient.post(`/bookings/${bookingId}/cancel`);
+            const res = await bookingService.cancel(bookingId);
             if (res.data.code === 0) {
               Alert.alert("Thành công", "Đã hủy đơn!");
               fetchBookings();

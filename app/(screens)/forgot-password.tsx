@@ -1,4 +1,4 @@
-import axiosClient from "../api/axiosClient";
+import { authService } from "@/src/services/authService";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -27,7 +27,7 @@ export default function ForgotPasswordScreen() {
 
     setIsLoading(true);
     try {
-      const response = await axiosClient.post("/auth/password-reset-request", {
+      const response = await authService.passwordResetRequest({
         identifier,
       });
 

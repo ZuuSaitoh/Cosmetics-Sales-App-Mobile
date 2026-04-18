@@ -11,7 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import axiosClient from "../api/axiosClient";
+import { providerService } from "@/src/services/providerService";
 
 // Định nghĩa Interface cho Provider
 interface Provider {
@@ -38,7 +38,7 @@ export default function AllEventStaffScreen() {
     try {
       setIsLoading(true);
       // Gọi API lấy danh sách nhân viên sự kiện
-      const res = await axiosClient.get("/providers/role/PROVIDER_EVENT_STAFF");
+      const res = await providerService.getByRole("PROVIDER_EVENT_STAFF");
       if (res.data.code === 0) {
         setList(res.data.result || []);
       }

@@ -13,7 +13,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { costumeService } from "@/src/services/costumeService";
+import { providerService } from "@/src/services/providerService";
 
 // Interface cho Provider (từ /providers/role/{roleName})
 interface Provider {
@@ -49,9 +50,9 @@ export default function UserHomeScreen() {
     try {
       setIsLoading(true);
       const [costumeRes, photoRes, staffRes] = await Promise.all([
-        axiosClient.get("/costumes"),
-        axiosClient.get("/providers/role/PROVIDER_PHOTOGRAPH"),
-        axiosClient.get("/providers/role/PROVIDER_EVENT_STAFF"),
+        costumeService.getAll(),
+        providerService.getByRole("PROVIDER_PHOTOGRAPH"),
+        providerService.getByRole("PROVIDER_EVENT_STAFF"),
       ]);
 
       if (costumeRes.data.code === 0) setCostumes(costumeRes.data.result || []);
@@ -73,9 +74,7 @@ export default function UserHomeScreen() {
     }
     try {
       setIsLoading(true);
-      const response = await axiosClient.get(`/costumes/search`, {
-        params: { keyword: searchQuery },
-      });
+      const response = await costumeService.search({ keyword: searchQuery });
       if (response.data.code === 0) setCostumes(response.data.result || []);
     } catch (error) {
       console.error("Lỗi tìm kiếm:", error);

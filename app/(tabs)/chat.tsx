@@ -1,8 +1,16 @@
+import { chatService } from "@/src/services/chatService";
+import { userService } from "@/src/services/userService";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -15,7 +23,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import axiosClient from "../api/axiosClient";
 
 export interface UserListItem {
   id: number;
@@ -47,7 +54,8 @@ const getCurrentUserIdFromToken = async (): Promise<string | null> => {
 
   try {
     const payload = jwtDecode<JwtPayload>(token);
-    const rawUserId = payload.sub ?? payload.id ?? payload.userId ?? payload.user_id;
+    const rawUserId =
+      payload.sub ?? payload.id ?? payload.userId ?? payload.user_id;
     if (rawUserId === undefined || rawUserId === null) return null;
     const normalized = String(rawUserId).trim();
     return normalized || null;
@@ -70,7 +78,10 @@ const asUserList = (data: unknown): UserListItem[] => {
   if (!Array.isArray(data)) return [];
   return data
     .map((item) => item as Partial<UserListItem>)
-    .filter((item): item is UserListItem => typeof item.id === "number" && typeof item.fullName === "string")
+    .filter(
+      (item): item is UserListItem =>
+        typeof item.id === "number" && typeof item.fullName === "string",
+    )
     .map((item) => ({
       id: item.id,
       fullName: item.fullName,
@@ -102,7 +113,12 @@ const formatTime = (value: string | null) => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+  return date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
 };
 
 export default function ChatInboxScreen() {
@@ -119,23 +135,27 @@ export default function ChatInboxScreen() {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const filteredRooms = useMemo(() => {
-    if (filter === "unread") return rooms.filter((room) => room.unreadCount > 0);
+    if (filter === "unread")
+      return rooms.filter((room) => room.unreadCount > 0);
     return rooms;
   }, [filter, rooms]);
 
-  const loadRooms = useCallback(async (userId?: string) => {
-    try {
-      const resolvedUserId = userId ?? currentUserId;
-      if (!resolvedUserId) return;
-      const response = await axiosClient.get(`/chat/rooms/user/${resolvedUserId}`);
-      setRooms(asRoomList(response.data?.result ?? response.data));
-    } catch (err) {
-      console.warn("loadRooms error", err);
-    } finally {
-      setLoadingRooms(false);
-      setRefreshing(false);
-    }
-  }, [currentUserId]);
+  const loadRooms = useCallback(
+    async (userId?: string) => {
+      try {
+        const resolvedUserId = userId ?? currentUserId;
+        if (!resolvedUserId) return;
+        const response = await chatService.getRooms(Number(resolvedUserId));
+        setRooms(asRoomList(response.data?.result ?? response.data));
+      } catch (err) {
+        console.warn("loadRooms error", err);
+      } finally {
+        setLoadingRooms(false);
+        setRefreshing(false);
+      }
+    },
+    [currentUserId],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -179,7 +199,7 @@ export default function ChatInboxScreen() {
     setLoadingSearch(true);
     debounceTimer.current = setTimeout(async () => {
       try {
-        const response = await axiosClient.get("/users/search", { params: { keyword } });
+        const response = await userService.searchUsers(keyword);
         setSearchResults(asUserList(response.data?.result ?? response.data));
       } catch (err) {
         console.warn("search users error", err);
@@ -202,13 +222,14 @@ export default function ChatInboxScreen() {
         return;
       }
 
-      const response = await axiosClient.get("/chat/room", {
-        params: { user1Id: resolvedUserId, user2Id: partnerId },
+      const response = await chatService.getOrCreateRoom({
+        user1Id: Number(resolvedUserId),
+        user2Id: partnerId,
       });
       const roomId = toNumber(response.data?.result?.id);
       if (!roomId) return;
 
-      router.push(`/chat/${roomId}`);
+      router.push(`/chat/${roomId}` as any);
     } catch (err) {
       console.warn("handleCreateOrGetRoom error", err);
     }
@@ -218,7 +239,17 @@ export default function ChatInboxScreen() {
     <Pressable
       key={room.roomId}
       style={styles.avatarItem}
-      onPress={() => router.push({ pathname: "/chat/[roomId]", params: { roomId: String(room.roomId), partnerId: String(room.partnerId), partnerName: room.partnerName } })}
+      onPress={() =>
+        router.push({
+          // @ts-ignore
+          pathname: "/chat/[roomId]",
+          params: {
+            roomId: String(room.roomId),
+            partnerId: String(room.partnerId),
+            partnerName: room.partnerName,
+          },
+        })
+      }
     >
       {room.partnerAvatar ? (
         <Image source={{ uri: room.partnerAvatar }} style={styles.avatar} />
@@ -234,7 +265,10 @@ export default function ChatInboxScreen() {
   );
 
   const renderUserResult = ({ item }: { item: UserListItem }) => (
-    <Pressable style={styles.resultItem} onPress={() => handleCreateOrGetRoom(item.id)}>
+    <Pressable
+      style={styles.resultItem}
+      onPress={() => handleCreateOrGetRoom(item.id)}
+    >
       {item.avatarUrl ? (
         <Image source={{ uri: item.avatarUrl }} style={styles.resultAvatar} />
       ) : (
@@ -255,6 +289,8 @@ export default function ChatInboxScreen() {
       style={styles.roomItem}
       onPress={() =>
         router.push({
+          // @ts-ignore
+          // @ts-ignore
           pathname: "/chat/[roomId]",
           params: {
             roomId: String(item.roomId),
@@ -273,7 +309,9 @@ export default function ChatInboxScreen() {
         </View>
       )}
       <View style={styles.roomContent}>
-        <Text style={styles.roomName} numberOfLines={1}>{item.partnerName}</Text>
+        <Text style={styles.roomName} numberOfLines={1}>
+          {item.partnerName}
+        </Text>
         <Text style={styles.roomMessage} numberOfLines={1}>
           {item.unreadCount > 0 ? `${item.unreadCount} chưa đọc · ` : ""}
           {formatTime(item.lastMessageAt) || "Chưa có tin nhắn"}
@@ -281,7 +319,9 @@ export default function ChatInboxScreen() {
       </View>
       {item.unreadCount > 0 && (
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</Text>
+          <Text style={styles.badgeText}>
+            {item.unreadCount > 99 ? "99+" : item.unreadCount}
+          </Text>
         </View>
       )}
     </Pressable>
@@ -292,7 +332,9 @@ export default function ChatInboxScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Chat</Text>
-          <Text style={styles.subtitle}>Nhắn tin realtime với cosplayer, provider, staff</Text>
+          <Text style={styles.subtitle}>
+            Nhắn tin realtime với cosplayer, provider, staff
+          </Text>
         </View>
       </View>
 
@@ -316,28 +358,56 @@ export default function ChatInboxScreen() {
             renderItem={renderUserResult}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
-              loadingSearch ? null : <Text style={styles.emptyText}>Không tìm thấy người dùng phù hợp.</Text>
+              loadingSearch ? null : (
+                <Text style={styles.emptyText}>
+                  Không tìm thấy người dùng phù hợp.
+                </Text>
+              )
             }
           />
         </View>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.avatarRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.avatarRow}
+      >
         {rooms.slice(0, 10).map(renderRoomAvatar)}
       </ScrollView>
 
       <View style={styles.filterRow}>
         <Pressable
-          style={[styles.filterBadge, filter === "all" && styles.filterBadgeActive]}
+          style={[
+            styles.filterBadge,
+            filter === "all" && styles.filterBadgeActive,
+          ]}
           onPress={() => setFilter("all")}
         >
-          <Text style={[styles.filterText, filter === "all" && styles.filterTextActive]}>Tất cả</Text>
+          <Text
+            style={[
+              styles.filterText,
+              filter === "all" && styles.filterTextActive,
+            ]}
+          >
+            Tất cả
+          </Text>
         </Pressable>
         <Pressable
-          style={[styles.filterBadge, filter === "unread" && styles.filterBadgeActive]}
+          style={[
+            styles.filterBadge,
+            filter === "unread" && styles.filterBadgeActive,
+          ]}
           onPress={() => setFilter("unread")}
         >
-          <Text style={[styles.filterText, filter === "unread" && styles.filterTextActive]}>Chưa đọc</Text>
+          <Text
+            style={[
+              styles.filterText,
+              filter === "unread" && styles.filterTextActive,
+            ]}
+          >
+            Chưa đọc
+          </Text>
         </Pressable>
       </View>
 
@@ -354,13 +424,17 @@ export default function ChatInboxScreen() {
           data={filteredRooms}
           keyExtractor={(item) => String(item.roomId)}
           renderItem={renderRoomItem}
-          contentContainerStyle={filteredRooms.length === 0 ? styles.emptyList : styles.roomList}
+          contentContainerStyle={
+            filteredRooms.length === 0 ? styles.emptyList : styles.roomList
+          }
           refreshing={refreshing}
           onRefresh={() => {
             setRefreshing(true);
             loadRooms();
           }}
-          ListEmptyComponent={<Text style={styles.emptyText}>Chưa có cuộc trò chuyện nào.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>Chưa có cuộc trò chuyện nào.</Text>
+          }
         />
       )}
     </SafeAreaView>
@@ -412,17 +486,51 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F5F1FF",
   },
-  resultAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#F1ECFF" },
-  resultAvatarFallback: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#F1ECFF", alignItems: "center", justifyContent: "center" },
+  resultAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#F1ECFF",
+  },
+  resultAvatarFallback: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#F1ECFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   resultContent: { flex: 1 },
   resultName: { color: "#2E2446", fontWeight: "700" },
   resultHint: { marginTop: 2, color: "#7A6B98", fontSize: 12 },
   avatarRow: { paddingHorizontal: 16, gap: 10, paddingBottom: 10 },
   avatarItem: { width: 68, alignItems: "center" },
-  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: "#F1ECFF" },
-  avatarFallback: { width: 54, height: 54, borderRadius: 27, backgroundColor: "#F1ECFF", alignItems: "center", justifyContent: "center" },
-  avatarName: { marginTop: 6, fontSize: 11, color: "#4A3B6B", textAlign: "center" },
-  filterRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingBottom: 10 },
+  avatar: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#F1ECFF",
+  },
+  avatarFallback: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#F1ECFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarName: {
+    marginTop: 6,
+    fontSize: 11,
+    color: "#4A3B6B",
+    textAlign: "center",
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
   filterBadge: {
     paddingHorizontal: 14,
     height: 34,
@@ -435,7 +543,12 @@ const styles = StyleSheet.create({
   filterText: { color: "#7A6B98", fontWeight: "700" },
   filterTextActive: { color: "#FFFFFF" },
   roomList: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
-  emptyList: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: 24 },
+  emptyList: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
   roomItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -446,15 +559,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EEE7FF",
   },
-  roomAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: "#F1ECFF" },
-  roomAvatarFallback: { width: 52, height: 52, borderRadius: 26, backgroundColor: "#F1ECFF", alignItems: "center", justifyContent: "center" },
+  roomAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#F1ECFF",
+  },
+  roomAvatarFallback: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#F1ECFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   roomContent: { flex: 1 },
   roomName: { color: "#2E2446", fontWeight: "800", fontSize: 15 },
   roomMessage: { marginTop: 4, color: "#7A6B98", fontSize: 13 },
-  badge: { minWidth: 22, height: 22, borderRadius: 11, backgroundColor: "#FF6B6B", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
+  badge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#FF6B6B",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
   badgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
   emptyText: { color: "#7A6B98", textAlign: "center" },
   errorText: { color: "#E24C4C", textAlign: "center" },
 });

@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View, Text, StyleSheet } from 'react-native';
-import { useUnreadChatCount } from '../../hooks/useUnreadChatCount';
+import { useUnreadChatCount } from '@/hooks/useUnreadChatCount';
 
 function ChatTabIcon({ color, focused }: { color: string; focused: boolean }) {
   const { count } = useUnreadChatCount();

@@ -20,7 +20,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import axiosClient from "../api/axiosClient";
+import { providerService } from "@/src/services/providerService";
+import { orderService } from "@/src/services/orderService";
 
 const RENTAL_STATUSES = [
   { key: "ALL", label: "Tất cả" },
@@ -60,10 +61,10 @@ export default function OrderManagementScreen() {
       const decoded: any = jwtDecode(token);
       const userId = decoded.sub;
 
-      const providerRes = await axiosClient.get(`/providers/user/${userId}`);
+      const providerRes = await providerService.getByUser(userId);
       const providerId = providerRes.data.result.id;
 
-      const response = await axiosClient.get(`/orders/provider/${providerId}`);
+      const response = await orderService.getProviderOrders(providerId);
 
       if (response.data.code === 0) {
         const fetchedOrders = response.data.result;
@@ -91,7 +92,7 @@ export default function OrderManagementScreen() {
           onPress: async () => {
             try {
               // Gửi POST đến API hủy đơn theo đúng Swagger bạn gửi
-              const res = await axiosClient.post(`/orders/${orderId}/cancel`);
+              const res = await orderService.cancelOrder(orderId);
 
               if (res.data.code === 0) {
                 Alert.alert("Thành công", "Đã hủy đơn hàng thành công! 🫡");
@@ -125,7 +126,7 @@ export default function OrderManagementScreen() {
 
         if (!newImageMap[cId]) {
           try {
-            const imgRes = await axiosClient.get(`/images/costume/${cId}`);
+            const imgRes = await orderService.getCostumeImage(cId);
             if (
               imgRes.data.code === 0 &&
               imgRes.data.result &&
@@ -171,7 +172,7 @@ export default function OrderManagementScreen() {
         text: "Xác nhận",
         onPress: async () => {
           try {
-            const res = await axiosClient.post(`/orders/${orderId}/prepare`);
+            const res = await orderService.prepareOrder(orderId);
             if (res.data.code === 0) {
               Alert.alert(
                 "Thành công",
@@ -229,11 +230,7 @@ export default function OrderManagementScreen() {
         } as any);
       }
 
-      const res = await axiosClient.post(
-        `/orders/${shipOrderId}/ship?trackingCode=${encodeURIComponent(trackingCode)}`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
+      const res = await orderService.shipOrder(Number(shipOrderId), { trackingNumber: trackingCode });
 
       if (res.data.code === 0) {
         setIsShipModalVisible(false);
@@ -265,9 +262,7 @@ export default function OrderManagementScreen() {
           text: "Xác nhận",
           onPress: async () => {
             try {
-              const res = await axiosClient.post(
-                `/orders/${orderId}/deliver-out`,
-              );
+              const res = await orderService.deliverOut(orderId);
               if (res.data.code === 0) {
                 Alert.alert(
                   "Thành công",
@@ -294,7 +289,7 @@ export default function OrderManagementScreen() {
         text: "Chốt đơn",
         onPress: async () => {
           try {
-            const res = await axiosClient.post(`/orders/${orderId}/complete`);
+            const res = await orderService.completeOrder(orderId);
             if (res.data.code === 0) {
               Alert.alert("Thành công", "Đã nhận lại đồ và hoàn tất đơn!");
               setSelectedStatus("COMPLETED");

@@ -14,7 +14,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { reviewService } from "@/src/services/reviewService";
 
 export default function ReviewScreen() {
   // Lấy orderId và cosplayerId từ params truyền qua
@@ -68,9 +68,7 @@ export default function ReviewScreen() {
         formData.append("files", { uri, name: filename, type } as any);
       });
 
-      const res = await axiosClient.post("/reviews", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await reviewService.submit({ cosplayerId: Number(cosplayerId), orderId: Number(orderId), rating, comment, files: images.map((uri, index) => ({ uri, name: uri.split("/").pop() || `review_${index}.jpg`, type: `image/${uri.split(".").pop()}` })) });
 
       if (res.data.code === 0) {
         Alert.alert("Thành công", "Cảm ơn bạn đã đánh giá!", [

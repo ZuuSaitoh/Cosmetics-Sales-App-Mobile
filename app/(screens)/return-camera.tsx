@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import axiosClient from '../api/axiosClient';
+import { orderService } from "@/src/services/orderService";
 
 export default function ReturnCameraScreen() {
   const { id } = useLocalSearchParams(); // Nhận id đơn hàng
@@ -51,16 +51,15 @@ export default function ReturnCameraScreen() {
       const type = match ? `image/${match[1]}` : `image/jpeg`;
 
       formData.append('images', { uri: localUri, name: filename, type } as any);
-      
-      // Tùy chỉnh tham số URL nếu backend yêu cầu mã vận đơn gửi kèm
-      // Tạm giả định API là: POST /orders/{id}/return?trackingCode=...
-      const res = await axiosClient.post(`/orders/${id}/return?trackingCode=${encodeURIComponent(trackingCode)}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+
+      const res = await orderService.returnItem(Number(id), {
+        returnCondition: "GOOD",
+        trackingCode: trackingCode,
       });
 
       if (res.data.code === 0) {
         Alert.alert("Hoàn tất", "Đã gửi thông tin trả hàng. Vui lòng chờ Shop xác nhận để nhận lại cọc nha!", [
-          { text: "OK", onPress: () => router.back() } // Quay lại màn hình đơn hàng
+          { text: "OK", onPress: () => router.back() }
         ]);
       } else {
         Alert.alert("Lỗi", res.data.message);

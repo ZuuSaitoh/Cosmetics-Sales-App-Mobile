@@ -15,7 +15,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { orderService } from "@/src/services/orderService";
+import { reviewService } from "@/src/services/reviewService";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -36,7 +37,7 @@ export default function ProviderOrderDetailScreen() {
 
   const fetchOrderDetail = async () => {
     try {
-      const response = await axiosClient.get(`/orders/${id}`);
+      const response = await orderService.getOrder(Number(id));
       if (response.data.code === 0) {
         setOrder(response.data.result);
       }
@@ -50,7 +51,7 @@ export default function ProviderOrderDetailScreen() {
   // --- LẤY THÔNG TIN REVIEW TỪ KHÁCH HÀNG ---
   const fetchReviewInfo = async () => {
     try {
-      const res = await axiosClient.get(`/reviews/order/${id}`);
+      const res = await reviewService.getByOrder(Number(id));
       // Backend trả về mảng result: [], lấy phần tử đầu tiên
       if (
         res.data.code === 0 &&
@@ -73,9 +74,7 @@ export default function ProviderOrderDetailScreen() {
         text: "Đồng ý",
         onPress: async () => {
           try {
-            const res = await axiosClient.put(`/orders/${id}/status`, {
-              status: newStatus,
-            });
+            const res = await orderService.updateOrderStatus(Number(id), newStatus);
             if (res.data.code === 0) {
               Alert.alert("Thành công", "Đã cập nhật trạng thái!");
               fetchOrderDetail();

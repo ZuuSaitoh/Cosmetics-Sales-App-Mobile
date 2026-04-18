@@ -16,7 +16,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { serviceService } from "@/src/services/serviceService";
+import { bookingService } from "@/src/services/bookingService";
 
 export default function ServiceDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -41,7 +42,7 @@ export default function ServiceDetailScreen() {
   const fetchService = async () => {
     try {
       setIsLoading(true);
-      const res = await axiosClient.get(`/services`);
+      const res = await serviceService.getAll();
       if (res.data.code === 0) {
         const found = (res.data.result || []).find((s: any) => s.id === Number(id));
         setService(found);
@@ -78,7 +79,7 @@ export default function ServiceDetailScreen() {
         cosplayerAddressId: 1, // TODO: cho user chọn địa chỉ
       };
 
-      const res = await axiosClient.post(`/bookings?cosplayerId=${cosplayerId}`, payload);
+      const res = await bookingService.create(cosplayerId, payload);
 
       if (res.data.code === 0) {
         const bookingId = res.data.result?.id || res.data.result;
@@ -91,17 +92,11 @@ export default function ServiceDetailScreen() {
               ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
               : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
 
-          const paymentRes = await axiosClient.post(
-            `/bookings/${bookingId}/pay`,
-            null,
-            {
-              params: {
-                cosplayerId: cosplayerId,
-                paymentMethod: selectedPaymentMethod,
-                returnUrl: returnUrl,
-              },
-            },
-          );
+          const paymentRes = await bookingService.pay(bookingId, {
+            cosplayerId: cosplayerId,
+            paymentMethod: selectedPaymentMethod,
+            returnUrl: returnUrl,
+          });
 
           if (paymentRes.data.code === 0) {
             const result = paymentRes.data.result;

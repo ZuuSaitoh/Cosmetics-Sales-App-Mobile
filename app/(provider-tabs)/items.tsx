@@ -5,7 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from "jwt-decode";
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import axiosClient from '../api/axiosClient'; 
+import { providerService } from "@/src/services/providerService";
+import { costumeService } from "@/src/services/costumeService"; 
 
 export default function ProviderItemsScreen() {
   const [costumes, setCostumes] = useState([]);
@@ -26,7 +27,7 @@ export default function ProviderItemsScreen() {
       const decoded: any = jwtDecode(token);
       const userId = decoded.sub; 
 
-      const providerResponse = await axiosClient.get(`/providers/user/${userId}`);
+      const providerResponse = await providerService.getByUser(userId);
 
       if (providerResponse.data.code !== 0 || !providerResponse.data.result) {
         Alert.alert('Thông báo', 'Bạn chưa thiết lập hồ sơ Shop!');
@@ -37,7 +38,7 @@ export default function ProviderItemsScreen() {
       setShopInfo(myShop);
       const actualProviderId = myShop.id;
 
-      const costumesResponse = await axiosClient.get(`/costumes/provider/${actualProviderId}`);
+      const costumesResponse = await costumeService.getByProvider(actualProviderId);
 
       if (costumesResponse.data.code === 0) {
         setCostumes(costumesResponse.data.result);

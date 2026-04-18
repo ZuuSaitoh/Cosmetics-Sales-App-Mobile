@@ -17,7 +17,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { userService } from "@/src/services/userService";
 
 export default function AddressBookScreen() {
   const [addresses, setAddresses] = useState([]);
@@ -110,7 +110,7 @@ export default function AddressBookScreen() {
   const fetchAddresses = async (uid: number) => {
     try {
       setIsLoading(true);
-      const res = await axiosClient.get(`/users/${uid}/addresses`);
+      const res = await userService.getAddresses(uid);
       if (res.data.code === 0) setAddresses(res.data.result);
     } catch (err) {
       console.error("Lỗi tải địa chỉ:", err);
@@ -137,7 +137,7 @@ export default function AddressBookScreen() {
         name: formData.receiverName,
       };
 
-      const res = await axiosClient.post(`/users/${userId}/addresses`, payload);
+      const res = await userService.addAddress(userId!, payload);
       if (res.data.code === 0) {
         setIsModalVisible(false);
         setFormData({
@@ -162,7 +162,7 @@ export default function AddressBookScreen() {
         text: "Xóa",
         style: "destructive",
         onPress: async () => {
-          await axiosClient.delete(`/users/${userId}/addresses/${id}`);
+          await userService.deleteAddress(userId!, id);
           fetchAddresses(userId!);
         },
       },

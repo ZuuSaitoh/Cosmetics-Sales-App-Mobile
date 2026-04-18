@@ -10,9 +10,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import axiosClient from '../api/axiosClient';
+import { notificationService } from "@/src/services/notificationService";
 
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -26,10 +25,7 @@ export default function NotificationsScreen() {
   // 1. GỌI API LẤY DANH SÁCH THÔNG BÁO (GET)
   const fetchNotifications = async () => {
     try {
-      const token = await AsyncStorage.getItem('cosmate_token');
-      const response = await axiosClient.get('/notifications', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await notificationService.getAll();
       
       if (response.data.code === 0) {
         setNotifications(response.data.result || []);
@@ -52,10 +48,7 @@ export default function NotificationsScreen() {
     if (isRead) return; // Đã đọc rồi thì không gọi API nữa cho nhẹ máy
 
     try {
-      const token = await AsyncStorage.getItem('cosmate_token');
-      const response = await axiosClient.post(`/notifications/mark-read/${id}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await notificationService.markAsRead(id);
 
       if (response.data.code === 0) {
         // Cập nhật lại state cục bộ để đổi màu item ngay lập tức
@@ -71,10 +64,7 @@ export default function NotificationsScreen() {
   // 3. GỌI API ĐÁNH DẤU ĐÃ ĐỌC TẤT CẢ (POST)
   const handleMarkAllAsRead = async () => {
     try {
-      const token = await AsyncStorage.getItem('cosmate_token');
-      const response = await axiosClient.post(`/notifications/mark-all-read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await notificationService.markAllAsRead();
 
       if (response.data.code === 0) {
         setNotifications(prev => prev.map(notif => ({ ...notif, read: true, isRead: true })));
@@ -93,10 +83,7 @@ export default function NotificationsScreen() {
         text: "Xóa", style: "destructive", 
         onPress: async () => {
           try {
-            const token = await AsyncStorage.getItem('cosmate_token');
-            const response = await axiosClient.delete(`/notifications/${id}`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await notificationService.delete(id);
 
             if (response.data.code === 0) {
               // Xóa item khỏi danh sách hiển thị

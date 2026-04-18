@@ -1,4 +1,4 @@
-import axiosClient from "../api/axiosClient";
+import { authService } from "@/src/services/authService";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -60,13 +60,13 @@ export default function ResetPasswordScreen() {
 
       if (isChangePassword) {
         // Đổi mật khẩu từ profile → dùng API change-password (xác minh mk cũ trong body)
-        response = await axiosClient.post(`/users/${userId}/change-password`, {
+        response = await authService.changePassword(Number(userId), {
           oldPassword,
           newPassword,
         });
       } else if (isForgotPassword) {
         // Quên mật khẩu (từ email) → dùng API password-reset
-        response = await axiosClient.post("/auth/password-reset", {
+        response = await authService.passwordReset({
           token,
           newPassword,
         });

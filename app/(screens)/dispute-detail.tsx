@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { disputeService } from "@/src/services/disputeService";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -45,7 +45,7 @@ export default function DisputeDetailScreen() {
 
   const fetchDispute = async () => {
     try {
-      const res = await axiosClient.get(`/disputes/order/${orderId}`);
+      const res = await disputeService.getByOrder(Number(orderId));
       if (res.data.code === 0 && res.data.result) {
         const list = res.data.result as any[];
         if (list.length > 0) {

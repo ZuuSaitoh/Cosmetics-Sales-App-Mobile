@@ -19,7 +19,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { orderService } from "@/src/services/orderService";
+import { reviewService } from "@/src/services/reviewService";
 
 export default function OrdersScreen() {
   const router = useRouter();
@@ -79,7 +80,7 @@ export default function OrdersScreen() {
 
       const decoded: any = jwtDecode(token);
       const userId = decoded.sub;
-      const response = await axiosClient.get(`/orders/user/${userId}`);
+      const response = await orderService.getUserOrders(userId);
 
       if (response.data.code === 0) {
         const fetchedOrders = response.data.result;
@@ -94,9 +95,7 @@ export default function OrdersScreen() {
         await Promise.all(
           completedOrders.map(async (order: any) => {
             try {
-              const revRes = await axiosClient.get(
-                `/reviews/order/${order.id}`,
-              );
+              const revRes = await reviewService.getByOrder(order.id);
 
               if (
                 revRes.data.code === 0 &&
@@ -131,9 +130,7 @@ export default function OrdersScreen() {
         onPress: async () => {
           try {
             // Gửi yêu cầu cập nhật trạng thái sang CANCELLED
-            const res = await axiosClient.post(`/orders/${orderId}/cancel`, {
-              status: "CANCELLED",
-            });
+            const res = await orderService.cancelOrder(orderId);
 
             if (res.data.code === 0) {
               Alert.alert("Thành công", "Đã hủy đơn hàng thành công!");
@@ -167,7 +164,7 @@ export default function OrdersScreen() {
         const cId = firstItem.costumeId;
         if (!newImageMap[cId]) {
           try {
-            const imgRes = await axiosClient.get(`/images/costume/${cId}`);
+            const imgRes = await orderService.getCostumeImage(cId);
             if (
               imgRes.data.code === 0 &&
               imgRes.data.result &&
@@ -236,9 +233,11 @@ export default function OrdersScreen() {
           ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
           : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
 
-      const res = await axiosClient.post(
-        `/orders/${repayOrderId}/pay?cosplayerId=${cosplayerId}&paymentMethod=${selectedRepayMethod}&returnUrl=${encodeURIComponent(returnUrl)}`,
-      );
+      const res = await orderService.repayOrder(repayOrderId, {
+        cosplayerId,
+        paymentMethod: selectedRepayMethod,
+        returnUrl,
+      });
 
       if (res.data.code === 0) {
         const orderData = res.data.result || res.data;
@@ -309,11 +308,7 @@ export default function OrdersScreen() {
 
       formData.append("images", { uri: localUri, name: filename, type } as any);
 
-      const res = await axiosClient.post(
-        `/orders/${confirmOrderId}/confirm-delivery`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
+      const res = await orderService.confirmDelivery(confirmOrderId!, [{ uri: localUri, name: filename, type }]);
 
       if (res.data.code === 0) {
         Alert.alert("Thành công", "Đã xác nhận nhận hàng!");

@@ -11,7 +11,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { walletService } from "@/src/services/walletService";
+import { orderService } from "@/src/services/orderService";
 
 type PaymentType = "order" | "topup";
 
@@ -57,9 +58,7 @@ export default function PaymentResultScreen() {
       if (!hasOrderId && currentMomoSuccess) {
         const decoded: any = jwtDecode(token);
         const uId = decoded.sub;
-        const txRes = await axiosClient.get(
-          `/wallets/user/${uId}/transactions`,
-        );
+        const txRes = await walletService.getTransactions(uId);
         if (txRes.data.code === 0 && txRes.data.result.length > 0) {
           const latestTx = txRes.data.result[0];
           // Nếu transaction mới nhất có trường orderId hoặc referenceOrderId → là luồng order
@@ -68,9 +67,7 @@ export default function PaymentResultScreen() {
               latestTx.orderId || latestTx.referenceOrderId;
             // Gọi luồng order với orderId tìm được
             setPaymentType("order");
-            const orderRes = await axiosClient.get(
-              `/orders/${detectedOrderId}`,
-            );
+            const orderRes = await orderService.getOrder(detectedOrderId);
             if (orderRes.data.code === 0) {
               setOrderData(orderRes.data.result);
               setIsSuccess(true);
@@ -87,7 +84,7 @@ export default function PaymentResultScreen() {
 
         const decoded: any = jwtDecode(token);
         const uId = decoded.sub;
-        const res = await axiosClient.get(`/wallets/user/${uId}/transactions`);
+        const res = await walletService.getTransactions(uId);
 
         if (res.data.code === 0 && res.data.result.length > 0) {
           const latestTx = res.data.result[0];
@@ -120,7 +117,7 @@ export default function PaymentResultScreen() {
           return;
         }
 
-        const orderRes = await axiosClient.get(`/orders/${orderId}`);
+        const orderRes = await orderService.getOrder(Number(orderId));
         if (orderRes.data.code === 0) {
           const order = orderRes.data.result;
           setOrderData(order);
@@ -132,7 +129,7 @@ export default function PaymentResultScreen() {
             let confirmed = false;
             for (let attempt = 0; attempt < 3; attempt++) {
               try {
-                await axiosClient.post(`/orders/${orderId}/confirm-payment`);
+                await orderService.confirmPayment(Number(orderId));
                 confirmed = true;
                 break;
               } catch (err: any) {

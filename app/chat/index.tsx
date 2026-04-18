@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
-import axiosClient from "../api/axiosClient";
+import { chatService } from "@/src/services/chatService";
 
 export interface ChatRoomResponse {
   roomId: number;
@@ -77,7 +77,7 @@ export default function ChatListScreen() {
         return;
       }
 
-      const response = await axiosClient.get(`/chat/rooms/user/${userId}`);
+      const response = await chatService.getRooms(Number(userId));
       const data = response.data?.result ?? response.data;
       setRooms(asChatRoomArray(data));
     } catch (err: unknown) {
@@ -109,6 +109,7 @@ export default function ChatListScreen() {
       style={styles.roomItem}
       onPress={() =>
         router.push({
+// @ts-ignore
           pathname: "/chat/[roomId]",
           params: {
             roomId: String(item.roomId),

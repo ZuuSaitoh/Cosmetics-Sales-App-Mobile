@@ -19,7 +19,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { orderService } from "@/src/services/orderService";
+import { userService } from "@/src/services/userService";
+import { costumeService } from "@/src/services/costumeService";
 
 export default function BookingScreen() {
   const { id } = useLocalSearchParams();
@@ -65,7 +67,7 @@ export default function BookingScreen() {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const res = await axiosClient.get(`/costumes/${id}`);
+      const res = await costumeService.getById(Number(id));
       if (res.data.code === 0) setCostume(res.data.result);
 
       // Fetch danh sách địa chỉ của user
@@ -73,7 +75,7 @@ export default function BookingScreen() {
       if (token) {
         const decoded: any = jwtDecode(token);
         const userId = Number(decoded.sub);
-        const addrRes = await axiosClient.get(`/users/${userId}/addresses`);
+        const addrRes = await userService.getAddresses(userId);
         if (addrRes.data.code === 0) {
           const addrList = addrRes.data.result;
           setAddresses(addrList);
@@ -191,13 +193,10 @@ export default function BookingScreen() {
       };
 
       // Gọi API POST /api/orders với tham số cosplayerId trên Query String
-      const res = await axiosClient.post(
-        `/orders?cosplayerId=${cosplayerId}`,
-        payload,
-      );
+      const res = await orderService.createOrder(cosplayerId, payload);
 
       if (res.data.code === 0) {
-        // 🚩 Lấy dữ liệu từ object 'result' theo đúng sơ đồ mới
+        // Lấy dữ liệu từ object 'result' theo đúng sơ đồ mới
         const orderData = res.data.result;
 
         // Xử lý luồng thanh toán qua cổng VNPAY hoặc MOMO

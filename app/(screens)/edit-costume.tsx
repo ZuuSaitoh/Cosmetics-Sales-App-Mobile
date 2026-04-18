@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import axiosClient from '../api/axiosClient';
+import { costumeService } from "@/src/services/costumeService";
 
 export default function EditCostumeScreen() {
   const { id } = useLocalSearchParams(); // Lấy ID món đồ cần sửa
@@ -27,7 +27,7 @@ export default function EditCostumeScreen() {
   // 1. Lấy dữ liệu cũ từ server
   const fetchDetail = async () => {
     try {
-      const res = await axiosClient.get(`/costumes/${id}`);
+      const res = await costumeService.getById(Number(id));
       if (res.data.code === 0) {
         const item = res.data.result;
         setFormData({
@@ -56,7 +56,7 @@ export default function EditCostumeScreen() {
     setIsSaving(true);
     try {
       // Gọi API cập nhật (thường là PUT hoặc POST tùy Backend của bạn)
-      const res = await axiosClient.put(`/costumes/${id}`, {
+      const res = await costumeService.update(Number(id), {
         ...formData,
         pricePerDay: Number(formData.pricePerDay),
         depositAmount: Number(formData.depositAmount),

@@ -21,7 +21,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { userService } from "@/src/services/userService";
+import { walletService } from "@/src/services/walletService";
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
@@ -56,13 +57,13 @@ export default function ProfileScreen() {
       setUserId(uId);
 
       // 🚩 Bổ sung: Lấy số dư ví (Wallet)
-      const walletRes = await axiosClient.get(`/wallets/user/${uId}`);
+      const walletRes = await walletService.getByUser(uId);
       if (walletRes.data.code === 0) {
         setBalance(walletRes.data.result.balance);
       }
 
       // 🚩 Lấy thông tin Profile (Đã dọn dẹp đoạn gọi trùng lặp)
-      const profileRes = await axiosClient.get(`/users/${uId}/profile`);
+      const profileRes = await userService.getProfile(uId);
       if (profileRes.data.code === 0) {
         const data = profileRes.data.result;
         setProfile(data);
@@ -85,7 +86,7 @@ export default function ProfileScreen() {
 
     setIsSaving(true);
     try {
-      const response = await axiosClient.put(`/users/${userId}/profile`, {
+      const response = await userService.updateProfile(userId, {
         fullName: editFullName,
         phone: editPhone,
       });
@@ -125,9 +126,7 @@ export default function ProfileScreen() {
           type,
         } as any);
 
-        const res = await axiosClient.put(`/users/${userId}/avatar`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        const res = await userService.updateAvatar(userId, formData);
 
         if (res.data.code === 0) {
           Alert.alert("Thành công", "Đã cập nhật ảnh đại diện!");

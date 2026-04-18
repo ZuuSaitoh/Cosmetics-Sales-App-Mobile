@@ -11,7 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import axiosClient from "../api/axiosClient";
+import { providerService } from "@/src/services/providerService";
 
 // Định nghĩa Interface cho Provider
 interface ProviderDetail {
@@ -41,7 +41,7 @@ export default function ProviderProfileScreen() {
     try {
       setIsLoading(true);
       // Gọi API lấy thông tin thợ ảnh theo providerId
-      const res = await axiosClient.get(`/providers/id/${providerId}`);
+      const res = await providerService.getById(Number(providerId));
       if (res.data.code === 0) {
         setProvider(res.data.result);
       }

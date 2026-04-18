@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { disputeService } from "@/src/services/disputeService";
 
 export default function CreateDisputeScreen() {
   const { orderId } = useLocalSearchParams();
@@ -46,15 +46,10 @@ export default function CreateDisputeScreen() {
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : "image/jpeg";
 
-        const formData = new FormData();
-        formData.append("file", {
+        const res = await disputeService.uploadEvidence({
           uri: localUri,
           name: filename,
           type,
-        } as any);
-
-        const res = await axiosClient.post("/upload", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
         });
 
         if (res.data.code === 0 && res.data.result?.url) {
@@ -80,10 +75,7 @@ export default function CreateDisputeScreen() {
 
     setIsSubmitting(true);
     try {
-      const res = await axiosClient.post(`/disputes?orderId=${orderId}`, {
-        reason,
-        files,
-      });
+      const res = await disputeService.create({ orderId: Number(orderId), reason, evidenceImages: images });
 
       if (res.data.code === 0) {
         Alert.alert("Thành công", "Đã gửi khiếu nại!", [

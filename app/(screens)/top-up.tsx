@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { paymentService } from "@/src/services/paymentService";
 
 const PRESET_AMOUNTS = [50000, 100000, 200000, 500000, 1000000];
 
@@ -65,18 +65,9 @@ export default function TopUpScreen() {
 
     setIsLoading(true);
     try {
-      const endpoint =
-        method === "vnpay"
-          ? "payment/api/vnpay/create"
-          : "payment/api/momo/create";
-
-      const response = await axiosClient.post(endpoint, null, {
-        params: {
-          userId: uId,
-          amount: numAmount,
-          returnUrl: backendReturnUrl, // 🚩 SỬA: Dùng link Backend thay cho Deep Link
-        },
-      });
+      const response = method === "vnpay"
+        ? await paymentService.topUpVNPay({ userId: uId, amount: numAmount, returnUrl: backendReturnUrl })
+        : await paymentService.topUpMoMo({ userId: uId, amount: numAmount, returnUrl: backendReturnUrl });
 
       if (response.data.code === 0 && response.data.result) {
         const result = response.data.result;

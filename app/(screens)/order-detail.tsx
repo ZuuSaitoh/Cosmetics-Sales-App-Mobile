@@ -16,7 +16,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { orderService } from "@/src/services/orderService";
+import { reviewService } from "@/src/services/reviewService";
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -79,7 +80,7 @@ export default function OrderDetailScreen() {
 
   const fetchOrderTrackings = async () => {
     try {
-      const response = await axiosClient.get(`/order-tracking/order/${id}`);
+      const response = await orderService.getOrderTracking(Number(id));
       if (response.data.code === 0) {
         const sortedTrackings = response.data.result.sort(
           (a: any, b: any) =>
@@ -94,7 +95,7 @@ export default function OrderDetailScreen() {
 
   const fetchOrderDetail = async () => {
     try {
-      const response = await axiosClient.get(`/orders/${id}`);
+      const response = await orderService.getOrder(Number(id));
       if (response.data.code === 0) {
         setOrder(response.data.result);
       }
@@ -107,7 +108,7 @@ export default function OrderDetailScreen() {
 
   const fetchReviewInfo = async () => {
     try {
-      const res = await axiosClient.get(`/reviews/order/${id}`);
+      const res = await reviewService.getByOrder(Number(id));
       if (
         res.data.code === 0 &&
         res.data.result &&
@@ -179,11 +180,7 @@ export default function OrderDetailScreen() {
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : `image/jpeg`;
       formData.append("images", { uri: localUri, name: filename, type } as any);
-      const res = await axiosClient.post(
-        `/orders/${id}/confirm-delivery`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
+      const res = await orderService.confirmDelivery(Number(id), [{ uri: localUri, name: filename, type }]);
       if (res.data.code === 0) {
         Alert.alert("Thành công", "Đã xác nhận nhận hàng!");
         setIsConfirmModalVisible(false);

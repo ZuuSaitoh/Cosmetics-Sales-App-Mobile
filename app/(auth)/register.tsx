@@ -1,4 +1,4 @@
-import axiosClient from "../api/axiosClient";
+import { authService } from "@/src/services/authService";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -110,12 +110,12 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
     try {
-      const response = await axiosClient.post("/auth/register", {
+      const response = await authService.register({
         fullName,
         email,
         username,
         password,
-        role: selectedRole,
+        role: selectedRole!,
       });
 
       if (response.data.code === 0) {

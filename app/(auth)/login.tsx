@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import axiosClient from "../api/axiosClient";
+import { authService } from "@/src/services/authService";
 
 const isValidEmail = (email: string) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -50,7 +50,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const response = await axiosClient.post("/auth/login", {
+      const response = await authService.login({
         usernameOrEmail: email,
         password: password,
       });

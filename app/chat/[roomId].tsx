@@ -20,7 +20,8 @@ import {
   View,
   DeviceEventEmitter,
 } from "react-native";
-import axiosClient, { API_BASE_URL, WS_BASE_URL } from "../api/axiosClient";
+import { API_BASE_URL, WS_BASE_URL } from "@/src/api/axiosClient";
+import { chatService } from "@/src/services/chatService";
 
 const textEncoding = require("text-encoding");
 (global as typeof globalThis & { TextEncoder: typeof textEncoding.TextEncoder }).TextEncoder =
@@ -141,9 +142,7 @@ export default function ChatRoomScreen() {
       if (!uid) return;
 
       // Gọi API xuống Backend báo Seen
-      await axiosClient.post(`/chat/room/${targetRoomId}/read`, null, {
-        params: { currentUserId: Number(uid) },
-      });
+      await chatService.markAsRead(targetRoomId, Number(uid));
       
       // Bắn loa phường báo ra ngoài TabBar tắt số đỏ
       DeviceEventEmitter.emit('refreshUnreadCount');
@@ -154,7 +153,7 @@ export default function ChatRoomScreen() {
 
   const fetchChatHistory = async (targetRoomId: number) => {
     try {
-      const response = await axiosClient.get(`/chat/messages/${targetRoomId}`);
+      const response = await chatService.getMessages(targetRoomId);
       const result = response.data?.result ?? [];
       const content = Array.isArray(result) ? result : Array.isArray(result?.content) ? result.content : [];
       const fetchedMessages = asChatMessageArray(content);
@@ -313,7 +312,7 @@ export default function ChatRoomScreen() {
         content: text,
       };
 
-      await axiosClient.post("/chat/messages", payload);
+      await chatService.sendMessage(payload);
       setInput("");
       await fetchChatHistory(roomKey);
     } catch (error) {
@@ -393,7 +392,7 @@ export default function ChatRoomScreen() {
         return;
       }
 
-      await axiosClient.post("/chat/messages", {
+      await chatService.sendMessage({
         roomId: roomKey,
         senderId: currentId,
         messageType: "IMAGE",

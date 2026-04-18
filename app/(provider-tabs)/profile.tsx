@@ -21,7 +21,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Dropdown } from "react-native-element-dropdown"; // Import thư viện
-import axiosClient from "../api/axiosClient";
+import axiosClient from "../src/api/axiosClient";
+import { providerService } from "@/src/services/providerService";
+import { userService } from "@/src/services/userService";
+import { walletService } from "@/src/services/walletService";
 
 export default function ProviderProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
@@ -75,14 +78,14 @@ export default function ProviderProfileScreen() {
       setUserId(uId);
 
       // Lấy số dư ví
-      const walletRes = await axiosClient.get(`/wallets/user/${uId}`);
+      const walletRes = await walletService.getByUser(uId);
       if (walletRes.data.code === 0) {
         setBalance(walletRes.data.result.balance || 0);
         setDepositBalance(walletRes.data.result.depositBalance || 0);
       }
 
       // Lấy thông tin provider
-      const providerRes = await axiosClient.get(`/providers/user/${uId}`);
+      const providerRes = await providerService.getByUser(uId);
       if (providerRes.data.code === 0 && providerRes.data.result) {
         const data = providerRes.data.result;
         setProfile(data);
@@ -115,7 +118,7 @@ export default function ProviderProfileScreen() {
         bankAccountNumber: editBankAccountNumber,
       };
 
-      const response = await axiosClient.put(`/providers/${providerId}`, payload);
+      const response = await providerService.updateProfile(providerId, payload);
       if (response.data.code === 0) {
         Alert.alert("Thành công", "Đã cập nhật hồ sơ Shop!");
         setProfile(response.data.result);
@@ -152,9 +155,7 @@ export default function ProviderProfileScreen() {
           type: "image/jpeg",
         } as any);
 
-        const res = await axiosClient.put(`/users/${userId}/avatar`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        const res = await userService.updateAvatar(userId, formData);
 
         if (res.data.code === 0) {
           Alert.alert("Thành công", "Đã cập nhật ảnh đại diện!");
@@ -188,13 +189,7 @@ export default function ProviderProfileScreen() {
           type: "image/jpeg",
         } as any);
 
-        const res = await axiosClient.put(
-          `/providers/${providerId}/cover-image`,
-          formData,
-          {
-            headers: { "Content-Type": "multipart/form-data" },
-          },
-        );
+        const res = await providerService.updateCoverImage(Number(providerId), formData);
 
         if (res.data.code === 0) {
           Alert.alert("Thành công", "Đã cập nhật ảnh bìa!");

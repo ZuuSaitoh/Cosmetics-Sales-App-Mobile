@@ -12,7 +12,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { providerService } from "@/src/services/providerService";
+import { costumeService } from "@/src/services/costumeService";
 
 const { width } = Dimensions.get("window");
 const COLUMN_WIDTH = (width - 45) / 2;
@@ -36,7 +37,7 @@ export default function ProviderRentalShopScreen() {
     try {
       // 🚩 BƯỚC 1: Lấy thông tin Shop bằng providerId
       // Endpoint: /api/providers/id/{providerId}
-      const shopRes = await axiosClient.get(`/providers/id/${providerId}`);
+      const shopRes = await providerService.getById(Number(providerId));
 
       if (shopRes.data.code === 0) {
         setProvider(shopRes.data.result);
@@ -44,9 +45,7 @@ export default function ProviderRentalShopScreen() {
 
       // 🚩 BƯỚC 2: Lấy trang phục bằng providerId
       // Endpoint: /api/costumes/provider/{providerId}
-      const costumeRes = await axiosClient.get(
-        `/costumes/provider/${providerId}`,
-      );
+      const costumeRes = await costumeService.getByProvider(Number(providerId));
 
       if (costumeRes.data.code === 0) {
         setCostumes(costumeRes.data.result);

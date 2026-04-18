@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { jwtDecode } from "jwt-decode";
-import axiosClient from "../app/api/axiosClient";
+import axiosClient from "@/src/api/axiosClient";
 import { DeviceEventEmitter } from "react-native";
 
 let cachedCount = 0;

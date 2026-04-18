@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
+import { reviewService } from "@/src/services/reviewService";
 
 const STAR_FILTERS = [
   { key: null, label: "Tất cả" },
@@ -49,7 +49,7 @@ export default function CostumeReviewsScreen() {
   const fetchReviews = async () => {
     try {
       setIsLoading(true);
-      const res = await axiosClient.get(`/reviews/costume/${costumeId}`);
+      const res = await reviewService.getByCostume(Number(costumeId));
       if (res.data.code === 0) {
         const reviews = res.data.result || [];
         // Sắp xếp mới nhất trước
