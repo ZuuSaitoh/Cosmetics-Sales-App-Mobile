@@ -1,3 +1,4 @@
+import { walletService } from "@/src/services/walletService";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
@@ -12,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { walletService } from "@/src/services/walletService";
 
 type Transaction = {
   id: number;
@@ -26,21 +26,31 @@ type Transaction = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
+  // Các type cũ (giữ lại phòng hờ)
   DEPOSIT: "Cọc",
   RENT: "Thuê",
   REFUND: "Hoàn tiền",
   TOPUP: "Nạp tiền",
   WITHDRAW: "Rút tiền",
   PAYMENT: "Thanh toán",
+  // Các type mới từ Database
+  CREDIT: "Nạp tiền / Nhận tiền",
+  DEBIT: "Trừ tiền / Thanh toán",
+  DEPOSIT_RETURN: "Hoàn tiền cọc",
+  PROVIDER_PAYOUT: "Doanh thu thuê đồ",
 };
 
 const TYPE_COLORS: Record<string, string> = {
   DEPOSIT: "#FF9800",
   RENT: "#B59DFF",
-  REFUND: "#4CAF50",
+  REFUND: "#28A745",
   TOPUP: "#2196F3",
   WITHDRAW: "#F44336",
   PAYMENT: "#9C27B0",
+  CREDIT: "#2196F3", // Xanh dương
+  DEBIT: "#F44336", // Đỏ
+  DEPOSIT_RETURN: "#28A745", // Xanh lá
+  PROVIDER_PAYOUT: "#9C27B0", // Tím
 };
 
 export default function TransactionHistoryScreen() {
@@ -97,17 +107,26 @@ export default function TransactionHistoryScreen() {
   };
 
   const renderItem = ({ item }: { item: Transaction }) => {
-    const isPositive = item.amount > 0;
+    // 🚩 Định nghĩa các loại giao dịch được CỘNG TIỀN (+)
+    const POSITIVE_TYPES = [
+      "CREDIT",
+      "DEPOSIT_RETURN",
+      "PROVIDER_PAYOUT",
+      "TOPUP",
+      "REFUND",
+    ];
+    const isPositive = POSITIVE_TYPES.includes(item.type);
+
     const typeLabel = TYPE_LABELS[item.type] || item.type;
     const typeColor = TYPE_COLORS[item.type] || "#888";
-    const isRefund = item.type === "REFUND";
 
     return (
       <View style={styles.transactionCard}>
         <View style={styles.txLeft}>
           <View style={[styles.txIcon, { backgroundColor: typeColor + "20" }]}>
+            {/* Đổi icon: Tiền vào mũi tên chúi xuống, Tiền ra mũi tên bay lên */}
             <Ionicons
-              name={isRefund ? "arrow-undo" : "arrow-forward"}
+              name={isPositive ? "arrow-down" : "arrow-up"}
               size={18}
               color={typeColor}
             />
@@ -124,10 +143,11 @@ export default function TransactionHistoryScreen() {
           <Text
             style={[
               styles.txAmount,
-              { color: isRefund ? "#28A745" : "#333" },
+              { color: isPositive ? "#28A745" : "#DC3545" }, // Xanh lá cho cộng, Đỏ cho trừ
             ]}
           >
-            {isRefund ? "+" : "-"}{formatPrice(item.amount)}
+            {isPositive ? "+" : "-"}
+            {formatPrice(item.amount)}
           </Text>
           <View
             style={[
