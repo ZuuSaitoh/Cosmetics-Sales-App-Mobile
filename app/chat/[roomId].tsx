@@ -1,10 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { Client, IMessage } from "@stomp/stompjs";
+import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -16,7 +19,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import axiosClient from "../api/axiosClient";
+import axiosClient, { API_BASE_URL, WS_BASE_URL } from "../api/axiosClient";
 
 const textEncoding = require("text-encoding");
 (global as typeof globalThis & { TextEncoder: typeof textEncoding.TextEncoder }).TextEncoder =
@@ -56,11 +59,13 @@ type ChatPartner = {
   role: string | null;
 };
 
-
-const normalizeId = (value: unknown) => {
-  if (value === undefined || value === null) return "";
-  return String(value);
+type JwtPayload = {
+  sub?: string | number;
+  userId?: string | number;
+  id?: string | number;
 };
+
+const normalizeId = (value: unknown) => (value === undefined || value === null ? "" : String(value));
 
 const parseNumber = (value: unknown) => {
   if (typeof value === "number") return value;
@@ -69,11 +74,6 @@ const parseNumber = (value: unknown) => {
     return Number.isNaN(parsed) ? null : parsed;
   }
   return null;
-};
-
-const getCurrentUserId = async (): Promise<string | null> => {
-  const value = await AsyncStorage.getItem("cosmate_user_id");
-  return value && value.trim() ? value.trim() : null;
 };
 
 const asChatMessageArray = (data: unknown): ChatMessageResponse[] => {
@@ -92,6 +92,8 @@ const asChatMessageArray = (data: unknown): ChatMessageResponse[] => {
     );
 };
 
+const safeString = (value: unknown) => (typeof value === "string" ? value : null);
+
 export default function ChatRoomScreen() {
   const { roomId, partnerId, partnerName, partnerAvatar, partnerRole } = useLocalSearchParams<RouteParams>();
   const [messages, setMessages] = useState<ChatMessageResponse[]>([]);
@@ -99,54 +101,89 @@ export default function ChatRoomScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [partner, setPartner] = useState<ChatPartner>({
-    id: 0,
-    name: String(partnerName ?? ""),
-    avatarUrl: partnerAvatar ?? null,
-    role: partnerRole ?? null,
+  const [partner] = useState<ChatPartner>({
+    id: parseNumber(partnerId) ?? 0,
+    name: safeString(partnerName) ?? "",
+    avatarUrl: safeString(partnerAvatar),
+    role: safeString(partnerRole),
   });
   const stompClientRef = useRef<Client | null>(null);
+  const pendingMessagesRef = useRef<ChatMessageRequest[]>([]);
   const flatListRef = useRef<FlatList<ChatMessageResponse>>(null);
 
   const roomKey = useMemo(() => parseNumber(roomId), [roomId]);
 
+  const fetchChatHistory = async (targetRoomId: number) => {
+    try {
+      const response = await axiosClient.get(`/chat/messages/${targetRoomId}`);
+      console.log("chat history response.data", response.data);
+      const result = response.data?.result ?? [];
+      const content = Array.isArray(result) ? result : Array.isArray(result?.content) ? result.content : [];
+      setMessages(asChatMessageArray(content));
+    } catch (error) {
+      console.warn("Load chat history failed", error);
+      setMessages([
+        {
+          id: -1,
+          roomId: targetRoomId,
+          senderId: 0,
+          messageType: "TEXT",
+          content: "Lỗi tải tin nhắn",
+          createdAt: new Date().toISOString(),
+          isRead: false,
+        },
+      ]);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       try {
-        const storedUserId = await getCurrentUserId();
-        if (storedUserId) setCurrentUserId(storedUserId);
+        const token = await AsyncStorage.getItem("cosmate_token");
+        if (token) {
+          try {
+            const decoded = jwtDecode<JwtPayload>(token);
+            const userId = decoded.sub ?? decoded.userId ?? decoded.id;
+            if (userId !== undefined && userId !== null) {
+              const normalizedUserId = String(userId);
+              setCurrentUserId(normalizedUserId);
+              await AsyncStorage.setItem("cosmate_user_id", normalizedUserId);
+            }
+          } catch (decodeError) {
+            console.warn("jwtDecode failed", decodeError);
+          }
+        }
 
         if (roomKey === null) return;
 
-        const response = await axiosClient.get(`/chat/messages/${roomKey}`);
-        const data = response.data?.result ?? response.data ?? [];
-        setMessages(asChatMessageArray(data));
+        await fetchChatHistory(roomKey);
       } catch (error) {
-        console.warn("Load chat history failed", error);
+        console.warn("Init chat screen failed", error);
       } finally {
         setLoading(false);
       }
     };
 
-    init();
+    void init();
   }, [roomKey]);
 
   useEffect(() => {
     if (roomKey === null) return;
 
     let mounted = true;
+    let client: Client | null = null;
 
-    const connectSocket = async () => {
+    const initWebSocket = async () => {
       try {
         const token = await AsyncStorage.getItem("cosmate_token");
         if (!token) {
-          console.warn("STOMP token is empty or missing");
+          console.error("Missing token for websocket connection");
           return;
         }
         if (!mounted) return;
 
-        const client = new Client({
-          brokerURL: "ws://10.88.54.16:8080/ws-mobile",
+        client = new Client({
+          webSocketFactory: () => new WebSocket(WS_BASE_URL),
           connectHeaders: {
             Authorization: "Bearer " + token,
           },
@@ -154,14 +191,22 @@ export default function ChatRoomScreen() {
           heartbeatIncoming: 4000,
           heartbeatOutgoing: 4000,
           onConnect: () => {
-            client.subscribe(`/topic/room/${roomKey}`, (message: IMessage) => {
+            client?.subscribe(`/topic/room/${roomKey}`, (message: IMessage) => {
               try {
                 const payload = JSON.parse(message.body) as ChatMessageResponse;
-                setMessages((prev) => [...prev, payload]);
+                setMessages((prev) => [payload, ...prev]);
               } catch (error) {
                 console.warn("Parse websocket message failed", error);
               }
             });
+
+            pendingMessagesRef.current.forEach((payload) => {
+              client?.publish({
+                destination: "/app/chat.sendMessage",
+                body: JSON.stringify(payload),
+              });
+            });
+            pendingMessagesRef.current = [];
           },
           onStompError: (frame) => {
             console.warn("STOMP error", frame.headers["message"], frame.body);
@@ -171,83 +216,153 @@ export default function ChatRoomScreen() {
         stompClientRef.current = client;
         client.activate();
       } catch (error) {
-        console.warn("Unable to connect STOMP", error);
+        console.error("Unable to initialize websocket", error);
       }
     };
 
-    connectSocket();
+    void initWebSocket();
 
     return () => {
       mounted = false;
-      void stompClientRef.current?.deactivate();
+      void client?.deactivate();
       stompClientRef.current = null;
     };
   }, [roomKey]);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      requestAnimationFrame(() => flatListRef.current?.scrollToEnd({ animated: true }));
+  const publishChatMessage = (payload: ChatMessageRequest) => {
+    const client = stompClientRef.current;
+    if (client?.connected) {
+      client.publish({
+        destination: "/app/chat.sendMessage",
+        body: JSON.stringify(payload),
+      });
+      return;
     }
-  }, [messages]);
+
+    pendingMessagesRef.current.push(payload);
+    client?.activate();
+  };
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || !stompClientRef.current?.connected || roomKey === null) return;
+    if (!text || roomKey === null) return;
 
     setSending(true);
     try {
       const payload: ChatMessageRequest = {
         roomId: roomKey,
-        senderId: Number(currentUserId) || Number(partnerId) || 0,
+        senderId: Number(currentUserId),
         messageType: "TEXT",
         content: text,
       };
 
-      stompClientRef.current.publish({
-        destination: "/app/chat.sendMessage",
-        body: JSON.stringify(payload),
-      });
+      await axiosClient.post("/chat/messages", payload);
       setInput("");
+      await fetchChatHistory(roomKey);
+    } catch (error) {
+      console.warn("Lỗi gửi tin nhắn:", error);
+      Alert.alert("Lỗi", "Không thể gửi tin nhắn lúc này.");
     } finally {
       setSending(false);
     }
   };
 
-  const onHeaderPress = () => {
-    const partnerIdValue = parseNumber(partnerId) ?? partner.id;
-    if (!partnerIdValue) return;
+  const handlePickAndSendImage = async () => {
+    if (roomKey === null) return;
 
-    const roleValue = String(partner.role ?? "").toUpperCase();
-    const isRental = roleValue === "PROVIDER_RENTAL" || roleValue === "5";
-    const isPhotographer = roleValue === "PROVIDER_PHOTOGRAPH" || roleValue === "6";
-    const isEventStaff = roleValue === "PROVIDER_EVENT_STAFF" || roleValue === "7";
-
-    if (isRental) {
-      router.push({ pathname: "/provider-rental-shop", params: { providerId: String(partnerIdValue) } });
+    const token = await AsyncStorage.getItem("cosmate_token");
+    if (!token) {
+      console.error("Missing token for image upload");
+      Alert.alert("Chưa đăng nhập", "Không có token để tải ảnh lên.");
       return;
     }
 
-    if (isPhotographer) {
-      router.push({ pathname: "/photographer", params: { providerId: String(partnerIdValue) } });
+    const currentId = Number(currentUserId);
+    if (!currentUserId || !currentId) {
+      console.error("Missing currentUserId for image upload");
       return;
     }
 
-    if (isEventStaff) {
-      router.push({ pathname: "/event-staff", params: { providerId: String(partnerIdValue) } });
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Quyền truy cập", "Bạn cần cấp quyền thư viện ảnh để gửi ảnh.");
       return;
     }
 
-    router.push("/profile/" + String(partnerIdValue));
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.7,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+    const uri = asset.uri;
+    const filename = asset.fileName ?? `chat-${Date.now()}.jpg`;
+    const match = /\.([A-Za-z0-9]+)$/.exec(filename);
+    const ext = match?.[1]?.toLowerCase();
+    const mimeType = asset.mimeType ?? (ext === "png" ? "image/png" : "image/jpeg");
+
+    try {
+      const formData = new FormData();
+      formData.append("roomId", String(roomKey));
+
+      if (Platform.OS === "web") {
+        const res = await fetch(uri);
+        const blob = await res.blob();
+        formData.append("file", blob, filename);
+      } else {
+        formData.append("file", {
+          uri,
+          name: filename,
+          type: mimeType,
+        } as any);
+      }
+
+      const response = await fetch(`${API_BASE_URL}/chat/upload-image`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          Accept: "application/json",
+        },
+        body: formData,
+      });
+      const data = await response.json();
+      const imageUrl = data?.result?.url || data?.result || data?.url;
+      if (!imageUrl || typeof imageUrl !== "string") {
+        console.warn("Upload image response missing url", data);
+        Alert.alert("Upload ảnh thất bại", "Backend không trả về URL ảnh hợp lệ.");
+        return;
+      }
+
+      await axiosClient.post("/chat/messages", {
+        roomId: roomKey,
+        senderId: currentId,
+        messageType: "IMAGE",
+        content: imageUrl,
+      });
+      await fetchChatHistory(roomKey);
+    } catch (error) {
+      console.warn("Upload image failed", error);
+      Alert.alert("Upload ảnh lỗi", "Không upload được ảnh. Hãy kiểm tra mạng và backend.");
+    }
   };
 
   const renderItem = ({ item }: { item: ChatMessageResponse }) => {
     const isMine = normalizeId(item.senderId) === currentUserId;
+    const isImage = item.messageType === "IMAGE";
+
     return (
       <View style={[styles.messageRow, isMine ? styles.mineRow : styles.otherRow]}>
         <View style={[styles.bubble, isMine ? styles.mineBubble : styles.otherBubble]}>
-          <Text style={[styles.messageText, isMine ? styles.mineText : styles.otherText]}>
-            {item.content}
-          </Text>
+          {isImage ? (
+            <Image source={{ uri: item.content }} style={styles.messageImage} />
+          ) : (
+            <Text style={[styles.messageText, isMine ? styles.mineText : styles.otherText]}>
+              {item.content}
+            </Text>
+          )}
         </View>
       </View>
     );
@@ -260,7 +375,7 @@ export default function ChatRoomScreen() {
           <Ionicons name="arrow-back" size={22} color="#2E2446" />
         </Pressable>
 
-        <Pressable style={styles.headerUser} onPress={onHeaderPress}>
+        <View style={styles.headerUser}>
           {partner.avatarUrl ? (
             <Image source={{ uri: partner.avatarUrl }} style={styles.headerAvatar} />
           ) : (
@@ -276,7 +391,7 @@ export default function ChatRoomScreen() {
               {partner.role || "Nhấn vào để xem hồ sơ"}
             </Text>
           </View>
-        </Pressable>
+        </View>
       </View>
 
       {loading ? (
@@ -287,10 +402,11 @@ export default function ChatRoomScreen() {
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+          keyboardVerticalOffset={100}
         >
           <FlatList
             ref={flatListRef}
+            inverted={true}
             data={messages}
             keyExtractor={(item, index) => String(item.id ?? index)}
             renderItem={renderItem}
@@ -299,7 +415,7 @@ export default function ChatRoomScreen() {
           />
 
           <View style={styles.inputBar}>
-            <Pressable style={styles.mediaBtn} onPress={() => console.log("open media picker") }>
+            <Pressable style={styles.mediaBtn} onPress={handlePickAndSendImage}>
               <Ionicons name="camera" size={20} color="#8E7AB5" />
             </Pressable>
             <TextInput
@@ -360,6 +476,7 @@ const styles = StyleSheet.create({
   mineBubble: { backgroundColor: "#B59DFF", borderBottomRightRadius: 6 },
   otherBubble: { backgroundColor: "#FFFFFF", borderBottomLeftRadius: 6, borderWidth: 1, borderColor: "#EEE7FF" },
   messageText: { fontSize: 15, lineHeight: 21 },
+  messageImage: { width: 220, height: 220, borderRadius: 14, backgroundColor: "#EEE7FF" },
   mineText: { color: "#FFFFFF" },
   otherText: { color: "#2E2446" },
   inputBar: {

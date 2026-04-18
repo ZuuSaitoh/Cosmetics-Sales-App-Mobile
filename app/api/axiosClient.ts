@@ -1,14 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios, { InternalAxiosRequestConfig } from "axios";
-import Constants from "expo-constants";
 
-// 1. Tự động lấy IP của máy tính đang chạy Expo
-const debuggerHost = Constants.expoConfig?.hostUri;
-const machineIP = debuggerHost ? debuggerHost.split(':')[0] : 'localhost';
-
-// 2. Tạo sẵn 2 biến URL động cho cả API và WebSocket
-export const API_BASE_URL = `http://${machineIP}:8080/api`;
-export const WS_BASE_URL = `ws://${machineIP}:8080/ws-mobile`;
+// 1. Tạo sẵn 2 biến URL động cho cả API và WebSocket
+export const API_BASE_URL = `http://192.168.1.118:8080/api`;
+export const WS_BASE_URL = `ws://192.168.1.118:8080/ws-mobile`;
 
 console.log("🔥 Đang gọi API tới:", API_BASE_URL);
 
