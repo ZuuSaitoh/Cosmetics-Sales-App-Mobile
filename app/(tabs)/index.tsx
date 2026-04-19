@@ -6,7 +6,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
 import { useFocusEffect, useRouter } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   FlatList,
@@ -56,14 +56,53 @@ export default function OrdersScreen() {
     return order.status === selectedTab;
   });
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+    const fetchOrdersSilentlyRef = React.useRef<() => void>(() => {});
+
   useFocusEffect(
     React.useCallback(() => {
-      fetchOrders(); // Tự động load lại dữ liệu mỗi khi bạn "quay xe" về trang này
+      fetchOrdersSilentlyRef.current();
     }, []),
   );
+
+  const fetchOrdersSilently = async () => {
+    try {
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (!token) return;
+      const decoded: any = jwtDecode(token);
+      const userId = decoded.sub;
+      const response = await orderService.getUserOrders(userId);
+      if (response.data.code === 0) {
+        const fetchedOrders = response.data.result || [];
+
+        // Cập nhật review status khi login lại
+        const reviewStatusMap: Record<number, boolean> = {};
+        const completedOrders = fetchedOrders.filter(
+          (o: any) => o.status === "COMPLETED",
+        );
+        await Promise.all(
+          completedOrders.map(async (order: any) => {
+            try {
+              const revRes = await reviewService.getByOrder(order.id);
+              if (
+                revRes.data.code === 0 &&
+                revRes.data.result &&
+                Array.isArray(revRes.data.result) &&
+                revRes.data.result.length > 0
+              ) {
+                reviewStatusMap[Number(order.id)] = true;
+              }
+            } catch {}
+          }),
+        );
+        reviewedOrdersRef.current = reviewStatusMap;
+
+        setOrders(fetchedOrders);
+        fetchImagesForOrders(fetchedOrders);
+      }
+    } catch {}
+  };
+
+  fetchOrdersSilentlyRef.current = fetchOrdersSilently;
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -232,7 +271,7 @@ export default function OrdersScreen() {
       }
       const decoded: any = jwtDecode(token);
       const cosplayerId = decoded.sub;
-      const SERVER_IP = "115.77.242.120";
+      const SERVER_IP = "171.232.184.122";
       const returnUrl =
         selectedRepayMethod === "VNPAY"
           ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`

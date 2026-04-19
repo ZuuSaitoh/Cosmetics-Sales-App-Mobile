@@ -57,7 +57,7 @@ export default function TopUpScreen() {
 
     // 🚩 BƯỚC 2: Cấu hình Link Return dẫn về Backend
     // IP máy chủ Backend (xác nhận IP trước khi chạy)
-    const SERVER_IP = "115.77.242.120";
+    const SERVER_IP = "171.232.184.122";
     const backendReturnUrl =
       method === "vnpay"
         ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`

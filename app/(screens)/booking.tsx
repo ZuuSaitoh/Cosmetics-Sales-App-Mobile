@@ -172,7 +172,7 @@ export default function BookingScreen() {
       const cosplayerId = Number(decoded.sub);
 
       // IP máy chủ Backend (xác nhận IP trước khi chạy)
-      const SERVER_IP = "115.77.242.120";
+      const SERVER_IP = "171.232.184.122";
 
       // Xây dựng returnUrl chuẩn để Backend xử lý Redirect sau thanh toán
       const returnUrl =

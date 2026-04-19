@@ -16,7 +16,13 @@ export default function ProviderItemsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(useCallback(() => { fetchData(); }, []));
+  const fetchDataSilentlyRef = React.useRef<() => void>(() => {});
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDataSilentlyRef.current();
+    }, [])
+  );
 
   const fetchData = async (isRefresh = false) => {
     if (isRefresh) {
@@ -60,6 +66,8 @@ export default function ProviderItemsScreen() {
       setRefreshing(false);
     }
   };
+
+  fetchDataSilentlyRef.current = () => fetchData(false);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);

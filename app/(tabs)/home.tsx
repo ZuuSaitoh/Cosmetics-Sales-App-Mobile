@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -40,8 +42,17 @@ export default function UserHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    fetchData();
+  const fetchDataSilentlyRef = useRef<() => void>(() => {});
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDataSilentlyRef.current();
+    }, [])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchData();
   }, []);
 
   const fetchData = async () => {
@@ -63,6 +74,8 @@ export default function UserHomeScreen() {
       setRefreshing(false);
     }
   };
+
+  fetchDataSilentlyRef.current = fetchData;
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -235,7 +248,7 @@ export default function UserHomeScreen() {
           numColumns={2}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.listContainer}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} colors={["#B59DFF"]} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#B59DFF"]} />}
         />
       )}
     </SafeAreaView>

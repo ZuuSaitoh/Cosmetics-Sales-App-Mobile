@@ -86,7 +86,7 @@ export default function ServiceDetailScreen() {
 
         // Thanh toán online: VNPAY hoặc MOMO
         if (selectedPaymentMethod === "VNPAY" || selectedPaymentMethod === "MOMO") {
-          const SERVER_IP = "115.77.242.120";
+          const SERVER_IP = "171.232.184.122";
           const returnUrl =
             selectedPaymentMethod === "VNPAY"
               ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
