@@ -4,7 +4,9 @@ import { CameraView } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +14,7 @@ import {
   Image,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -39,6 +42,7 @@ export default function OrderManagementScreen() {
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // --- STATE LƯU TRỮ HÌNH ẢNH TRANG PHỤC ---
   const [costumeImages, setCostumeImages] = useState<Record<number, string>>(
@@ -52,12 +56,14 @@ export default function OrderManagementScreen() {
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [scannedCode, setScannedCode] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  useFocusEffect(useCallback(() => { fetchOrders(); }, []));
 
-  const fetchOrders = async () => {
-    setIsLoading(true);
+  const fetchOrders = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
       if (!token) return;
@@ -80,6 +86,7 @@ export default function OrderManagementScreen() {
       console.error("Lỗi tải đơn hàng:", error);
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -513,6 +520,14 @@ export default function OrderManagementScreen() {
             );
           }}
           contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchOrders(true)}
+              colors={["#B59DFF"]}
+              tintColor={"#B59DFF"}
+            />
+          }
           ListEmptyComponent={
             <Text style={styles.emptyText}>Chưa có đơn hàng nào.</Text>
           }

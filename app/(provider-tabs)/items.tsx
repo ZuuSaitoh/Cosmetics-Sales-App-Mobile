@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from "jwt-decode";
@@ -12,26 +14,30 @@ export default function ProviderItemsScreen() {
   const [costumes, setCostumes] = useState([]);
   const [shopInfo, setShopInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useFocusEffect(useCallback(() => { fetchData(); }, []));
 
-  const fetchData = async () => {
+  const fetchData = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
       const token = await AsyncStorage.getItem('cosmate_token');
       if (!token) {
         Alert.alert('Lỗi', 'Phiên đăng nhập hết hạn.');
-        setIsLoading(false); return;
+        if (!isRefresh) setIsLoading(false); return;
       }
       const decoded: any = jwtDecode(token);
-      const userId = decoded.sub; 
+      const userId = decoded.sub;
 
       const providerResponse = await providerService.getByUser(userId);
 
       if (providerResponse.data.code !== 0 || !providerResponse.data.result) {
         Alert.alert('Thông báo', 'Bạn chưa thiết lập hồ sơ Shop!');
-        setIsLoading(false); return;
+        if (!isRefresh) setIsLoading(false); return;
       }
 
       const myShop = providerResponse.data.result;
@@ -51,6 +57,7 @@ export default function ProviderItemsScreen() {
       Alert.alert('Lỗi', 'Không thể tải dữ liệu kho đồ.');
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -136,6 +143,14 @@ export default function ProviderItemsScreen() {
         renderItem={renderCostumeItem}
         contentContainerStyle={{ padding: 15, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchData(true)}
+            colors={['#B59DFF']}
+            tintColor={'#B59DFF'}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="shirt-outline" size={50} color="#C4B9DF" />
