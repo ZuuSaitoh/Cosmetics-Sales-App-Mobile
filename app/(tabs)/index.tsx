@@ -1,4 +1,5 @@
 import { orderService } from "@/src/services/orderService";
+import { providerService } from "@/src/services/providerService";
 import { reviewService } from "@/src/services/reviewService";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -28,6 +29,9 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [costumeImages, setCostumeImages] = useState<Record<number, string>>(
+    {},
+  );
+  const [providerNames, setProviderNames] = useState<Record<number, string>>(
     {},
   );
 
@@ -98,6 +102,23 @@ export default function OrdersScreen() {
 
         setOrders(fetchedOrders);
         fetchImagesForOrders(fetchedOrders);
+
+        // Load provider shop names
+        const newProviderNames: Record<number, string> = { ...providerNames };
+        const uniqueProviderIds = [...new Set<number>(fetchedOrders.map((o: any) => o.providerId).filter(Boolean) as number[])];
+        await Promise.all(
+          uniqueProviderIds.map(async (pId: number) => {
+            if (!newProviderNames[pId]) {
+              try {
+                const pRes = await providerService.getById(pId);
+                if (pRes.data.code === 0 && pRes.data.result) {
+                  newProviderNames[pId] = pRes.data.result.shopName || "Shop";
+                }
+              } catch {}
+            }
+          }),
+        );
+        setProviderNames(newProviderNames);
       }
     } catch {}
   };
@@ -393,11 +414,12 @@ export default function OrdersScreen() {
     const costumeName = firstItem
       ? `Trang phục ID: ${costumeId}`
       : "Đơn hàng Cosplay";
+    const shopName = item.providerId ? (providerNames[Number(item.providerId)] || "Shop") : "Shop";
 
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.shopName}>Cửa hàng ID: {item.providerId}</Text>
+          <Text style={styles.shopName}>{shopName}</Text>
           <Text
             style={[
               styles.statusText,

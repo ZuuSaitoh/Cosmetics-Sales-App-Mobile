@@ -411,9 +411,6 @@ export default function CostumeDetailScreen() {
               <Text style={styles.shopName}>
                 {provider?.shopName || "Đang tải..."}
               </Text>
-              <Text style={styles.shopSubtitle}>
-                Người đăng: ID {costume.providerId || "N/A"}
-              </Text>
             </View>
           </View>
 
