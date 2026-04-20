@@ -4,7 +4,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +20,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Dropdown } from "react-native-element-dropdown"; // Import thư viện
 import axiosClient from "../src/api/axiosClient";
 import { providerService } from "@/src/services/providerService";
 import { userService } from "@/src/services/userService";
@@ -43,6 +42,8 @@ export default function ProviderProfileScreen() {
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [banks, setBanks] = useState<any[]>([]);
+  const [bankSearch, setBankSearch] = useState("");
+  const [showBankModal, setShowBankModal] = useState(false);
   const [isWithdrawModalVisible, setIsWithdrawModalVisible] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -67,6 +68,16 @@ export default function ProviderProfileScreen() {
       console.error("Lỗi lấy danh sách ngân hàng:", error);
     }
   };
+
+  const filteredBanks = useMemo(() => {
+    if (!bankSearch.trim()) return banks;
+    const q = bankSearch.toLowerCase();
+    return banks.filter(
+      (b: any) =>
+        b.name?.toLowerCase().includes(q) ||
+        b.shortName?.toLowerCase().includes(q),
+    );
+  }, [banks, bankSearch]);
 
   const fetchProfile = async () => {
     try {
@@ -498,40 +509,20 @@ export default function ProviderProfileScreen() {
                 multiline
               />
               <Text style={styles.inputLabel}>Tên Ngân hàng</Text>
-              <Dropdown
-                style={styles.dropdown}
-                placeholderStyle={styles.placeholderStyle}
-                selectedTextStyle={styles.selectedTextStyle}
-                inputSearchStyle={styles.inputSearchStyle}
-                data={banks}
-                search
-                maxHeight={300}
-                labelField="name"
-                valueField="id"
-                placeholder="Chọn ngân hàng..."
-                searchPlaceholder="Tìm kiếm tên ngân hàng..."
-                value={editBankName}
-                onChange={(item) => {
-                  setEditBankName(item.shortName || item.name);
-                }}
-                renderLeftIcon={() => (
-                  <Ionicons
-                    style={styles.icon}
-                    name="business-outline"
-                    size={20}
-                    color="#8E7AB5"
-                  />
-                )}
-                renderItem={(item: any, selected: boolean) => (
-                  <View style={[styles.bankItem, selected && styles.bankItemSelected]}>
-                    <View style={styles.bankInfo}>
-                      <Text style={styles.bankName}>{item.name}</Text>
-                      <Text style={styles.bankCode}>{item.shortName}</Text>
-                    </View>
-                    {selected && <Ionicons name="checkmark" size={18} color="#B59DFF" />}
-                  </View>
-                )}
-              />
+              <TouchableOpacity
+                style={[styles.bankSelect, { marginTop: 4 }]}
+                onPress={() => { setShowBankModal(true); setBankSearch(""); }}
+              >
+                <Text
+                  style={[
+                    styles.bankSelectText,
+                    !editBankName && styles.bankSelectPlaceholder,
+                  ]}
+                >
+                  {editBankName || "— Chọn ngân hàng —"}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color="#8E7AB5" />
+              </TouchableOpacity>
               <Text style={styles.inputLabel}>Số tài khoản</Text>
               <TextInput
                 style={styles.input}
@@ -612,6 +603,59 @@ export default function ProviderProfileScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* MODAL CHỌN NGÂN HÀNG */}
+      <Modal animationType="slide" transparent={true} visible={showBankModal}>
+        <View style={styles.bankModalOverlay}>
+          <View style={styles.bankModalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn ngân hàng</Text>
+              <TouchableOpacity onPress={() => { setShowBankModal(false); setBankSearch(""); }}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.bankSearchWrap}>
+              <Ionicons name="search" size={16} color="#8E7AB5" />
+              <TextInput
+                style={styles.bankSearchInput}
+                placeholder="Tìm ngân hàng..."
+                placeholderTextColor="#C4B5E0"
+                value={bankSearch}
+                onChangeText={setBankSearch}
+              />
+              {bankSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setBankSearch("")}>
+                  <Ionicons name="close-circle" size={16} color="#8E7AB5" />
+                </TouchableOpacity>
+              )}
+            </View>
+            <ScrollView style={styles.bankList} showsVerticalScrollIndicator={false}>
+              {filteredBanks.map((bank: any) => (
+                <TouchableOpacity
+                  key={bank.id}
+                  style={[
+                    styles.bankItem,
+                    editBankName === bank.name && styles.bankItemSelected,
+                  ]}
+                  onPress={() => {
+                    setEditBankName(bank.name);
+                    setShowBankModal(false);
+                    setBankSearch("");
+                  }}
+                >
+                  <View style={styles.bankInfo}>
+                    <Text style={styles.bankName}>{bank.name}</Text>
+                    <Text style={styles.bankCode}>{bank.shortName}</Text>
+                  </View>
+                  {editBankName === bank.name && (
+                    <Ionicons name="checkmark-circle" size={20} color="#B59DFF" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -867,43 +911,64 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   saveBtnText: { color: "#fff", fontSize: 17, fontWeight: "bold" },
-  dropdown: {
-    height: 55,
-    borderColor: "#E0D7FF",
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+
+  // Bank select & modal
+  bankSelect: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: "#FBFBFF",
+    borderWidth: 1.5,
+    borderColor: "#E0D7FF",
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
     marginBottom: 20,
   },
-  icon: {
-    marginRight: 10,
+  bankSelectText: { fontSize: 15, color: "#4A3B6B", fontWeight: "600" },
+  bankSelectPlaceholder: { fontSize: 15, color: "#C4B5E0" },
+  bankModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
-  placeholderStyle: {
-    fontSize: 16,
-    color: "#AAA",
+  bankModalContainer: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+    maxHeight: "75%",
   },
-  selectedTextStyle: {
-    fontSize: 16,
-    color: "#333",
+  bankSearchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F9FB",
+    marginHorizontal: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 8,
+    marginBottom: 12,
   },
-  inputSearchStyle: {
-    height: 40,
-    fontSize: 16,
-    borderRadius: 8,
+  bankSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#4A3B6B",
+    padding: 0,
   },
+  bankList: { paddingBottom: 10 },
+  bankInfo: { flex: 1 },
+  bankCode: { fontSize: 12, color: "#8E7AB5", marginTop: 2 },
+  bankName: { fontSize: 15, fontWeight: "600", color: "#333" },
   bankItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#F5F5F5",
   },
   bankItemSelected: {
-    backgroundColor: "#F4F1FF",
+    backgroundColor: "#F9F8FF",
   },
-  bankInfo: { flex: 1 },
-  bankName: { fontSize: 15, fontWeight: "600", color: "#333" },
-  bankCode: { fontSize: 12, color: "#8E7AB5", marginTop: 2 },
 });
