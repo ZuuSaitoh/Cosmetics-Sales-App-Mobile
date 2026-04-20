@@ -442,13 +442,13 @@ export default function ProviderProfileScreen() {
                 data={banks}
                 search
                 maxHeight={300}
-                labelField="shortName"
-                valueField="shortName"
+                labelField="name"
+                valueField="id"
                 placeholder="Chọn ngân hàng..."
-                searchPlaceholder="Tìm kiếm..."
+                searchPlaceholder="Tìm kiếm tên ngân hàng..."
                 value={editBankName}
                 onChange={(item) => {
-                  setEditBankName(item.shortName);
+                  setEditBankName(item.shortName || item.name);
                 }}
                 renderLeftIcon={() => (
                   <Ionicons
@@ -458,16 +458,13 @@ export default function ProviderProfileScreen() {
                     color="#8E7AB5"
                   />
                 )}
-                renderItem={(item: any) => (
-                  <View style={styles.bankItem}>
-                    <Image
-                      source={{ uri: item.logo }}
-                      style={styles.bankLogo}
-                    />
+                renderItem={(item: any, selected: boolean) => (
+                  <View style={[styles.bankItem, selected && styles.bankItemSelected]}>
                     <View style={styles.bankInfo}>
-                      <Text style={styles.bankName}>{item.shortName}</Text>
-                      <Text style={styles.bankCode}>{item.name}</Text>
+                      <Text style={styles.bankName}>{item.name}</Text>
+                      <Text style={styles.bankCode}>{item.shortName}</Text>
                     </View>
+                    {selected && <Ionicons name="checkmark" size={18} color="#B59DFF" />}
                   </View>
                 )}
               />
@@ -732,17 +729,13 @@ const styles = StyleSheet.create({
   bankItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "#F5F5F5",
   },
-  bankLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    marginRight: 12,
-    backgroundColor: "#F8F8F8",
+  bankItemSelected: {
+    backgroundColor: "#F4F1FF",
   },
   bankInfo: { flex: 1 },
   bankName: { fontSize: 15, fontWeight: "600", color: "#333" },
