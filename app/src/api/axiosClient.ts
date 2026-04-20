@@ -1,12 +1,17 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios, { InternalAxiosRequestConfig } from "axios";
 
-export const API_BASE_URL = "http://171.232.184.122:8080/api";
-export const WS_BASE_URL = "ws://171.232.184.122:8080/ws-mobile";
+export const API_BASE_URL = "https://pry-perplexed-neatness.ngrok-free.dev/api";
+export const WS_BASE_URL =
+  "wss://pry-perplexed-neatness.ngrok-free.dev/ws-mobile";
 
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Content-Type": "application/json",
+    // Bùa chú để vượt qua màn hình cảnh báo của Ngrok
+    "ngrok-skip-browser-warning": "69420",
+  },
 });
 
 axiosClient.interceptors.request.use(
