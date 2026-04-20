@@ -43,6 +43,9 @@ export default function ProviderProfileScreen() {
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [banks, setBanks] = useState<any[]>([]);
+  const [isWithdrawModalVisible, setIsWithdrawModalVisible] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // 🚩 Tự động load lại mỗi khi quay về trang cá nhân
   useFocusEffect(
@@ -218,6 +221,41 @@ export default function ProviderProfileScreen() {
     ]);
   };
 
+  const handleWithdraw = async () => {
+    const amount = Number(withdrawAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert("Lỗi", "Số tiền rút không hợp lệ!");
+      return;
+    }
+    if (amount > balance) {
+      Alert.alert("Lỗi", "Số tiền rút vượt quá số dư khả dụng!");
+      return;
+    }
+    if (!profile?.bankName || !profile?.bankAccountNumber) {
+      Alert.alert("Lỗi", "Vui lòng cập nhật thông tin ngân hàng trước!");
+      return;
+    }
+
+    setIsWithdrawing(true);
+    try {
+      const res = await walletService.withdraw({
+        amount,
+        bankAccountNumber: profile.bankAccountNumber,
+        bankName: profile.bankName,
+      });
+      if (res.data.code === 0) {
+        Alert.alert("Thành công", "Yêu cầu rút tiền đã được gửi!");
+        setIsWithdrawModalVisible(false);
+        setWithdrawAmount("");
+        fetchProfile();
+      }
+    } catch (error: any) {
+      Alert.alert("Lỗi", error?.response?.data?.message || "Không thể rút tiền lúc này.");
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
   if (isLoading)
     return (
       <View style={styles.centered}>
@@ -311,6 +349,16 @@ export default function ProviderProfileScreen() {
               </Text>
             </View>
           </View>
+          <TouchableOpacity
+            style={styles.withdrawBtn}
+            onPress={(e) => {
+              e.stopPropagation();
+              setIsWithdrawModalVisible(true);
+            }}
+          >
+            <Ionicons name="cash-outline" size={16} color="#fff" />
+            <Text style={styles.withdrawBtnText}>Rút tiền</Text>
+          </TouchableOpacity>
         </TouchableOpacity>
 
         {/* STATS SECTION */}
@@ -375,6 +423,19 @@ export default function ProviderProfileScreen() {
 
         {/* ACTIONS */}
         <View style={styles.actionSection}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => router.push("/(screens)/withdraw-history")}
+          >
+            <View style={styles.actionLeft}>
+              <View style={[styles.iconWrap, { backgroundColor: "#FFF3E0" }]}>
+                <Ionicons name="cash-outline" size={20} color="#FF9800" />
+              </View>
+              <Text style={styles.actionText}>Lịch sử rút tiền</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => setIsEditModalVisible(true)}
@@ -493,6 +554,65 @@ export default function ProviderProfileScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* MODAL RÚT TIỀN */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isWithdrawModalVisible}
+        onRequestClose={() => setIsWithdrawModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.withdrawModalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsWithdrawModalVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.withdrawModalContainer}
+            onPress={() => {}}
+          >
+            <View style={styles.withdrawModalHeader}>
+              <Text style={styles.withdrawModalTitle}>Rút tiền về tài khoản</Text>
+              <TouchableOpacity onPress={() => setIsWithdrawModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.withdrawBankInfo}>
+              <Ionicons name="card-outline" size={20} color="#B59DFF" />
+              <Text style={styles.withdrawBankText}>
+                {profile?.bankName || "Chưa cập nhật"} - {profile?.bankAccountNumber || "***"}
+              </Text>
+            </View>
+            <Text style={styles.inputLabel}>Số tiền muốn rút (VND)</Text>
+            <TextInput
+              style={styles.input}
+              value={withdrawAmount}
+              onChangeText={setWithdrawAmount}
+              placeholder={`Tối đa: ${new Intl.NumberFormat("vi-VN").format(balance)}`}
+              placeholderTextColor="#CCC"
+              keyboardType="numeric"
+            />
+            <Text style={styles.withdrawNote}>
+              Số dư khả dụng:{" "}
+              <Text style={{ color: "#28A745", fontWeight: "bold" }}>
+                {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(balance)}
+              </Text>
+            </Text>
+            <TouchableOpacity
+              style={[styles.saveBtn, isWithdrawing && styles.saveBtnDisabled]}
+              onPress={handleWithdraw}
+              disabled={isWithdrawing}
+            >
+              {isWithdrawing ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnText}>Xác nhận rút tiền</Text>
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -586,8 +706,9 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 10,
+    justifyContent: "space-between",
   },
-  walletLeft: { flexDirection: "row", alignItems: "center" },
+  walletLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
   walletIconWrap: {
     width: 48,
     height: 48,
@@ -599,6 +720,48 @@ const styles = StyleSheet.create({
   },
   walletLabel: { fontSize: 13, color: "#8E7AB5", marginBottom: 4 },
   walletBalance: { fontSize: 20, fontWeight: "bold", color: "#28A745" },
+  withdrawBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#B59DFF",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  withdrawBtnText: { fontSize: 13, color: "#fff", fontWeight: "600" },
+  withdrawModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  withdrawModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+  },
+  withdrawModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  withdrawModalTitle: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
+  withdrawBankInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4F1FF",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 20,
+    gap: 10,
+  },
+  withdrawBankText: { fontSize: 14, color: "#4A3B6B", fontWeight: "600" },
+  withdrawNote: { fontSize: 13, color: "#666", marginTop: -10, marginBottom: 20 },
+  saveBtnDisabled: { opacity: 0.6 },
 
   statsCard: {
     flexDirection: "row",

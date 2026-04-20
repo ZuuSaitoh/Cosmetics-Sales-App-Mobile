@@ -194,14 +194,12 @@ export default function ProfileScreen() {
 
         {/* WALLET CARD - NƠI HIỂN THỊ SỐ DƯ */}
         <View style={styles.walletCard}>
-          <TouchableOpacity
-            style={styles.walletLeft}
-            onPress={() => router.push("/(screens)/transaction-history" as any)}
-          >
+          {/* Row 1: Icon + Label + Balance */}
+          <View style={styles.walletTop}>
             <View style={styles.walletIconWrap}>
-              <Ionicons name="wallet-outline" size={24} color="#B59DFF" />
+              <Ionicons name="wallet-outline" size={22} color="#B59DFF" />
             </View>
-            <View>
+            <View style={styles.walletInfo}>
               <Text style={styles.walletLabel}>Số dư ví CosMate</Text>
               <Text style={styles.walletBalance}>
                 {new Intl.NumberFormat("vi-VN", {
@@ -210,14 +208,26 @@ export default function ProfileScreen() {
                 }).format(balance)}
               </Text>
             </View>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            style={styles.depositBtn}
-            onPress={() => router.push("/(screens)/top-up" as any)}
-          >
-            <Text style={styles.depositBtnText}>Nạp tiền</Text>
-          </TouchableOpacity>
+          {/* Row 2: Action buttons */}
+          <View style={styles.walletActions}>
+            <TouchableOpacity
+              style={styles.actionDeposit}
+              onPress={() => router.push("/(screens)/top-up" as any)}
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#fff" />
+              <Text style={styles.actionDepositText}>Nạp tiền</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionWithdraw}
+              onPress={() => router.push("/(screens)/withdraw" as any)}
+            >
+              <Ionicons name="cash-outline" size={18} color="#B59DFF" />
+              <Text style={styles.actionWithdrawText}>Rút tiền</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* INFO SECTION */}
@@ -495,36 +505,71 @@ const styles = StyleSheet.create({
   },
   resetPasswordBtnText: { fontSize: 15, color: "#B59DFF", fontWeight: "600" },
   walletCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     backgroundColor: "#fff",
     marginHorizontal: 20,
     marginTop: -25,
-    padding: 15,
-    borderRadius: 15,
+    borderRadius: 18,
     elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowColor: "#B59DFF",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    overflow: "hidden",
   },
-  walletLeft: { flexDirection: "row", alignItems: "center" },
+  walletTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    paddingBottom: 12,
+  },
   walletIconWrap: {
-    width: 45,
-    height: 45,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     backgroundColor: "#F4F1FF",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
+  walletInfo: { flex: 1 },
   walletLabel: { fontSize: 12, color: "#8E7AB5", marginBottom: 2 },
-  walletBalance: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
-  depositBtn: {
-    backgroundColor: "#B59DFF",
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 10,
+  walletBalance: { fontSize: 20, fontWeight: "bold", color: "#4A3B6B" },
+  walletActions: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 10,
   },
-  depositBtnText: { color: "#fff", fontSize: 13, fontWeight: "bold" },
+  actionDeposit: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#B59DFF",
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  actionDepositText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  actionWithdraw: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#F4F1FF",
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#E0D7FF",
+  },
+  actionWithdrawText: {
+    color: "#B59DFF",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
 });
