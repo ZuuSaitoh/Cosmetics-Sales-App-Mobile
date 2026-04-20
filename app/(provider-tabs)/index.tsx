@@ -26,6 +26,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { orderService } from "@/src/services/orderService";
 import { providerService } from "@/src/services/providerService";
+import { userService } from "@/src/services/userService";
+import { costumeService } from "@/src/services/costumeService";
 
 const RENTAL_STATUSES = [
   { key: "ALL", label: "Tất cả" },
@@ -48,6 +50,8 @@ export default function OrderManagementScreen() {
   const [costumeImages, setCostumeImages] = useState<Record<number, string>>(
     {},
   );
+  const [costumeNames, setCostumeNames] = useState<Record<number, string>>({});
+  const [userNames, setUserNames] = useState<Record<number, string>>({});
 
   const [isShipModalVisible, setIsShipModalVisible] = useState(false);
   const [shipOrderId, setShipOrderId] = useState<number | null>(null);
@@ -79,8 +83,9 @@ export default function OrderManagementScreen() {
         const fetchedOrders = response.data.result;
         setOrders(fetchedOrders);
 
-        // GỌI HÀM LẤY ẢNH SAU KHI CÓ DANH SÁCH ĐƠN
+        // GỌI HÀM LẤY ẢNH, TÊN TRANG PHỤC, TÊN KHÁCH
         fetchImagesForOrders(fetchedOrders);
+        fetchNamesForOrders(fetchedOrders);
       }
     } catch (error) {
       console.error("Lỗi tải đơn hàng:", error);
@@ -154,6 +159,45 @@ export default function OrderManagementScreen() {
     if (hasNewImages) {
       setCostumeImages(newImageMap);
     }
+  };
+
+  const fetchNamesForOrders = async (ordersList: any[]) => {
+    const newCostumeNames: Record<number, string> = { ...costumeNames };
+    const newUserNames: Record<number, string> = { ...userNames };
+
+    // Lấy danh sách unique costumeId & cosplayerId để gọi song song
+    const uniqueCostumeIds = [...new Set<number>(
+      ordersList.flatMap((o: any) => (o.details || []).map((d: any) => d.costumeId)).filter(Boolean) as number[]
+    )];
+    const uniqueUserIds = [...new Set<number>(
+      ordersList.map((o: any) => o.cosplayerId).filter(Boolean) as number[]
+    )];
+
+    await Promise.all([
+      ...uniqueCostumeIds.map(async (cId: number) => {
+        if (!newCostumeNames[cId]) {
+          try {
+            const cRes = await costumeService.getById(cId);
+            if (cRes.data.code === 0 && cRes.data.result) {
+              newCostumeNames[cId] = cRes.data.result.name || "Trang phục";
+            }
+          } catch {}
+        }
+      }),
+      ...uniqueUserIds.map(async (uId: number) => {
+        if (!newUserNames[uId]) {
+          try {
+            const uRes = await userService.getProfile(uId);
+            if (uRes.data.code === 0 && uRes.data.result) {
+              newUserNames[uId] = uRes.data.result.fullName || uRes.data.result.name || "Khách hàng";
+            }
+          } catch {}
+        }
+      }),
+    ]);
+
+    setCostumeNames(newCostumeNames);
+    setUserNames(newUserNames);
   };
 
   const formatPrice = (price: number) => {
@@ -434,8 +478,8 @@ export default function OrderManagementScreen() {
                 ? costumeImages[costumeId]
                 : "https://via.placeholder.com/200x200.png?text=Loading...";
 
-            const costumeName = firstItem
-              ? `Trang phục ID: ${costumeId}`
+            const costumeName = firstItem && costumeId
+              ? costumeNames[costumeId] || `Trang phục ID: ${costumeId}`
               : "Đơn hàng Cosplay";
 
             return (
@@ -446,7 +490,7 @@ export default function OrderManagementScreen() {
                       <Ionicons name="person" size={16} color="#fff" />
                     </View>
                     <Text style={styles.customerName}>
-                      Khách ID: {item.cosplayerId || "Ẩn danh"}
+                      {userNames[item.cosplayerId] || `Khách ID: ${item.cosplayerId}`}
                     </Text>
                   </View>
                   <Text
@@ -469,11 +513,11 @@ export default function OrderManagementScreen() {
                   />
                   <View style={styles.productDetails}>
                     <Text style={styles.itemName} numberOfLines={2}>
-                      {costumeName}{" "}
-                      {firstItem && firstItem.size
-                        ? `(Size: ${firstItem.size})`
-                        : ""}
+                      {costumeName}
                     </Text>
+                    {firstItem && firstItem.size && (
+                      <Text style={styles.itemSize}>Size: {firstItem.size}</Text>
+                    )}
                     <Text style={styles.price}>
                       {formatPrice(item.totalAmount)}
                     </Text>
@@ -687,7 +731,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#E0D7FF",
   },
   productDetails: { flex: 1, justifyContent: "center" },
-  itemName: { fontSize: 15, color: "#333", marginBottom: 5, fontWeight: "500" },
+  itemName: { fontSize: 15, color: "#333", marginBottom: 3, fontWeight: "500" },
+  itemSize: { fontSize: 13, color: "#888", marginBottom: 4 },
   price: { fontSize: 16, fontWeight: "bold", color: "#B59DFF" },
 
   cardBody: {

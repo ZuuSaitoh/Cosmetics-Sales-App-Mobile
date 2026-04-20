@@ -1,5 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -17,6 +19,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { orderService } from "@/src/services/orderService";
 import { reviewService } from "@/src/services/reviewService";
+import { chatService } from "@/src/services/chatService";
+import { costumeService } from "@/src/services/costumeService";
+import { userService } from "@/src/services/userService";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -24,6 +29,8 @@ export default function ProviderOrderDetailScreen() {
   const { id } = useLocalSearchParams();
   const [order, setOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [costumeNames, setCostumeNames] = useState<Record<number, string>>({});
+  const [customerName, setCustomerName] = useState<string>("");
 
   // --- STATE QUẢN LÝ ĐÁNH GIÁ (MỚI) ---
   const [review, setReview] = useState<any>(null);
@@ -39,7 +46,35 @@ export default function ProviderOrderDetailScreen() {
     try {
       const response = await orderService.getOrder(Number(id));
       if (response.data.code === 0) {
-        setOrder(response.data.result);
+        const orderData = response.data.result;
+        setOrder(orderData);
+
+        // Lấy tên trang phục cho từng item
+        const details = orderData.details || [];
+        const newNames: Record<number, string> = { ...costumeNames };
+        await Promise.all(
+          details.map(async (item: any) => {
+            if (item.costumeId && !newNames[item.costumeId]) {
+              try {
+                const cRes = await costumeService.getById(item.costumeId);
+                if (cRes.data.code === 0 && cRes.data.result) {
+                  newNames[item.costumeId] = cRes.data.result.name || "Trang phục";
+                }
+              } catch {}
+            }
+          }),
+        );
+        setCostumeNames(newNames);
+
+        // Lấy tên khách hàng
+        if (orderData.cosplayerId) {
+          try {
+            const uRes = await userService.getProfile(orderData.cosplayerId);
+            if (uRes.data.code === 0 && uRes.data.result) {
+              setCustomerName(uRes.data.result.fullName || uRes.data.result.name || "Khách hàng");
+            }
+          } catch {}
+        }
       }
     } catch (error) {
       console.error("Lỗi lấy chi tiết đơn (Provider):", error);
@@ -64,6 +99,45 @@ export default function ProviderOrderDetailScreen() {
       }
     } catch (err) {
       setReview(null);
+    }
+  };
+
+  const handleOpenChat = async () => {
+    if (!order) return;
+    const customerUserId = order.cosplayerId;
+    if (!customerUserId) {
+      Alert.alert("Thông báo", "Không có thông tin khách hàng để liên hệ.");
+      return;
+    }
+    try {
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (!token) {
+        router.push("/(auth)/login");
+        return;
+      }
+      const decoded: any = jwtDecode(token);
+      const currentUserId = decoded.sub ?? decoded.userId ?? decoded.id;
+      if (!currentUserId) {
+        Alert.alert("Lỗi", "Không xác định được tài khoản của bạn.");
+        return;
+      }
+      const chatRes = await chatService.getOrCreateRoom(
+        Number(currentUserId),
+        Number(customerUserId),
+      );
+      const roomId = chatRes.data?.result?.id ?? chatRes.data?.id;
+      const chatPartnerName = customerName || order.userFullName || "Khách hàng";
+      router.push({
+        pathname: "/chat/[roomId]",
+        params: {
+          roomId: String(roomId),
+          partnerId: String(customerUserId),
+          partnerName: chatPartnerName,
+        },
+      });
+    } catch (err) {
+      console.error(">>> [handleOpenChat] ERROR:", err);
+      Alert.alert("Lỗi", "Không thể mở cuộc trò chuyện. Vui lòng thử lại.");
     }
   };
 
@@ -115,7 +189,7 @@ export default function ProviderOrderDetailScreen() {
           <View>
             <Text style={styles.statusText}>{order.status}</Text>
             <Text style={styles.statusSubText}>
-              Khách hàng: {order.userFullName || "N/A"}
+              Khách hàng: {customerName || order.userFullName || "N/A"}
             </Text>
           </View>
           <Ionicons name="shield-checkmark-outline" size={40} color="#fff" />
@@ -147,17 +221,32 @@ export default function ProviderOrderDetailScreen() {
           </View>
           {order.details?.map((item: any) => (
             <View key={item.id} style={styles.itemRow}>
-              <Text style={styles.itemName}>
-                ID: {item.costumeId} (Size: {item.size})
-              </Text>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName}>
+                  {costumeNames[item.costumeId] || `Trang phục ID: ${item.costumeId}`}
+                </Text>
+                <Text style={styles.itemSub}>Size: {item.size}</Text>
+              </View>
               <Text style={styles.itemPrice}>x{item.numberOfItems}</Text>
             </View>
           ))}
           <View style={styles.divider} />
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Doanh thu đơn hàng:</Text>
+            <Text style={styles.totalLabel}>Tiền cọc khách đã trả:</Text>
+            <Text style={styles.depositPrice}>
+              {formatPrice(order.totalDepositAmount)}
+            </Text>
+          </View>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabelBold}>Tổng giá trị đơn:</Text>
             <Text style={styles.totalPriceBold}>
               {formatPrice(order.totalAmount)}
+            </Text>
+          </View>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Doanh thu thực nhận:</Text>
+            <Text style={[styles.totalPriceBold, { color: "#28A745" }]}>
+              {formatPrice((order.totalAmount || 0) - (order.totalDepositAmount || 0))}
             </Text>
           </View>
         </View>
@@ -255,15 +344,7 @@ export default function ProviderOrderDetailScreen() {
           )}
           <TouchableOpacity
             style={styles.btnChat}
-            onPress={() =>
-              router.push({
-                pathname: "/(screens)/chat-detail",
-                params: {
-                  partnerId: order.userId,
-                  partnerName: order.userFullName,
-                },
-              } as any)
-            }
+            onPress={handleOpenChat}
           >
             <Ionicons
               name="chatbubbles-outline"
@@ -398,7 +479,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  itemName: { fontSize: 14, color: "#4A3B6B" },
+  itemName: { fontSize: 14, color: "#4A3B6B", fontWeight: "600" },
+  itemInfo: { flex: 1 },
+  itemSub: { fontSize: 13, color: "#888", marginTop: 2 },
   itemPrice: { fontWeight: "bold", color: "#333" },
   divider: { height: 1, backgroundColor: "#EEE", marginVertical: 10 },
   totalRow: {
@@ -407,6 +490,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   totalLabel: { fontSize: 14, color: "#666" },
+  totalLabelBold: { fontSize: 14, fontWeight: "bold", color: "#333" },
+  depositPrice: { fontSize: 14, color: "#FF9900" },
   totalPriceBold: { fontSize: 18, fontWeight: "bold", color: "#B59DFF" },
   actionBox: { padding: 20, gap: 12 },
   btnRow: { flexDirection: "row" },
