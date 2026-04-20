@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,28 +18,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { walletService } from "@/src/services/walletService";
+import { userService } from "@/src/services/userService";
 
 const PRESET_AMOUNTS = [100000, 200000, 500000, 1000000, 2000000];
-
-// Danh sách ngân hàng phổ biến Việt Nam
-const BANK_LIST = [
-  { code: "VCB", name: "Vietcombank" },
-  { code: "VTB", name: "VietinBank" },
-  { code: "BIDV", name: "BIDV" },
-  { code: "AGR", name: "Agribank" },
-  { code: "MB", name: "MB Bank" },
-  { code: "TPB", name: "TPBank" },
-  { code: "ACB", name: "ACB" },
-  { code: "TCB", name: "Techcombank" },
-  { code: "VPB", name: "VPBank" },
-  { code: "SHB", name: "SHB" },
-  { code: "HDB", name: "HDBank" },
-  { code: "MSB", name: "MSB" },
-  { code: "OCB", name: "OCB" },
-  { code: "SCB", name: "SCB" },
-  { code: "STB", name: "Sacombank" },
-  { code: "CTG", name: "CTG - Citibank" },
-];
 
 export default function WithdrawScreen() {
   const [amount, setAmount] = useState("");
@@ -49,6 +30,51 @@ export default function WithdrawScreen() {
   const [bankAccountName, setBankAccountName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showBankModal, setShowBankModal] = useState(false);
+  const [bankList, setBankList] = useState<any[]>([]);
+  const [bankSearch, setBankSearch] = useState("");
+
+  const filteredBanks = useMemo(() => {
+    if (!bankSearch.trim()) return bankList;
+    const q = bankSearch.toLowerCase();
+    return bankList.filter(
+      (b: any) =>
+        b.name?.toLowerCase().includes(q) ||
+        b.shortName?.toLowerCase().includes(q),
+    );
+  }, [bankList, bankSearch]);
+  const [wallet, setWallet] = useState<any>(null);
+  const [balance, setBalance] = useState(0);
+
+  useEffect(() => { fetchData(); }, []);
+
+  const fetchData = async () => {
+    try {
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (!token) return;
+      const decoded: any = jwtDecode(token);
+      const uId = decoded.sub;
+
+      const [walletRes, bankRes] = await Promise.all([
+        walletService.getByUser(uId),
+        userService.getBankList(),
+      ]);
+
+      if (walletRes.data.code === 0) {
+        const data = walletRes.data.result;
+        setWallet(data);
+        setBalance(data.balance);
+      }
+
+      if (bankRes.data?.code === "00") {
+        setBankList(bankRes.data.data || []);
+      }
+    } catch (error) {
+      console.error("Lỗi lấy dữ liệu:", error);
+    }
+  };
+
+  const formatVND = (v: number) =>
+    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(v);
 
   const formatInputAmount = (val: string) => {
     if (!val) return "";
@@ -64,8 +90,13 @@ export default function WithdrawScreen() {
   };
 
   const handleWithdraw = async () => {
+    const withdrawable = wallet?.withdrawableBalance ?? balance;
     if (!amount || parseInt(amount) < 50000) {
       Alert.alert("Lỗi", "Số tiền rút tối thiểu là 50.000đ");
+      return;
+    }
+    if (parseInt(amount) > withdrawable) {
+      Alert.alert("Lỗi", "Số tiền rút vượt quá số dư có thể rút.");
       return;
     }
     if (!bankName) {
@@ -157,7 +188,9 @@ export default function WithdrawScreen() {
               />
             </View>
 
-            <Text style={styles.minLabel}>Tối thiểu 50.000đ</Text>
+            <Text style={styles.minLabel}>
+              Tối thiểu 50.000đ · Có thể rút: {formatVND(wallet?.withdrawableBalance ?? balance)}
+            </Text>
 
             {/* Preset buttons */}
             <View style={styles.presetContainer}>
@@ -193,7 +226,7 @@ export default function WithdrawScreen() {
             <Text style={styles.label}>Ngân hàng</Text>
             <TouchableOpacity
               style={styles.selectInput}
-              onPress={() => setShowBankModal(true)}
+              onPress={() => { setShowBankModal(true); setBankSearch(""); }}
             >
               <Text
                 style={[
@@ -261,14 +294,32 @@ export default function WithdrawScreen() {
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn ngân hàng</Text>
-              <TouchableOpacity onPress={() => setShowBankModal(false)}>
+              <TouchableOpacity onPress={() => { setShowBankModal(false); setBankSearch(""); }}>
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
+
+            {/* Search bar */}
+            <View style={styles.bankSearchWrap}>
+              <Ionicons name="search" size={16} color="#8E7AB5" />
+              <TextInput
+                style={styles.bankSearchInput}
+                placeholder="Tìm ngân hàng..."
+                placeholderTextColor="#C4B5E0"
+                value={bankSearch}
+                onChangeText={setBankSearch}
+              />
+              {bankSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setBankSearch("")}>
+                  <Ionicons name="close-circle" size={16} color="#8E7AB5" />
+                </TouchableOpacity>
+              )}
+            </View>
+
             <ScrollView style={styles.bankList} showsVerticalScrollIndicator={false}>
-              {BANK_LIST.map((bank) => (
+              {filteredBanks.map((bank: any) => (
                 <TouchableOpacity
-                  key={bank.code}
+                  key={bank.id}
                   style={[
                     styles.bankItem,
                     bankName === bank.name && styles.bankItemActive,
@@ -442,7 +493,24 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0F0F0",
   },
   modalTitle: { fontSize: 17, fontWeight: "bold", color: "#4A3B6B" },
-  bankList: { paddingBottom: 20 },
+  bankSearchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F9FB",
+    marginHorizontal: 20,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 8,
+  },
+  bankSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#4A3B6B",
+    padding: 0,
+  },
+  bankList: { paddingBottom: 20, paddingTop: 8 },
   bankItem: {
     flexDirection: "row",
     alignItems: "center",
