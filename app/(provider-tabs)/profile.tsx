@@ -293,7 +293,10 @@ export default function ProviderProfileScreen() {
         </View>
 
         {/* WALLET CARD */}
-        <View style={styles.walletCard}>
+        <TouchableOpacity
+          style={styles.walletCard}
+          onPress={() => router.push("/(screens)/transaction-history")}
+        >
           <View style={styles.walletLeft}>
             <View style={styles.walletIconWrap}>
               <Ionicons name="wallet-outline" size={24} color="#B59DFF" />
@@ -308,7 +311,7 @@ export default function ProviderProfileScreen() {
               </Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* STATS SECTION */}
         <View style={styles.statsCard}>
