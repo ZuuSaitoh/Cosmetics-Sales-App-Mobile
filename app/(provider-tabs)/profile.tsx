@@ -4,7 +4,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +20,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Dropdown } from "react-native-element-dropdown"; // Import thư viện
 import axiosClient from "../src/api/axiosClient";
 import { providerService } from "@/src/services/providerService";
 import { userService } from "@/src/services/userService";
@@ -43,6 +42,11 @@ export default function ProviderProfileScreen() {
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [banks, setBanks] = useState<any[]>([]);
+  const [bankSearch, setBankSearch] = useState("");
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [isWithdrawModalVisible, setIsWithdrawModalVisible] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // 🚩 Tự động load lại mỗi khi quay về trang cá nhân
   useFocusEffect(
@@ -64,6 +68,16 @@ export default function ProviderProfileScreen() {
       console.error("Lỗi lấy danh sách ngân hàng:", error);
     }
   };
+
+  const filteredBanks = useMemo(() => {
+    if (!bankSearch.trim()) return banks;
+    const q = bankSearch.toLowerCase();
+    return banks.filter(
+      (b: any) =>
+        b.name?.toLowerCase().includes(q) ||
+        b.shortName?.toLowerCase().includes(q),
+    );
+  }, [banks, bankSearch]);
 
   const fetchProfile = async () => {
     try {
@@ -218,6 +232,41 @@ export default function ProviderProfileScreen() {
     ]);
   };
 
+  const handleWithdraw = async () => {
+    const amount = Number(withdrawAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert("Lỗi", "Số tiền rút không hợp lệ!");
+      return;
+    }
+    if (amount > balance) {
+      Alert.alert("Lỗi", "Số tiền rút vượt quá số dư khả dụng!");
+      return;
+    }
+    if (!profile?.bankName || !profile?.bankAccountNumber) {
+      Alert.alert("Lỗi", "Vui lòng cập nhật thông tin ngân hàng trước!");
+      return;
+    }
+
+    setIsWithdrawing(true);
+    try {
+      const res = await walletService.withdraw({
+        amount,
+        bankAccountNumber: profile.bankAccountNumber,
+        bankName: profile.bankName,
+      });
+      if (res.data.code === 0) {
+        Alert.alert("Thành công", "Yêu cầu rút tiền đã được gửi!");
+        setIsWithdrawModalVisible(false);
+        setWithdrawAmount("");
+        fetchProfile();
+      }
+    } catch (error: any) {
+      Alert.alert("Lỗi", error?.response?.data?.message || "Không thể rút tiền lúc này.");
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
   if (isLoading)
     return (
       <View style={styles.centered}>
@@ -293,7 +342,10 @@ export default function ProviderProfileScreen() {
         </View>
 
         {/* WALLET CARD */}
-        <View style={styles.walletCard}>
+        <TouchableOpacity
+          style={styles.walletCard}
+          onPress={() => router.push("/(screens)/transaction-history")}
+        >
           <View style={styles.walletLeft}>
             <View style={styles.walletIconWrap}>
               <Ionicons name="wallet-outline" size={24} color="#B59DFF" />
@@ -308,7 +360,17 @@ export default function ProviderProfileScreen() {
               </Text>
             </View>
           </View>
-        </View>
+          <TouchableOpacity
+            style={styles.withdrawBtn}
+            onPress={(e) => {
+              e.stopPropagation();
+              setIsWithdrawModalVisible(true);
+            }}
+          >
+            <Ionicons name="cash-outline" size={16} color="#fff" />
+            <Text style={styles.withdrawBtnText}>Rút tiền</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
 
         {/* STATS SECTION */}
         <View style={styles.statsCard}>
@@ -374,6 +436,19 @@ export default function ProviderProfileScreen() {
         <View style={styles.actionSection}>
           <TouchableOpacity
             style={styles.actionBtn}
+            onPress={() => router.push("/(screens)/withdraw-history")}
+          >
+            <View style={styles.actionLeft}>
+              <View style={[styles.iconWrap, { backgroundColor: "#FFF3E0" }]}>
+                <Ionicons name="cash-outline" size={20} color="#FF9800" />
+              </View>
+              <Text style={styles.actionText}>Lịch sử rút tiền</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionBtn}
             onPress={() => setIsEditModalVisible(true)}
           >
             <View style={styles.actionLeft}>
@@ -434,43 +509,20 @@ export default function ProviderProfileScreen() {
                 multiline
               />
               <Text style={styles.inputLabel}>Tên Ngân hàng</Text>
-              <Dropdown
-                style={styles.dropdown}
-                placeholderStyle={styles.placeholderStyle}
-                selectedTextStyle={styles.selectedTextStyle}
-                inputSearchStyle={styles.inputSearchStyle}
-                data={banks}
-                search
-                maxHeight={300}
-                labelField="shortName"
-                valueField="shortName"
-                placeholder="Chọn ngân hàng..."
-                searchPlaceholder="Tìm kiếm..."
-                value={editBankName}
-                onChange={(item) => {
-                  setEditBankName(item.shortName);
-                }}
-                renderLeftIcon={() => (
-                  <Ionicons
-                    style={styles.icon}
-                    name="business-outline"
-                    size={20}
-                    color="#8E7AB5"
-                  />
-                )}
-                renderItem={(item: any) => (
-                  <View style={styles.bankItem}>
-                    <Image
-                      source={{ uri: item.logo }}
-                      style={styles.bankLogo}
-                    />
-                    <View style={styles.bankInfo}>
-                      <Text style={styles.bankName}>{item.shortName}</Text>
-                      <Text style={styles.bankCode}>{item.name}</Text>
-                    </View>
-                  </View>
-                )}
-              />
+              <TouchableOpacity
+                style={[styles.bankSelect, { marginTop: 4 }]}
+                onPress={() => { setShowBankModal(true); setBankSearch(""); }}
+              >
+                <Text
+                  style={[
+                    styles.bankSelectText,
+                    !editBankName && styles.bankSelectPlaceholder,
+                  ]}
+                >
+                  {editBankName || "— Chọn ngân hàng —"}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color="#8E7AB5" />
+              </TouchableOpacity>
               <Text style={styles.inputLabel}>Số tài khoản</Text>
               <TextInput
                 style={styles.input}
@@ -492,6 +544,118 @@ export default function ProviderProfileScreen() {
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* MODAL RÚT TIỀN */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isWithdrawModalVisible}
+        onRequestClose={() => setIsWithdrawModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.withdrawModalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsWithdrawModalVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.withdrawModalContainer}
+            onPress={() => {}}
+          >
+            <View style={styles.withdrawModalHeader}>
+              <Text style={styles.withdrawModalTitle}>Rút tiền về tài khoản</Text>
+              <TouchableOpacity onPress={() => setIsWithdrawModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.withdrawBankInfo}>
+              <Ionicons name="card-outline" size={20} color="#B59DFF" />
+              <Text style={styles.withdrawBankText}>
+                {profile?.bankName || "Chưa cập nhật"} - {profile?.bankAccountNumber || "***"}
+              </Text>
+            </View>
+            <Text style={styles.inputLabel}>Số tiền muốn rút (VND)</Text>
+            <TextInput
+              style={styles.input}
+              value={withdrawAmount}
+              onChangeText={setWithdrawAmount}
+              placeholder={`Tối đa: ${new Intl.NumberFormat("vi-VN").format(balance)}`}
+              placeholderTextColor="#CCC"
+              keyboardType="numeric"
+            />
+            <Text style={styles.withdrawNote}>
+              Số dư khả dụng:{" "}
+              <Text style={{ color: "#28A745", fontWeight: "bold" }}>
+                {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(balance)}
+              </Text>
+            </Text>
+            <TouchableOpacity
+              style={[styles.saveBtn, isWithdrawing && styles.saveBtnDisabled]}
+              onPress={handleWithdraw}
+              disabled={isWithdrawing}
+            >
+              {isWithdrawing ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnText}>Xác nhận rút tiền</Text>
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* MODAL CHỌN NGÂN HÀNG */}
+      <Modal animationType="slide" transparent={true} visible={showBankModal}>
+        <View style={styles.bankModalOverlay}>
+          <View style={styles.bankModalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn ngân hàng</Text>
+              <TouchableOpacity onPress={() => { setShowBankModal(false); setBankSearch(""); }}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.bankSearchWrap}>
+              <Ionicons name="search" size={16} color="#8E7AB5" />
+              <TextInput
+                style={styles.bankSearchInput}
+                placeholder="Tìm ngân hàng..."
+                placeholderTextColor="#C4B5E0"
+                value={bankSearch}
+                onChangeText={setBankSearch}
+              />
+              {bankSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setBankSearch("")}>
+                  <Ionicons name="close-circle" size={16} color="#8E7AB5" />
+                </TouchableOpacity>
+              )}
+            </View>
+            <ScrollView style={styles.bankList} showsVerticalScrollIndicator={false}>
+              {filteredBanks.map((bank: any) => (
+                <TouchableOpacity
+                  key={bank.id}
+                  style={[
+                    styles.bankItem,
+                    editBankName === bank.name && styles.bankItemSelected,
+                  ]}
+                  onPress={() => {
+                    setEditBankName(bank.name);
+                    setShowBankModal(false);
+                    setBankSearch("");
+                  }}
+                >
+                  <View style={styles.bankInfo}>
+                    <Text style={styles.bankName}>{bank.name}</Text>
+                    <Text style={styles.bankCode}>{bank.shortName}</Text>
+                  </View>
+                  {editBankName === bank.name && (
+                    <Ionicons name="checkmark-circle" size={20} color="#B59DFF" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -586,8 +750,9 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 10,
+    justifyContent: "space-between",
   },
-  walletLeft: { flexDirection: "row", alignItems: "center" },
+  walletLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
   walletIconWrap: {
     width: 48,
     height: 48,
@@ -599,6 +764,48 @@ const styles = StyleSheet.create({
   },
   walletLabel: { fontSize: 13, color: "#8E7AB5", marginBottom: 4 },
   walletBalance: { fontSize: 20, fontWeight: "bold", color: "#28A745" },
+  withdrawBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#B59DFF",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  withdrawBtnText: { fontSize: 13, color: "#fff", fontWeight: "600" },
+  withdrawModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  withdrawModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+  },
+  withdrawModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  withdrawModalTitle: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
+  withdrawBankInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4F1FF",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 20,
+    gap: 10,
+  },
+  withdrawBankText: { fontSize: 14, color: "#4A3B6B", fontWeight: "600" },
+  withdrawNote: { fontSize: 13, color: "#666", marginTop: -10, marginBottom: 20 },
+  saveBtnDisabled: { opacity: 0.6 },
 
   statsCard: {
     flexDirection: "row",
@@ -704,47 +911,64 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   saveBtnText: { color: "#fff", fontSize: 17, fontWeight: "bold" },
-  dropdown: {
-    height: 55,
-    borderColor: "#E0D7FF",
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+
+  // Bank select & modal
+  bankSelect: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: "#FBFBFF",
+    borderWidth: 1.5,
+    borderColor: "#E0D7FF",
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
     marginBottom: 20,
   },
-  icon: {
-    marginRight: 10,
+  bankSelectText: { fontSize: 15, color: "#4A3B6B", fontWeight: "600" },
+  bankSelectPlaceholder: { fontSize: 15, color: "#C4B5E0" },
+  bankModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
-  placeholderStyle: {
-    fontSize: 16,
-    color: "#AAA",
+  bankModalContainer: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+    maxHeight: "75%",
   },
-  selectedTextStyle: {
-    fontSize: 16,
-    color: "#333",
+  bankSearchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F9FB",
+    marginHorizontal: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 8,
+    marginBottom: 12,
   },
-  inputSearchStyle: {
-    height: 40,
-    fontSize: 16,
-    borderRadius: 8,
+  bankSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#4A3B6B",
+    padding: 0,
   },
+  bankList: { paddingBottom: 10 },
+  bankInfo: { flex: 1 },
+  bankCode: { fontSize: 12, color: "#8E7AB5", marginTop: 2 },
+  bankName: { fontSize: 15, fontWeight: "600", color: "#333" },
   bankItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "#F5F5F5",
   },
-  bankLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    marginRight: 12,
-    backgroundColor: "#F8F8F8",
+  bankItemSelected: {
+    backgroundColor: "#F9F8FF",
   },
-  bankInfo: { flex: 1 },
-  bankName: { fontSize: 15, fontWeight: "600", color: "#333" },
-  bankCode: { fontSize: 12, color: "#8E7AB5", marginTop: 2 },
 });

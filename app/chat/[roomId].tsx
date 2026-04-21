@@ -449,9 +449,6 @@ export default function ChatRoomScreen() {
               <Text style={styles.title} numberOfLines={1}>
                 {partner.name || `Phòng ${roomKey}`}
               </Text>
-              <Text style={styles.subtitle} numberOfLines={1}>
-                {partner.role || "Nhấn vào để xem hồ sơ"}
-              </Text>
             </View>
           </View>
         </View>

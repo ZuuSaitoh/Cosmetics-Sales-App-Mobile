@@ -6,4 +6,10 @@ export const walletService = {
 
   getTransactions: (userId: number) =>
     axiosClient.get(`/wallets/user/${userId}/transactions`),
+
+  withdraw: (data: { amount: number; bankAccountNumber: string; bankName: string }) =>
+    axiosClient.post("/withdraws", data),
+
+  getWithdraws: (userId: number) =>
+    axiosClient.get(`/withdraws/${userId}`),
 };

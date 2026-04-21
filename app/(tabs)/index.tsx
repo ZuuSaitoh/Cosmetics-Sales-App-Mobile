@@ -1,4 +1,6 @@
 import { orderService } from "@/src/services/orderService";
+import { providerService } from "@/src/services/providerService";
+import { costumeService } from "@/src/services/costumeService";
 import { reviewService } from "@/src/services/reviewService";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -28,6 +30,12 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [costumeImages, setCostumeImages] = useState<Record<number, string>>(
+    {},
+  );
+  const [providerNames, setProviderNames] = useState<Record<number, string>>(
+    {},
+  );
+  const [costumeNames, setCostumeNames] = useState<Record<number, string>>(
     {},
   );
 
@@ -98,6 +106,40 @@ export default function OrdersScreen() {
 
         setOrders(fetchedOrders);
         fetchImagesForOrders(fetchedOrders);
+
+        // Load provider shop names
+        const newProviderNames: Record<number, string> = { ...providerNames };
+        const uniqueProviderIds = [...new Set<number>(fetchedOrders.map((o: any) => o.providerId).filter(Boolean) as number[])];
+        await Promise.all(
+          uniqueProviderIds.map(async (pId: number) => {
+            if (!newProviderNames[pId]) {
+              try {
+                const pRes = await providerService.getById(pId);
+                if (pRes.data.code === 0 && pRes.data.result) {
+                  newProviderNames[pId] = pRes.data.result.shopName || "Shop";
+                }
+              } catch {}
+            }
+          }),
+        );
+        setProviderNames(newProviderNames);
+
+        // Load costume names
+        const newCostumeNames: Record<number, string> = { ...costumeNames };
+        const uniqueCostumeIds = [...new Set<number>(fetchedOrders.flatMap((o: any) => (o.details || []).map((d: any) => d.costumeId)).filter(Boolean) as number[])];
+        await Promise.all(
+          uniqueCostumeIds.map(async (cId: number) => {
+            if (!newCostumeNames[cId]) {
+              try {
+                const cRes = await costumeService.getById(cId);
+                if (cRes.data.code === 0 && cRes.data.result) {
+                  newCostumeNames[cId] = cRes.data.result.name || "Trang phục";
+                }
+              } catch {}
+            }
+          }),
+        );
+        setCostumeNames(newCostumeNames);
       }
     } catch {}
   };
@@ -381,7 +423,6 @@ export default function OrdersScreen() {
   };
 
   const renderOrderItem = ({ item }: { item: any }) => {
-    // Dùng ref để đọc review status ngay lập tức, tránh stale state
     const isReviewed = !!reviewedOrdersRef.current[Number(item.id)];
     const firstItem =
       item.details && item.details.length > 0 ? item.details[0] : null;
@@ -390,14 +431,13 @@ export default function OrdersScreen() {
       costumeId && costumeImages[costumeId]
         ? costumeImages[costumeId]
         : "https://via.placeholder.com/200x200.png?text=Loading...";
-    const costumeName = firstItem
-      ? `Trang phục ID: ${costumeId}`
-      : "Đơn hàng Cosplay";
+    const costumeName = costumeId ? (costumeNames[Number(costumeId)] || "Đơn hàng Cosplay") : "Đơn hàng Cosplay";
+    const shopName = item.providerId ? (providerNames[Number(item.providerId)] || "Shop") : "Shop";
 
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.shopName}>Cửa hàng ID: {item.providerId}</Text>
+          <Text style={styles.shopName}>{shopName}</Text>
           <Text
             style={[
               styles.statusText,
@@ -411,10 +451,10 @@ export default function OrdersScreen() {
         <View style={styles.productInfo}>
           <Image source={{ uri: coverImage }} style={styles.productImage} />
           <View style={styles.productDetails}>
-            <Text style={styles.itemName} numberOfLines={2}>
-              {costumeName}{" "}
-              {firstItem && firstItem.size ? `(Size: ${firstItem.size})` : ""}
-            </Text>
+            <Text style={styles.itemName} numberOfLines={2}>{costumeName}</Text>
+            {firstItem && firstItem.size && (
+              <Text style={styles.itemSize}>Size: {firstItem.size}</Text>
+            )}
             <Text style={styles.price}>{formatPrice(item.totalAmount)}</Text>
           </View>
         </View>
@@ -756,7 +796,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#E0D7FF",
   },
   productDetails: { flex: 1, justifyContent: "center" },
-  itemName: { fontSize: 15, color: "#333", marginBottom: 5 },
+  itemName: { fontSize: 15, color: "#333" },
+  itemSize: { fontSize: 12, color: "#888", marginTop: 3 },
   price: { fontSize: 16, fontWeight: "bold", color: "#B59DFF" },
   actionRow: {
     flexDirection: "row",

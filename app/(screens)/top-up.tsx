@@ -109,7 +109,11 @@ export default function TopUpScreen() {
           <Ionicons name="arrow-back" size={24} color="#4A3B6B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Nạp tiền vào ví</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity
+          onPress={() => router.push("/(screens)/transaction-history" as any)}
+        >
+          <Ionicons name="time-outline" size={22} color="#4A3B6B" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>

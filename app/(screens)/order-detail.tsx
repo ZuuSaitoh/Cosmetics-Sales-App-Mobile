@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { chatService } from "@/src/services/chatService";
+import { costumeService } from "@/src/services/costumeService";
 import { orderService } from "@/src/services/orderService";
 import { providerService } from "@/src/services/providerService";
 import { reviewService } from "@/src/services/reviewService";
@@ -66,6 +67,7 @@ export default function OrderDetailScreen() {
   const { width: screenWidth } = Dimensions.get("window");
   const [review, setReview] = useState<any>(null);
   const reviewImages = Array.isArray(review?.images) ? review.images : [];
+  const [costumeNames, setCostumeNames] = useState<Record<number, string>>({});
 
   // --- STATE CHO MODAL XÁC NHẬN NHẬN ĐỒ ---
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
@@ -101,7 +103,25 @@ export default function OrderDetailScreen() {
     try {
       const response = await orderService.getOrder(Number(id));
       if (response.data.code === 0) {
-        setOrder(response.data.result);
+        const orderData = response.data.result;
+        setOrder(orderData);
+
+        // Load costume names
+        const details = orderData.details || [];
+        const newNames: Record<number, string> = { ...costumeNames };
+        await Promise.all(
+          details.map(async (item: any) => {
+            if (item.costumeId && !newNames[item.costumeId]) {
+              try {
+                const cRes = await costumeService.getById(item.costumeId);
+                if (cRes.data.code === 0 && cRes.data.result) {
+                  newNames[item.costumeId] = cRes.data.result.name || "Trang phục";
+                }
+              } catch {}
+            }
+          }),
+        );
+        setCostumeNames(newNames);
       }
     } catch (error) {
       console.error("Lỗi lấy chi tiết đơn:", error);
@@ -139,6 +159,7 @@ export default function OrderDetailScreen() {
       const providerRes = await providerService.getById(providerId);
       console.log(">>> [handleOpenChat] providerRes:", providerRes?.data);
       const providerUserId = providerRes.data?.result?.userId;
+      const providerShopName = providerRes.data?.result?.shopName;
       console.log(">>> [handleOpenChat] providerUserId (User B):", providerUserId);
       if (!providerUserId) {
         Alert.alert("Lỗi", "Không tìm thấy tài khoản cửa hàng.");
@@ -177,7 +198,7 @@ export default function OrderDetailScreen() {
         params: {
           roomId: String(roomId),
           partnerId: String(providerUserId),
-          partnerName: order.shopName || "Cửa hàng Cosplay",
+          partnerName: providerShopName || order.shopName || "Cửa hàng Cosplay",
         },
       });
     } catch (err) {
@@ -425,7 +446,7 @@ export default function OrderDetailScreen() {
             <View key={item.id} style={styles.itemRow}>
               <View style={styles.itemInfo}>
                 <Text style={styles.itemName}>
-                  Trang phục ID: {item.costumeId}
+                  {costumeNames[item.costumeId] || `Trang phục ID: ${item.costumeId}`}
                 </Text>
                 <Text style={styles.itemSub}>
                   Size: {item.size} | Số lượng: x{item.numberOfItems}
