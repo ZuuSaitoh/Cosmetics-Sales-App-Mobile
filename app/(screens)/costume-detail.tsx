@@ -314,15 +314,19 @@ export default function CostumeDetailScreen() {
         </TouchableOpacity>
         {/* NÚT TRÁI TIM MỚI */}
         <TouchableOpacity
-          style={[styles.backBtn, styles.wishlistBtn]}
+          style={[styles.backBtn, styles.wishlistBtn, isProcessingWishlist && { opacity: 0.7 }]}
           onPress={toggleWishlist}
           disabled={isProcessingWishlist}
         >
-          <Ionicons
-            name={isWishlisted ? "heart" : "heart-outline"}
-            size={24}
-            color={isWishlisted ? "#FF5252" : "#333"}
-          />
+          {isProcessingWishlist ? (
+            <ActivityIndicator size="small" color={isWishlisted ? "#FF5252" : "#333"} />
+          ) : (
+            <Ionicons
+              name={isWishlisted ? "heart" : "heart-outline"}
+              size={24}
+              color={isWishlisted ? "#FF5252" : "#333"}
+            />
+          )}
         </TouchableOpacity>
       </View>
 

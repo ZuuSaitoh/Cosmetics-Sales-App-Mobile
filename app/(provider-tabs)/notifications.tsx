@@ -17,6 +17,9 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isMarkAllLoading, setIsMarkAllLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [markingReadId, setMarkingReadId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchNotifications();
@@ -46,7 +49,9 @@ export default function NotificationsScreen() {
   // 2. GỌI API ĐÁNH DẤU ĐÃ ĐỌC 1 ITEM (POST)
   const handleMarkAsRead = async (id: number, isRead: boolean) => {
     if (isRead) return; // Đã đọc rồi thì không gọi API nữa cho nhẹ máy
+    if (markingReadId === id) return;
 
+    setMarkingReadId(id);
     try {
       const response = await notificationService.markAsRead(id);
 
@@ -58,11 +63,15 @@ export default function NotificationsScreen() {
       }
     } catch (error) {
       console.error('Lỗi đánh dấu đọc:', error);
+    } finally {
+      setMarkingReadId(null);
     }
   };
 
   // 3. GỌI API ĐÁNH DẤU ĐÃ ĐỌC TẤT CẢ (POST)
   const handleMarkAllAsRead = async () => {
+    if (isMarkAllLoading) return;
+    setIsMarkAllLoading(true);
     try {
       const response = await notificationService.markAllAsRead();
 
@@ -72,6 +81,8 @@ export default function NotificationsScreen() {
       }
     } catch (error) {
       console.error('Lỗi đánh dấu đọc tất cả:', error);
+    } finally {
+      setIsMarkAllLoading(false);
     }
   };
 
@@ -82,6 +93,7 @@ export default function NotificationsScreen() {
       { 
         text: "Xóa", style: "destructive", 
         onPress: async () => {
+          setDeletingId(id);
           try {
             const response = await notificationService.delete(id);
 
@@ -92,6 +104,8 @@ export default function NotificationsScreen() {
           } catch (error) {
             console.error('Lỗi xóa thông báo:', error);
             Alert.alert("Lỗi", "Không thể xóa thông báo lúc này.");
+          } finally {
+            setDeletingId(null);
           }
         }
       }
@@ -105,9 +119,14 @@ export default function NotificationsScreen() {
 
     return (
       <TouchableOpacity 
-        style={[styles.notifCard, !isItemRead && styles.unreadCard]} 
+        style={[
+          styles.notifCard,
+          !isItemRead && styles.unreadCard,
+          markingReadId === item.id && { opacity: 0.7 },
+        ]} 
         activeOpacity={0.7}
         onPress={() => handleMarkAsRead(item.id, isItemRead)}
+        disabled={markingReadId === item.id}
       >
         <View style={styles.iconContainer}>
           <Ionicons name={isItemRead ? "notifications-outline" : "notifications"} size={24} color={isItemRead ? "#A0A0A0" : "#B59DFF"} />
@@ -120,8 +139,16 @@ export default function NotificationsScreen() {
           <Text style={styles.time}>{item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : 'Vừa xong'}</Text>
         </View>
 
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
-          <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+        <TouchableOpacity
+          style={[styles.deleteBtn, deletingId === item.id && { opacity: 0.5 }]}
+          onPress={() => handleDelete(item.id)}
+          disabled={deletingId === item.id}
+        >
+          {deletingId === item.id ? (
+            <ActivityIndicator size="small" color="#FF6B6B" />
+          ) : (
+            <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+          )}
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -136,8 +163,16 @@ export default function NotificationsScreen() {
       {/* HEADER TỰ CUSTOM */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Thông báo</Text>
-        <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllBtn}>
-          <Ionicons name="checkmark-done-circle-outline" size={24} color="#B59DFF" />
+        <TouchableOpacity
+          onPress={handleMarkAllAsRead}
+          style={[styles.markAllBtn, isMarkAllLoading && { opacity: 0.5 }]}
+          disabled={isMarkAllLoading}
+        >
+          {isMarkAllLoading ? (
+            <ActivityIndicator size="small" color="#B59DFF" />
+          ) : (
+            <Ionicons name="checkmark-done-circle-outline" size={24} color="#B59DFF" />
+          )}
         </TouchableOpacity>
       </View>
 

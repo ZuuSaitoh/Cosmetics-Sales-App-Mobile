@@ -28,6 +28,9 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isMarkAllLoading, setIsMarkAllLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [markingReadId, setMarkingReadId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchNotifications();
@@ -54,6 +57,8 @@ export default function NotificationsScreen() {
 
   const handleMarkAsRead = async (id: number, isRead: boolean) => {
     if (isRead) return;
+    if (markingReadId === id) return;
+    setMarkingReadId(id);
     try {
       const response = await notificationService.markAsRead(id);
       if (response.data.code === 0) {
@@ -63,10 +68,14 @@ export default function NotificationsScreen() {
       }
     } catch (error) {
       console.error("Lỗi đánh dấu đọc:", error);
+    } finally {
+      setMarkingReadId(null);
     }
   };
 
   const handleMarkAllAsRead = async () => {
+    if (isMarkAllLoading) return;
+    setIsMarkAllLoading(true);
     try {
       const response = await notificationService.markAllAsRead();
       if (response.data.code === 0) {
@@ -75,6 +84,8 @@ export default function NotificationsScreen() {
       }
     } catch (error) {
       console.error("Lỗi đánh dấu đọc tất cả:", error);
+    } finally {
+      setIsMarkAllLoading(false);
     }
   };
 
@@ -85,6 +96,7 @@ export default function NotificationsScreen() {
         text: "Xóa",
         style: "destructive",
         onPress: async () => {
+          setDeletingId(id);
           try {
             const response = await notificationService.delete(id);
             if (response.data.code === 0) {
@@ -93,6 +105,8 @@ export default function NotificationsScreen() {
           } catch (error) {
             console.error("Lỗi xóa thông báo:", error);
             Alert.alert("Lỗi", "Không thể xóa thông báo lúc này.");
+          } finally {
+            setDeletingId(null);
           }
         },
       },
@@ -103,9 +117,14 @@ export default function NotificationsScreen() {
     const isRead = item.isRead || item.read || false;
     return (
       <TouchableOpacity
-        style={[styles.notifCard, !isRead && styles.unreadCard]}
+        style={[
+          styles.notifCard,
+          !isRead && styles.unreadCard,
+          markingReadId === item.id && { opacity: 0.7 },
+        ]}
         activeOpacity={0.7}
         onPress={() => handleMarkAsRead(item.id, isRead)}
+        disabled={markingReadId === item.id}
       >
         <View style={styles.iconContainer}>
           <Ionicons
@@ -128,10 +147,15 @@ export default function NotificationsScreen() {
           </Text>
         </View>
         <TouchableOpacity
-          style={styles.deleteBtn}
+          style={[styles.deleteBtn, deletingId === item.id && { opacity: 0.5 }]}
           onPress={() => handleDelete(item.id)}
+          disabled={deletingId === item.id}
         >
-          <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+          {deletingId === item.id ? (
+            <ActivityIndicator size="small" color="#FF6B6B" />
+          ) : (
+            <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+          )}
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -151,9 +175,14 @@ export default function NotificationsScreen() {
         <Text style={styles.headerTitle}>Thông báo</Text>
         <TouchableOpacity
           onPress={handleMarkAllAsRead}
-          style={styles.markAllBtn}
+          style={[styles.markAllBtn, isMarkAllLoading && { opacity: 0.5 }]}
+          disabled={isMarkAllLoading}
         >
-          <Ionicons name="checkmark-done-circle-outline" size={24} color="#B59DFF" />
+          {isMarkAllLoading ? (
+            <ActivityIndicator size="small" color="#B59DFF" />
+          ) : (
+            <Ionicons name="checkmark-done-circle-outline" size={24} color="#B59DFF" />
+          )}
         </TouchableOpacity>
       </View>
       {notifications.length === 0 ? (

@@ -1,0 +1,139 @@
+---
+description: CosMate mobile — stack, Expo Router, layers, UI/API conventions (project root context)
+alwaysApply: true
+---
+
+# CosMate Mobile — Cursor Rules (Source of Truth)
+
+Bạn đang làm việc trong repo **Cosmetics-Sales-App-Mobile** (`cosmate-app`): ứng dụng **Expo + React Native + TypeScript**, điều hướng bằng **Expo Router**. Tuân thủ các quy tắc dưới đây cho mọi thay đổi.
+
+---
+
+## 1. Tech stack & thư viện chính
+
+| Hạng tầng | Công nghệ |
+|-----------|-----------|
+| Runtime / build | **Expo SDK ~54**, **React 19**, **React Native 0.81** |
+| Routing | **expo-router ~6** (file-based), trên **@react-navigation/native** + bottom-tabs |
+| HTTP | **axios** — instance tại `app/src/api/axiosClient.ts` |
+| Lưu token / prefs | **@react-native-async-storage/async-storage** (ví dụ key `cosmate_token`) |
+| JWT | **jwt-decode** |
+| Realtime | **@stomp/stompjs** (khi dùng WebSocket/STOMP) |
+| UI RN | **react-native-safe-area-context**, **react-native-screens**, **gesture-handler**, **reanimated** |
+| Media | **expo-camera**, **expo-image**, **expo-image-picker** |
+| Icons | **@expo/vector-icons** (thường **Ionicons** trên màn nghiệp vụ) |
+| Form / chọn ngày | **react-native-element-dropdown**, **@react-native-community/datetimepicker** |
+| Khác | **expo-haptics**, **expo-web-browser**, **expo-linking**, **expo-status-bar** |
+
+**Styling:** ưu tiên **`StyleSheet.create`** + style object khi cần giá trị động. **Không** dùng NativeWind/Tailwind/styled-components trong repo này trừ khi team chủ động thêm. Theme tham chiếu: `app/constants/theme.ts`, hook `useThemeColor`, component `ThemedView` / `ThemedText`.
+
+---
+
+## 2. Kiến trúc thư mục & routing (Expo Router)
+
+- **Entry:** `package.json` → `"main": "expo-router/entry"`. Mọi route nằm dưới **`app/`**.
+- **Root layout:** `app/_layout.tsx` — `SafeAreaProvider` + `StatusBar` + `Stack` (`headerShown: false`), khai báo các nhóm: `(auth)`, `(tabs)`, `(screens)`, `(provider-tabs)`, `(provider-service-tabs)`.
+- **Route groups** (thư mục trong ngoặc): tách luồng **khách / provider / auth**; tên nhóm **không** xuất hiện trong URL.
+- **Screens:** file `*.tsx` trong các nhóm trên + các route động / đặc biệt (`app/chat/[roomId].tsx`, `app/chat/index.tsx`, `app/ai/*`, v.v.).
+- **Layouts lồng nhau:** mỗi nhóm có `_layout.tsx` riêng (Stack hoặc Tabs).
+- **Shared UI:** `app/components/` (và `app/components/ui/`) — hiện có themed view/text, parallax, collapsible, icon symbol, external link, haptic tab, v.v. **Chưa** có design system `Button`/`Input`/`Modal` dùng chung; khi thêm, đặt dưới `app/components/` hoặc `app/components/ui/`.
+- **Hooks tái sử dụng:** `app/hooks/` — **ưu tiên đường dẫn này** (tránh trùng file ở `hooks/` gốc repo nếu không cần thiết).
+- **API:** `app/src/api/axiosClient.ts` — base URL, interceptor gắn `Authorization: Bearer` từ AsyncStorage.
+- **Services (gọi backend):** `app/src/services/*.ts` — export object kiểu `export const xxxService = { method: () => axiosClient... }`.
+- **Types:** `app/src/types/*.ts` — model theo domain.
+- **Alias import:** `tsconfig` map `@/*` → `app/*`. Trong code dưới `app/`, ưu tiên `@/components/...`, `@/hooks/...`, `@/src/services/...`.
+
+**Luồng dữ liệu gợi ý:** Screen / hook gọi **`xxxService`**, không import `axios` trực tiếp trong UI nếu có thể tránh; mọi HTTP đi qua **`axiosClient`**.
+
+---
+
+## 3. Quy chuẩn code (conventions)
+
+### Đặt tên
+
+- **Màn hình (route):** file **`kebab-case.tsx`** theo convention Expo Router hiện có (`order-detail.tsx`, `forgot-password.tsx`, …). **Default export** component màn hình: `export default function OrderDetailScreen()`.
+- **Component tái sử dụng:** **`PascalCase.tsx`**, named export hoặc default tùy file hiện có; props type rõ ràng (`Props` / `XxxProps`).
+- **Hooks:** **`useThingName.ts`**, function **`useThingName`**. Không JSX trong hook.
+- **Service:** **`thingService.ts`**, export **`thingService`** (camelCase + hậu tố Service).
+- **Types:** **`thing.ts`** trong `app/src/types/`, export interface/type có tên rõ nghĩa.
+
+### Import
+
+- Dùng alias **`@/`** cho mọi import từ cây `app/` (đồng nhất, tránh `../../../`).
+- Giữ thứ tự hợp lý: React / RN → thư viện ngoài → expo-router → nội bộ `@/`.
+
+### TypeScript
+
+- **`strict: true`**. Tránh `any` không cần thiết; nếu buộc dùng (legacy), ghi chú ngắn hoặc thu hẹp kiểu sớm.
+
+### Custom hook
+
+- Tên **`use` + PascalCase**.
+- Trả về object hoặc tuple ổn định; tách side effect rõ (`useEffect` có dependency đúng).
+- Async logic: có thể đặt trong hook với **`try/catch/finally`** hoặc để screen gọi — nhưng **mọi chỗ gọi API async** phải có xử lý lỗi và **`finally`** để reset loading (xem mục 4).
+
+---
+
+## 4. Best practices bắt buộc (dự án)
+
+### 4.1 Gọi API — `try` / `catch` / `finally`
+
+- Mọi **`await`** tới service/API từ user action hoặc `useEffect` fetch quan trọng phải nằm trong **`try { ... } catch { ... } finally { ... }`**.
+- **`finally`:** luôn reset **`isLoading` / `submitting`** về `false` (và các flag tương tự), kể cả khi thành công hoặc lỗi.
+- **`catch`:** log hoặc xử lý rõ (`Alert.alert`, toast nếu có), không nuốt lỗi im lặng trừ khi có lý do đã ghi chú.
+
+```tsx
+const [isLoading, setIsLoading] = useState(false);
+
+const onSubmit = async () => {
+  setIsLoading(true);
+  try {
+    const res = await authService.login(payload);
+    // xử lý res
+  } catch (e) {
+    console.error(e);
+    Alert.alert("Lỗi", "Không thể kết nối. Vui lòng thử lại.");
+  } finally {
+    setIsLoading(false);
+  }
+};
+```
+
+### 4.2 Nút submit / gọi API — loading + disabled (chống spam)
+
+- **Bắt buộc:** Mọi ** nút (TouchableOpacity / Pressable / custom Button)** kích hoạt **submit form** hoặc **gọi API** phải:
+  1. **`disabled={isLoading}`** (hoặc `pointerEvents="none"` + opacity — nhưng ưu tiên `disabled` nếu component hỗ trợ).
+  2. Hiển thị **`ActivityIndicator`** (cùng chỗ với label hoặc thay label khi loading), màu đọc được trên nền nút.
+  3. Trong `onPress`, **return sớm** nếu `isLoading` để tránh race (tùy trường hợp).
+
+```tsx
+<TouchableOpacity
+  style={[styles.primaryBtn, isLoading && styles.primaryBtnDisabled]}
+  onPress={onSubmit}
+  disabled={isLoading}
+  activeOpacity={0.8}
+>
+  {isLoading ? (
+    <ActivityIndicator color="#fff" />
+  ) : (
+    <Text style={styles.primaryBtnText}>Đăng nhập</Text>
+  )}
+</TouchableOpacity>
+```
+
+- Form validation fail **trước** khi gọi API: không bật loading, hoặc bật rất ngắn — tránh nhấp nút vô nghĩa.
+
+### 4.3 Khác
+
+- Token: chỉ đọc/ghi qua **AsyncStorage** + interceptor đã cấu hình; không hardcode secret.
+- Không chỉnh **`API_BASE_URL`** production trong commit nếu team có quy trình env — nếu chưa có `.env`, giữ một nguồn sự thật ở `axiosClient.ts` và ghi chú khi thay.
+- Giữ diff **nhỏ, đúng scope**; không refactor hàng loạt không liên quan ticket.
+
+---
+
+## 5. Checklist nhanh trước khi hoàn thành task
+
+- [ ] API path: đã qua **`axiosClient`** / **`xxxService`**?
+- [ ] Có **`try` / `catch` / `finally`** và reset loading trong `finally`?
+- [ ] Nút submit có **`disabled` + `ActivityIndicator`** khi loading?
+- [ ] Import **`@/`** nhất quán, không thêm dependency lớn không cần thiết?

@@ -103,6 +103,7 @@ export default function ChatRoomScreen() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [partner] = useState<ChatPartner>({
     id: parseNumber(partnerId) ?? 0,
@@ -326,6 +327,7 @@ export default function ChatRoomScreen() {
 
   const handlePickAndSendImage = async () => {
     if (roomKey === null) return;
+    if (isUploadingImage) return;
 
     const token = await AsyncStorage.getItem("cosmate_token");
     if (!token) {
@@ -361,6 +363,7 @@ export default function ChatRoomScreen() {
     const ext = match?.[1]?.toLowerCase();
     const mimeType = asset.mimeType ?? (ext === "png" ? "image/png" : "image/jpeg");
 
+    setIsUploadingImage(true);
     try {
       const formData = new FormData();
       formData.append("roomId", String(roomKey));
@@ -403,6 +406,8 @@ export default function ChatRoomScreen() {
     } catch (error) {
       console.warn("Upload image failed", error);
       Alert.alert("Upload ảnh lỗi", "Không upload được ảnh. Hãy kiểm tra mạng và backend.");
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -472,8 +477,16 @@ export default function ChatRoomScreen() {
 
         {loading ? null : (
           <View style={styles.inputBar}>
-            <Pressable style={styles.mediaBtn} onPress={handlePickAndSendImage}>
-              <Ionicons name="camera" size={20} color="#8E7AB5" />
+            <Pressable
+              style={[styles.mediaBtn, isUploadingImage && { opacity: 0.6 }]}
+              onPress={handlePickAndSendImage}
+              disabled={isUploadingImage || sending}
+            >
+              {isUploadingImage ? (
+                <ActivityIndicator size="small" color="#8E7AB5" />
+              ) : (
+                <Ionicons name="camera" size={20} color="#8E7AB5" />
+              )}
             </Pressable>
             <TextInput
               style={styles.input}
@@ -486,9 +499,13 @@ export default function ChatRoomScreen() {
             <Pressable
               style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
               onPress={handleSend}
-              disabled={!input.trim() || sending}
+              disabled={!input.trim() || sending || isUploadingImage}
             >
-              <Ionicons name="send" size={18} color="#FFFFFF" />
+              {sending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="send" size={18} color="#FFFFFF" />
+              )}
             </Pressable>
           </View>
         )}

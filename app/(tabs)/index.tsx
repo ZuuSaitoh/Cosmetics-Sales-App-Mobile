@@ -10,6 +10,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -42,6 +43,8 @@ export default function OrdersScreen() {
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
   const [confirmOrderId, setConfirmOrderId] = useState<number | null>(null);
   const [confirmImage, setConfirmImage] = useState<any>(null);
+  const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
   // Ref track review status — không trigger re-render trong lúc fetch
   const reviewedOrdersRef = React.useRef<Record<number, boolean>>({});
   const ORDER_STATUS_TABS = [
@@ -213,6 +216,7 @@ export default function OrdersScreen() {
         text: "Hủy đơn",
         style: "destructive",
         onPress: async () => {
+          setCancellingOrderId(orderId);
           try {
             // Gửi yêu cầu cập nhật trạng thái sang CANCELLED
             const res = await orderService.cancelOrder(orderId);
@@ -226,6 +230,8 @@ export default function OrdersScreen() {
               "Lỗi",
               "Không thể hủy đơn lúc này, bạn thử lại sau nha!",
             );
+          } finally {
+            setCancellingOrderId(null);
           }
         },
       },
@@ -391,6 +397,7 @@ export default function OrdersScreen() {
       return;
     }
 
+    setIsConfirmingDelivery(true);
     try {
       const formData = new FormData();
       const localUri = confirmImage.uri;
@@ -412,6 +419,8 @@ export default function OrdersScreen() {
     } catch (error) {
       console.error("Lỗi confirm delivery:", error);
       Alert.alert("Lỗi", "Không thể gửi xác nhận lúc này.");
+    } finally {
+      setIsConfirmingDelivery(false);
     }
   };
 
@@ -482,12 +491,18 @@ export default function OrdersScreen() {
               style={[
                 styles.btnOutline,
                 { borderColor: "#FF4D4D", backgroundColor: "#FFF5F5" },
+                cancellingOrderId === item.id && { opacity: 0.6 },
               ]}
               onPress={() => handleCancelOrder(item.id)}
+              disabled={cancellingOrderId === item.id}
             >
-              <Text style={[styles.btnOutlineText, { color: "#FF4D4D" }]}>
-                Hủy đơn hàng
-              </Text>
+              {cancellingOrderId === item.id ? (
+                <ActivityIndicator size="small" color="#FF4D4D" />
+              ) : (
+                <Text style={[styles.btnOutlineText, { color: "#FF4D4D" }]}>
+                  Hủy đơn hàng
+                </Text>
+              )}
             </TouchableOpacity>
           )}
           {item.status === "COMPLETED" && (
@@ -685,10 +700,15 @@ export default function OrdersScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.modalSubmitBtn}
+              style={[styles.modalSubmitBtn, isConfirmingDelivery && { opacity: 0.7 }]}
               onPress={submitConfirmDelivery}
+              disabled={isConfirmingDelivery}
             >
-              <Text style={styles.modalSubmitText}>Gửi xác nhận & Thuê đồ</Text>
+              {isConfirmingDelivery ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.modalSubmitText}>Gửi xác nhận & Thuê đồ</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -757,9 +777,11 @@ export default function OrdersScreen() {
               onPress={handleRepay}
               disabled={isRepaying}
             >
-              <Text style={styles.modalSubmitText}>
-                {isRepaying ? "Đang xử lý..." : "Thanh toán ngay"}
-              </Text>
+              {isRepaying ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.modalSubmitText}>Thanh toán ngay</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

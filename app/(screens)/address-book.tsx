@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
@@ -23,6 +24,8 @@ export default function AddressBookScreen() {
   const [addresses, setAddresses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [deletingAddressId, setDeletingAddressId] = useState<number | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
   // Danh sách từ API
   const [provinces, setProvinces] = useState([]);
@@ -129,6 +132,7 @@ export default function AddressBookScreen() {
       return;
     }
 
+    setIsSavingAddress(true);
     try {
       // Gộp các thông tin địa chỉ thành một chuỗi hoặc gửi object tùy API Backend của bạn
       const payload = {
@@ -152,6 +156,8 @@ export default function AddressBookScreen() {
       }
     } catch (err) {
       Alert.alert("Lỗi", "Không thể lưu địa chỉ lúc này.");
+    } finally {
+      setIsSavingAddress(false);
     }
   };
 
@@ -162,8 +168,15 @@ export default function AddressBookScreen() {
         text: "Xóa",
         style: "destructive",
         onPress: async () => {
-          await userService.deleteAddress(userId!, id);
-          fetchAddresses(userId!);
+          setDeletingAddressId(id);
+          try {
+            await userService.deleteAddress(userId!, id);
+            fetchAddresses(userId!);
+          } catch {
+            Alert.alert("Lỗi", "Không thể xóa địa chỉ lúc này.");
+          } finally {
+            setDeletingAddressId(null);
+          }
         },
       },
     ]);
@@ -176,8 +189,16 @@ export default function AddressBookScreen() {
         <Text style={styles.addressPhone}>{item.phone}</Text>
         <Text style={styles.addressText}>{item.address}</Text>
       </View>
-      <TouchableOpacity onPress={() => handleDelete(item.id)}>
-        <Ionicons name="trash-outline" size={20} color="#FF4D4D" />
+      <TouchableOpacity
+        onPress={() => handleDelete(item.id)}
+        disabled={deletingAddressId === item.id}
+        style={deletingAddressId === item.id ? { opacity: 0.5 } : undefined}
+      >
+        {deletingAddressId === item.id ? (
+          <ActivityIndicator size="small" color="#FF4D4D" />
+        ) : (
+          <Ionicons name="trash-outline" size={20} color="#FF4D4D" />
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -391,10 +412,15 @@ export default function AddressBookScreen() {
                 </TouchableOpacity>
                 {/* NÚT LƯU MÀU TÍM CHUẨN */}
                 <TouchableOpacity
-                  style={styles.submitBtn}
+                  style={[styles.submitBtn, isSavingAddress && styles.submitBtnDisabled]}
                   onPress={handleAddAddress}
+                  disabled={isSavingAddress}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "bold" }}>Lưu</Text>
+                  {isSavingAddress ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={{ color: "#fff", fontWeight: "bold" }}>Lưu</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -514,7 +540,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 30,
     borderRadius: 20,
+    minWidth: 100,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  submitBtnDisabled: { opacity: 0.7 },
   listItem: {
     paddingVertical: 15,
     borderBottomWidth: 1,
