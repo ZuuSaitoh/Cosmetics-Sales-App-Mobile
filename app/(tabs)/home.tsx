@@ -94,7 +94,7 @@ export default function UserHomeScreen() {
   };
 
   const handleCameraSearch = () => {
-    router.push("/image-search" as any);
+    router.push("/ai/image-search" as any);
   };
 
   const formatPrice = (price: number) => {
