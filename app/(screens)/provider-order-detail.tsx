@@ -36,6 +36,8 @@ export default function ProviderOrderDetailScreen() {
   const [review, setReview] = useState<any>(null);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [initialIndex, setInitialIndex] = useState(0);
+  const [openingChat, setOpeningChat] = useState(false);
+  const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
 
   useEffect(() => {
     fetchOrderDetail();
@@ -104,11 +106,13 @@ export default function ProviderOrderDetailScreen() {
 
   const handleOpenChat = async () => {
     if (!order) return;
+    if (openingChat) return;
     const customerUserId = order.cosplayerId;
     if (!customerUserId) {
       Alert.alert("Thông báo", "Không có thông tin khách hàng để liên hệ.");
       return;
     }
+    setOpeningChat(true);
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
       if (!token) {
@@ -138,6 +142,8 @@ export default function ProviderOrderDetailScreen() {
     } catch (err) {
       console.error(">>> [handleOpenChat] ERROR:", err);
       Alert.alert("Lỗi", "Không thể mở cuộc trò chuyện. Vui lòng thử lại.");
+    } finally {
+      setOpeningChat(false);
     }
   };
 
@@ -147,6 +153,7 @@ export default function ProviderOrderDetailScreen() {
       {
         text: "Đồng ý",
         onPress: async () => {
+          setIsUpdatingOrder(true);
           try {
             const res = await orderService.updateOrderStatus(Number(id), newStatus);
             if (res.data.code === 0) {
@@ -155,6 +162,8 @@ export default function ProviderOrderDetailScreen() {
             }
           } catch (err) {
             Alert.alert("Lỗi", "Không thể cập nhật.");
+          } finally {
+            setIsUpdatingOrder(false);
           }
         },
       },
@@ -305,25 +314,37 @@ export default function ProviderOrderDetailScreen() {
         <View style={styles.actionBox}>
           {order.status === "CREATED" && (
             <TouchableOpacity
-              style={styles.btnPrimary}
+              style={[styles.btnPrimary, isUpdatingOrder && { opacity: 0.7 }]}
               onPress={() =>
                 updateStatus("DELIVERING_OUT", "Xác nhận đơn và đi giao ngay?")
               }
+              disabled={isUpdatingOrder}
             >
-              <Text style={styles.btnText}>Xác nhận & Giao hàng</Text>
+              {isUpdatingOrder ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.btnText}>Xác nhận & Giao hàng</Text>
+              )}
             </TouchableOpacity>
           )}
           {order.status === "SHIPPING_BACK" && (
             <View style={styles.btnRow}>
               <TouchableOpacity
-                style={[styles.btnGreen, { flex: 1, marginRight: 8 }]}
+                style={[styles.btnGreen, { flex: 1, marginRight: 8 }, isUpdatingOrder && { opacity: 0.7 }]}
                 onPress={() =>
                   updateStatus("COMPLETED", "Xác nhận nhận đồ & Hoàn cọc?")
                 }
+                disabled={isUpdatingOrder}
               >
                 <View style={styles.btnRowCenter}>
-                  <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.btnGreenText}>Hoàn tất đơn hàng</Text>
+                  {isUpdatingOrder ? (
+                    <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />
+                  ) : (
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  )}
+                  <Text style={styles.btnGreenText}>
+                    {isUpdatingOrder ? "Đang xử lý..." : "Hoàn tất đơn hàng"}
+                  </Text>
                 </View>
               </TouchableOpacity>
               <TouchableOpacity
@@ -343,16 +364,23 @@ export default function ProviderOrderDetailScreen() {
             </View>
           )}
           <TouchableOpacity
-            style={styles.btnChat}
+            style={[styles.btnChat, openingChat && { opacity: 0.7 }]}
             onPress={handleOpenChat}
+            disabled={openingChat || isUpdatingOrder}
           >
-            <Ionicons
-              name="chatbubbles-outline"
-              size={20}
-              color="#4A3B6B"
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.btnChatText}>Nhắn tin cho khách</Text>
+            {openingChat ? (
+              <ActivityIndicator color="#4A3B6B" style={{ marginRight: 8 }} />
+            ) : (
+              <Ionicons
+                name="chatbubbles-outline"
+                size={20}
+                color="#4A3B6B"
+                style={{ marginRight: 8 }}
+              />
+            )}
+            <Text style={styles.btnChatText}>
+              {openingChat ? "Đang mở..." : "Nhắn tin cho khách"}
+            </Text>
           </TouchableOpacity>
         </View>
 

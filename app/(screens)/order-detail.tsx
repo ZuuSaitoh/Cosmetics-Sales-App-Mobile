@@ -72,6 +72,8 @@ export default function OrderDetailScreen() {
   // --- STATE CHO MODAL XÁC NHẬN NHẬN ĐỒ ---
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
   const [confirmImage, setConfirmImage] = useState<any>(null);
+  const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -148,12 +150,14 @@ export default function OrderDetailScreen() {
   // Lấy userId của provider (User B) từ providerId rồi mở phòng chat
   const handleOpenChat = async () => {
     if (!order) return;
+    if (openingChat) return;
     const providerId = order.providerId;
     console.log(">>> [handleOpenChat] providerId:", providerId);
     if (!providerId) {
       Alert.alert("Thông báo", "Không có thông tin cửa hàng để liên hệ.");
       return;
     }
+    setOpeningChat(true);
     try {
       // 1. Lấy userId của provider (User B) từ providerId
       const providerRes = await providerService.getById(providerId);
@@ -204,6 +208,8 @@ export default function OrderDetailScreen() {
     } catch (err) {
       console.error(">>> [handleOpenChat] ERROR:", err);
       Alert.alert("Lỗi", "Không thể mở cuộc trò chuyện. Vui lòng thử lại.");
+    } finally {
+      setOpeningChat(false);
     }
   };
 
@@ -244,6 +250,7 @@ export default function OrderDetailScreen() {
       Alert.alert("Thông báo", "Vui lòng chụp ảnh tình trạng đồ.");
       return;
     }
+    setIsConfirmingDelivery(true);
     try {
       const formData = new FormData();
       const localUri = confirmImage.uri;
@@ -259,6 +266,8 @@ export default function OrderDetailScreen() {
       }
     } catch {
       Alert.alert("Lỗi", "Không thể gửi xác nhận lúc này.");
+    } finally {
+      setIsConfirmingDelivery(false);
     }
   };
 
@@ -526,10 +535,20 @@ export default function OrderDetailScreen() {
         )}
 
         <View style={styles.btnRow}>
-          <TouchableOpacity style={[styles.btnAction, { flex: 1, marginRight: 8 }]} onPress={handleOpenChat}>
+          <TouchableOpacity
+            style={[styles.btnAction, { flex: 1, marginRight: 8 }, openingChat && { opacity: 0.7 }]}
+            onPress={handleOpenChat}
+            disabled={openingChat}
+          >
             <View style={styles.btnRowCenter}>
-              <Ionicons name="chatbubble-ellipses" size={20} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={styles.btnActionText}>Liên hệ cửa hàng</Text>
+              {openingChat ? (
+                <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />
+              ) : (
+                <Ionicons name="chatbubble-ellipses" size={20} color="#fff" style={{ marginRight: 8 }} />
+              )}
+              <Text style={styles.btnActionText}>
+                {openingChat ? "Đang mở..." : "Liên hệ cửa hàng"}
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -635,8 +654,16 @@ export default function OrderDetailScreen() {
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmSubmitBtn} onPress={submitConfirmDelivery}>
-              <Text style={styles.confirmSubmitText}>Gửi xác nhận</Text>
+            <TouchableOpacity
+              style={[styles.confirmSubmitBtn, isConfirmingDelivery && { opacity: 0.7 }]}
+              onPress={submitConfirmDelivery}
+              disabled={isConfirmingDelivery}
+            >
+              {isConfirmingDelivery ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.confirmSubmitText}>Gửi xác nhận</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

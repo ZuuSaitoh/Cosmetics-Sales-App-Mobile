@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   StyleSheet,
@@ -18,6 +19,7 @@ import { userService } from "@/src/services/userService";
 export default function WishlistScreen() {
   const [wishlist, setWishlist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [removingWishlistId, setRemovingWishlistId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchWishlist();
@@ -43,9 +45,15 @@ export default function WishlistScreen() {
   };
 
   const removeFromWishlist = async (wishlistId: number) => {
+    if (removingWishlistId !== null) return;
+    setRemovingWishlistId(wishlistId);
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
-      const decoded: any = jwtDecode(token || "");
+      if (!token) {
+        Alert.alert("Thông báo", "Vui lòng đăng nhập.");
+        return;
+      }
+      const decoded: any = jwtDecode(token);
       const userId = decoded.sub;
 
       const res = await userService.removeFromWishlist(userId, wishlistId);
@@ -53,6 +61,9 @@ export default function WishlistScreen() {
         setWishlist(wishlist.filter((item: any) => item.id !== wishlistId));
       }
     } catch (err) {
+      Alert.alert("Lỗi", "Không thể bỏ yêu thích lúc này.");
+    } finally {
+      setRemovingWishlistId(null);
     }
   };
 
@@ -77,8 +88,16 @@ export default function WishlistScreen() {
               <Text style={styles.name} numberOfLines={1}>{item.costume?.name}</Text>
               <Text style={styles.price}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.costume?.pricePerDay || 0)}/ngày</Text>
             </View>
-            <TouchableOpacity onPress={() => removeFromWishlist(item.id)}>
-              <Ionicons name="heart" size={24} color="#FF5252" />
+            <TouchableOpacity
+              onPress={() => removeFromWishlist(item.id)}
+              disabled={removingWishlistId === item.id}
+              style={removingWishlistId === item.id ? { opacity: 0.5 } : undefined}
+            >
+              {removingWishlistId === item.id ? (
+                <ActivityIndicator size="small" color="#FF5252" />
+              ) : (
+                <Ionicons name="heart" size={24} color="#FF5252" />
+              )}
             </TouchableOpacity>
           </View>
         )}

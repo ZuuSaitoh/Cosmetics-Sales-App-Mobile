@@ -44,6 +44,7 @@
           }
         }
       ],
+      "expo-notifications",
       "@react-native-community/datetimepicker"
     ],
     "experiments": {
@@ -51,7 +52,6 @@
       "reactCompiler": true
     },
     "extra": {
-      "router": {},
       "eas": {
         "projectId": "0c8ac811-38e8-4505-948b-58e98145efc5"
       }

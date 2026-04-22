@@ -26,6 +26,7 @@ export default function ServiceDetailScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [numSlotsStr, setNumSlotsStr] = useState("1");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const paymentMethods = [
     { id: "VNPAY", label: "Ví điện tử VNPAY", icon: "credit-card" as const },
@@ -64,7 +65,9 @@ export default function ServiceDetailScreen() {
       Alert.alert("Thông báo", "Vui lòng chọn phương thức thanh toán!");
       return;
     }
+    if (isSubmitting) return;
 
+    setIsSubmitting(true);
     try {
       const token = await AsyncStorage.getItem("cosmate_token");
       if (!token) return;
@@ -127,6 +130,8 @@ export default function ServiceDetailScreen() {
       }
     } catch (err: any) {
       Alert.alert("Lỗi", err.response?.data?.message || "Đặt dịch vụ thất bại.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -268,8 +273,16 @@ export default function ServiceDetailScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.btnSubmit} onPress={handleBooking}>
-          <Text style={styles.btnSubmitText}>Đặt dịch vụ</Text>
+        <TouchableOpacity
+          style={[styles.btnSubmit, isSubmitting && styles.btnSubmitDisabled]}
+          onPress={handleBooking}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.btnSubmitText}>Đặt dịch vụ</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
 
@@ -299,8 +312,16 @@ export default function ServiceDetailScreen() {
           <Text style={styles.chatText}>Chat</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.rentButton} onPress={handleBooking}>
-          <Text style={styles.rentButtonText}>Đặt dịch vụ</Text>
+        <TouchableOpacity
+          style={[styles.rentButton, isSubmitting && styles.rentButtonDisabled]}
+          onPress={handleBooking}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.rentButtonText}>Đặt dịch vụ</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -353,6 +374,7 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 16, fontWeight: "bold", color: "#B59DFF" },
   totalValue: { fontSize: 18, fontWeight: "bold", color: "#B59DFF" },
   btnSubmit: { backgroundColor: "#B59DFF", padding: 18, borderRadius: 30, alignItems: "center", marginTop: 30, marginBottom: 20 },
+  btnSubmitDisabled: { opacity: 0.7 },
   btnSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   bottomBar: {
     flexDirection: "row",
@@ -383,5 +405,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: "center",
   },
+  rentButtonDisabled: { opacity: 0.7 },
   rentButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });

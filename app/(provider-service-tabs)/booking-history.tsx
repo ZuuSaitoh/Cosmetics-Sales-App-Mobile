@@ -56,6 +56,7 @@ export default function BookingHistoryScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("ALL");
+  const [processingBookingId, setProcessingBookingId] = useState<number | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -106,6 +107,7 @@ export default function BookingHistoryScreen() {
       {
         text: "Xác nhận",
         onPress: async () => {
+          setProcessingBookingId(bookingId);
           try {
             const res = await bookingService.confirm(bookingId);
             if (res.data.code === 0) {
@@ -116,6 +118,8 @@ export default function BookingHistoryScreen() {
             }
           } catch {
             Alert.alert("Lỗi", "Không thể xác nhận đơn.");
+          } finally {
+            setProcessingBookingId(null);
           }
         },
       },
@@ -129,6 +133,7 @@ export default function BookingHistoryScreen() {
         text: "Hủy",
         style: "destructive",
         onPress: async () => {
+          setProcessingBookingId(bookingId);
           try {
             const res = await bookingService.cancel(bookingId);
             if (res.data.code === 0) {
@@ -137,6 +142,8 @@ export default function BookingHistoryScreen() {
             }
           } catch {
             Alert.alert("Lỗi", "Không thể hủy đơn.");
+          } finally {
+            setProcessingBookingId(null);
           }
         },
       },
@@ -256,16 +263,30 @@ export default function BookingHistoryScreen() {
                 {(item.status === "PENDING" || item.status === "PAID") && (
                   <>
                     <TouchableOpacity
-                      style={[styles.btnOutline, { borderColor: "#FF4D4D" }]}
+                      style={[
+                        styles.btnOutline,
+                        { borderColor: "#FF4D4D" },
+                        processingBookingId === item.id && { opacity: 0.6 },
+                      ]}
                       onPress={() => handleCancelBooking(item.id)}
+                      disabled={processingBookingId === item.id}
                     >
-                      <Text style={[styles.btnOutlineText, { color: "#FF4D4D" }]}>Hủy đơn</Text>
+                      {processingBookingId === item.id ? (
+                        <ActivityIndicator size="small" color="#FF4D4D" />
+                      ) : (
+                        <Text style={[styles.btnOutlineText, { color: "#FF4D4D" }]}>Hủy đơn</Text>
+                      )}
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={styles.btnPrimary}
+                      style={[styles.btnPrimary, processingBookingId === item.id && { opacity: 0.7 }]}
                       onPress={() => handleConfirmBooking(item.id)}
+                      disabled={processingBookingId === item.id}
                     >
-                      <Text style={styles.btnPrimaryText}>Xác nhận</Text>
+                      {processingBookingId === item.id ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text style={styles.btnPrimaryText}>Xác nhận</Text>
+                      )}
                     </TouchableOpacity>
                   </>
                 )}
