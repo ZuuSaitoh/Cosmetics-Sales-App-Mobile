@@ -63,6 +63,19 @@ export default function ProviderServiceTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="services"
+        options={{
+          title: "Dịch vụ",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "briefcase" : "briefcase-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="notifications"
         options={{
           title: "Thông báo",

@@ -65,8 +65,8 @@ export default function LoginScreen() {
         if (roles.includes("PROVIDER_RENTAL")) {
           router.replace("/(provider-tabs)/items");
         } else if (
-          roles.includes("PROVIDER_PHOTOGRAPHER") ||
-          roles.includes("PROVIDER_STAFF")
+          roles.includes("PROVIDER_PHOTOGRAPH") ||
+          roles.includes("PROVIDER_EVENT_STAFF")
         ) {
           router.replace("/(provider-service-tabs)/booking-history" as any);
         } else if (roles.includes("COSPLAYER")) {

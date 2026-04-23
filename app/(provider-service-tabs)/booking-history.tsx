@@ -1,7 +1,6 @@
+import { serviceControllerService } from "@/src/services/serviceControllerService";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
-import { jwtDecode } from "jwt-decode";
 import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
@@ -17,8 +16,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { providerService } from "@/src/services/providerService";
-import { bookingService } from "@/src/services/bookingService";
 
 const BOOKING_STATUSES = [
   { key: "ALL", label: "Tất cả" },
@@ -56,7 +53,9 @@ export default function BookingHistoryScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("ALL");
-  const [processingBookingId, setProcessingBookingId] = useState<number | null>(null);
+  const [processingBookingId, setProcessingBookingId] = useState<number | null>(
+    null,
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -67,19 +66,7 @@ export default function BookingHistoryScreen() {
   const fetchBookings = async () => {
     try {
       setIsLoading(true);
-      const token = await AsyncStorage.getItem("cosmate_token");
-      if (!token) return;
-      const decoded: any = jwtDecode(token);
-      const userId = decoded.sub;
-
-      const providerRes = await providerService.getByUser(userId);
-      if (providerRes.data.code !== 0 || !providerRes.data.result) {
-        setIsLoading(false);
-        return;
-      }
-      const providerId = providerRes.data.result.id;
-
-      const res = await bookingService.getByProvider(providerId);
+      const res = await serviceControllerService.getProviderServiceOrders();
       if (res.data.code === 0) {
         setBookings(res.data.result || []);
       }
@@ -99,7 +86,10 @@ export default function BookingHistoryScreen() {
   });
 
   const formatPrice = (price: number) =>
-    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price || 0);
+    new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(price || 0);
 
   const handleConfirmBooking = (bookingId: number) => {
     Alert.alert("Xác nhận đơn", "Chấp nhận đơn thuê này?", [
@@ -109,9 +99,10 @@ export default function BookingHistoryScreen() {
         onPress: async () => {
           setProcessingBookingId(bookingId);
           try {
-            const res = await bookingService.confirm(bookingId);
+            const res =
+              await serviceControllerService.providerSetWaiting(bookingId);
             if (res.data.code === 0) {
-              Alert.alert("Thành công", "Đã xác nhận đơn!");
+              Alert.alert("Thành công", "Đã cập nhật trạng thái đơn!");
               fetchBookings();
             } else {
               Alert.alert("Lỗi", res.data.message);
@@ -135,7 +126,8 @@ export default function BookingHistoryScreen() {
         onPress: async () => {
           setProcessingBookingId(bookingId);
           try {
-            const res = await bookingService.cancel(bookingId);
+            const res =
+              await serviceControllerService.cancelServiceOrder(bookingId);
             if (res.data.code === 0) {
               Alert.alert("Thành công", "Đã hủy đơn!");
               fetchBookings();
@@ -152,23 +144,35 @@ export default function BookingHistoryScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "COMPLETED": return "#28A745";
-      case "CANCELLED": return "#FF4D4D";
-      case "IN_PROGRESS": return "#FF9900";
-      case "CONFIRMED": return "#4A90D9";
-      default: return "#B59DFF";
+      case "COMPLETED":
+        return "#28A745";
+      case "CANCELLED":
+        return "#FF4D4D";
+      case "IN_PROGRESS":
+        return "#FF9900";
+      case "CONFIRMED":
+        return "#4A90D9";
+      default:
+        return "#B59DFF";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "PENDING": return "Chờ xác nhận";
-      case "PAID": return "Đã thanh toán";
-      case "CONFIRMED": return "Đã xác nhận";
-      case "IN_PROGRESS": return "Đang thực hiện";
-      case "COMPLETED": return "Hoàn thành";
-      case "CANCELLED": return "Đã hủy";
-      default: return status;
+      case "PENDING":
+        return "Chờ xác nhận";
+      case "PAID":
+        return "Đã thanh toán";
+      case "CONFIRMED":
+        return "Đã xác nhận";
+      case "IN_PROGRESS":
+        return "Đang thực hiện";
+      case "COMPLETED":
+        return "Hoàn thành";
+      case "CANCELLED":
+        return "Đã hủy";
+      default:
+        return status;
     }
   };
 
@@ -187,11 +191,17 @@ export default function BookingHistoryScreen() {
           {BOOKING_STATUSES.map((s) => (
             <TouchableOpacity
               key={s.key}
-              style={[styles.filterChip, selectedStatus === s.key && styles.filterChipActive]}
+              style={[
+                styles.filterChip,
+                selectedStatus === s.key && styles.filterChipActive,
+              ]}
               onPress={() => setSelectedStatus(s.key)}
             >
               <Text
-                style={[styles.filterChipText, selectedStatus === s.key && styles.filterChipTextActive]}
+                style={[
+                  styles.filterChipText,
+                  selectedStatus === s.key && styles.filterChipTextActive,
+                ]}
               >
                 {s.label}
               </Text>
@@ -210,7 +220,14 @@ export default function BookingHistoryScreen() {
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContainer}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchBookings(); }} colors={["#B59DFF"]} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchBookings();
+              }}
+              colors={["#B59DFF"]}
+            />
           }
           renderItem={({ item }) => (
             <View style={styles.card}>
@@ -223,8 +240,18 @@ export default function BookingHistoryScreen() {
                       : ""}
                   </Text>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + "22" }]}>
-                  <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: getStatusColor(item.status) + "22" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: getStatusColor(item.status) },
+                    ]}
+                  >
                     {getStatusLabel(item.status)}
                   </Text>
                 </View>
@@ -232,9 +259,17 @@ export default function BookingHistoryScreen() {
 
               <View style={styles.serviceRow}>
                 {item.service?.imageUrls?.[0] ? (
-                  <Image source={{ uri: item.service.imageUrls[0] }} style={styles.serviceImage} />
+                  <Image
+                    source={{ uri: item.service.imageUrls[0] }}
+                    style={styles.serviceImage}
+                  />
                 ) : (
-                  <View style={[styles.serviceImage, styles.serviceImagePlaceholder]}>
+                  <View
+                    style={[
+                      styles.serviceImage,
+                      styles.serviceImagePlaceholder,
+                    ]}
+                  >
                     <Ionicons name="camera-outline" size={24} color="#B59DFF" />
                   </View>
                 )}
@@ -243,7 +278,9 @@ export default function BookingHistoryScreen() {
                     {item.service?.serviceName || "Dịch vụ"}
                   </Text>
                   <Text style={styles.serviceType}>
-                    {item.service?.serviceType === "PHOTOGRAPHER" ? "📸 Thợ ảnh" : "🎪 Staff sự kiện"}
+                    {item.service?.serviceType === "PHOTOGRAPHER"
+                      ? "📸 Thợ ảnh"
+                      : "🎪 Staff sự kiện"}
                   </Text>
                 </View>
               </View>
@@ -251,11 +288,15 @@ export default function BookingHistoryScreen() {
               <View style={styles.priceRow}>
                 <View>
                   <Text style={styles.priceLabel}>Tổng cộng</Text>
-                  <Text style={styles.priceValue}>{formatPrice(item.totalAmount)}</Text>
+                  <Text style={styles.priceValue}>
+                    {formatPrice(item.totalAmount)}
+                  </Text>
                 </View>
                 <View style={{ alignItems: "flex-end" }}>
                   <Text style={styles.priceLabel}>Đã cọc</Text>
-                  <Text style={styles.priceValue}>{formatPrice(item.depositAmount)}</Text>
+                  <Text style={styles.priceValue}>
+                    {formatPrice(item.depositAmount)}
+                  </Text>
                 </View>
               </View>
 
@@ -274,11 +315,18 @@ export default function BookingHistoryScreen() {
                       {processingBookingId === item.id ? (
                         <ActivityIndicator size="small" color="#FF4D4D" />
                       ) : (
-                        <Text style={[styles.btnOutlineText, { color: "#FF4D4D" }]}>Hủy đơn</Text>
+                        <Text
+                          style={[styles.btnOutlineText, { color: "#FF4D4D" }]}
+                        >
+                          Hủy đơn
+                        </Text>
                       )}
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.btnPrimary, processingBookingId === item.id && { opacity: 0.7 }]}
+                      style={[
+                        styles.btnPrimary,
+                        processingBookingId === item.id && { opacity: 0.7 },
+                      ]}
                       onPress={() => handleConfirmBooking(item.id)}
                       disabled={processingBookingId === item.id}
                     >
@@ -308,7 +356,9 @@ export default function BookingHistoryScreen() {
             <View style={styles.emptyContainer}>
               <Ionicons name="calendar-outline" size={60} color="#D4C4F0" />
               <Text style={styles.emptyTitle}>Chưa có đơn đặt nào</Text>
-              <Text style={styles.emptySubtitle}>Đơn đặt dịch vụ sẽ xuất hiện ở đây</Text>
+              <Text style={styles.emptySubtitle}>
+                Đơn đặt dịch vụ sẽ xuất hiện ở đây
+              </Text>
             </View>
           }
         />
@@ -320,36 +370,113 @@ export default function BookingHistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F5F7" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: { backgroundColor: "#fff", padding: 20, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
+  header: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
   headerTitle: { fontSize: 20, fontWeight: "900", color: "#4A3B6B" },
-  filterWrapper: { backgroundColor: "#fff", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
+  filterWrapper: {
+    backgroundColor: "#fff",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
   filterContainer: { paddingHorizontal: 15 },
-  filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: "#F4F5F7", marginRight: 10, borderWidth: 1, borderColor: "transparent" },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F4F5F7",
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
   filterChipActive: { backgroundColor: "#F4F1FF", borderColor: "#B59DFF" },
   filterChipText: { fontSize: 13, color: "#666", fontWeight: "500" },
   filterChipTextActive: { color: "#B59DFF", fontWeight: "bold" },
   listContainer: { padding: 15, paddingBottom: 100 },
-  card: { backgroundColor: "#fff", borderRadius: 12, padding: 15, marginBottom: 15, elevation: 2 },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 15,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
   bookingId: { fontSize: 14, fontWeight: "bold", color: "#4A3B6B" },
   bookingDate: { fontSize: 12, color: "#888", marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 12, fontWeight: "bold" },
   serviceRow: { flexDirection: "row", marginBottom: 12 },
   serviceImage: { width: 70, height: 70, borderRadius: 10, marginRight: 12 },
-  serviceImagePlaceholder: { backgroundColor: "#F4F1FF", justifyContent: "center", alignItems: "center" },
+  serviceImagePlaceholder: {
+    backgroundColor: "#F4F1FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   serviceInfo: { flex: 1, justifyContent: "center" },
-  serviceName: { fontSize: 15, fontWeight: "600", color: "#333", marginBottom: 4 },
+  serviceName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
   serviceType: { fontSize: 12, color: "#888" },
-  priceRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#F0F0F0", marginBottom: 12 },
+  priceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#F0F0F0",
+    marginBottom: 12,
+  },
   priceLabel: { fontSize: 12, color: "#888" },
-  priceValue: { fontSize: 15, fontWeight: "bold", color: "#B59DFF", marginTop: 2 },
+  priceValue: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#B59DFF",
+    marginTop: 2,
+  },
   cardFooter: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
-  btnOutline: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, borderWidth: 1, borderColor: "#B59DFF" },
+  btnOutline: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#B59DFF",
+  },
   btnOutlineText: { color: "#B59DFF", fontWeight: "bold", fontSize: 13 },
-  btnPrimary: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8, backgroundColor: "#B59DFF" },
+  btnPrimary: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    backgroundColor: "#B59DFF",
+  },
   btnPrimaryText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
-  emptyContainer: { alignItems: "center", marginTop: 80, paddingHorizontal: 30 },
-  emptyTitle: { fontSize: 17, fontWeight: "600", color: "#4A3B6B", marginTop: 15 },
-  emptySubtitle: { fontSize: 13, color: "#8E7AB5", textAlign: "center", marginTop: 6, lineHeight: 18 },
+  emptyContainer: {
+    alignItems: "center",
+    marginTop: 80,
+    paddingHorizontal: 30,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#4A3B6B",
+    marginTop: 15,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: "#8E7AB5",
+    textAlign: "center",
+    marginTop: 6,
+    lineHeight: 18,
+  },
 });
