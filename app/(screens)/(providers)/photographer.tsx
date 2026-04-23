@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Image,
+    FlatList,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -12,6 +13,7 @@ import {
     View,
 } from "react-native";
 import { providerService } from "@/src/services/providerService";
+import { serviceControllerService } from "@/src/services/serviceControllerService";
 
 // Định nghĩa Interface cho Provider
 interface ProviderDetail {
@@ -27,30 +29,65 @@ interface ProviderDetail {
   bankName: string | null;
 }
 
+interface ProviderServiceItem {
+  id: number;
+  serviceName: string;
+  serviceType: string;
+  description: string;
+  pricePerSlot: number;
+  minPrice: number;
+  maxPrice: number;
+  imageUrls: string[];
+}
+
 export default function ProviderProfileScreen() {
   const { providerId } = useLocalSearchParams();
   const router = useRouter();
   const [provider, setProvider] = useState<ProviderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [services, setServices] = useState<ProviderServiceItem[]>([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(true);
 
-  useEffect(() => {
-    if (providerId) fetchProviderDetails();
-  }, [providerId]);
+  const fetchProviderServices = useCallback(async (pid: number) => {
+    try {
+      setIsLoadingServices(true);
+      const res = await serviceControllerService.getAllServicesByProvider(pid);
+      if (res.data?.code === 0) {
+        setServices(res.data.result || []);
+      } else {
+        setServices([]);
+      }
+    } catch {
+      setServices([]);
+    } finally {
+      setIsLoadingServices(false);
+    }
+  }, []);
 
-  const fetchProviderDetails = async () => {
+  const fetchProviderDetails = useCallback(async () => {
     try {
       setIsLoading(true);
       // Gọi API lấy thông tin thợ ảnh theo providerId
       const res = await providerService.getById(Number(providerId));
       if (res.data.code === 0) {
         setProvider(res.data.result);
+        await fetchProviderServices(res.data.result.id);
       }
     } catch (error) {
       console.error("Lỗi lấy thông tin thợ ảnh:", error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fetchProviderServices, providerId]);
+
+  useEffect(() => {
+    if (providerId) fetchProviderDetails();
+  }, [fetchProviderDetails, providerId]);
+
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+      price || 0,
+    );
 
   if (isLoading) {
     return (
@@ -128,15 +165,57 @@ export default function ProviderProfileScreen() {
           </View>
         </View>
 
-        {/* 4. Portfolio/Services Placeholder */}
+        {/* 4. Services */}
         <View style={styles.tabSection}>
-          <Text style={styles.sectionTitle}>Sản phẩm nổi bật</Text>
-          <View style={styles.placeholderBox}>
-            <Ionicons name="images-outline" size={40} color="#CCC" />
-            <Text style={styles.placeholderText}>
-              Thợ ảnh chưa đăng sản phẩm mẫu.
-            </Text>
-          </View>
+          <Text style={styles.sectionTitle}>Dịch vụ đang có</Text>
+          {isLoadingServices ? (
+            <ActivityIndicator color="#B59DFF" />
+          ) : services.length > 0 ? (
+            <FlatList
+              data={services}
+              scrollEnabled={false}
+              keyExtractor={(item) => item.id.toString()}
+              ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.serviceCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(screens)/service-detail",
+                      params: { id: item.id },
+                    } as any)
+                  }
+                >
+                  {item.imageUrls?.[0] ? (
+                    <Image source={{ uri: item.imageUrls[0] }} style={styles.serviceImage} />
+                  ) : (
+                    <View style={[styles.serviceImage, styles.serviceImagePlaceholder]}>
+                      <Ionicons name="image-outline" size={20} color="#B59DFF" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.serviceName} numberOfLines={2}>
+                      {item.serviceName}
+                    </Text>
+                    <Text style={styles.serviceDescription} numberOfLines={2}>
+                      {item.description || "Không có mô tả."}
+                    </Text>
+                    <Text style={styles.servicePrice}>
+                      {formatPrice(item.minPrice || item.pricePerSlot)} -{" "}
+                      {formatPrice(item.maxPrice || item.pricePerSlot)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          ) : (
+            <View style={styles.placeholderBox}>
+              <Ionicons name="briefcase-outline" size={40} color="#CCC" />
+              <Text style={styles.placeholderText}>
+                Provider chưa đăng dịch vụ nào.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -225,6 +304,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   placeholderText: { color: "#999", marginTop: 10, fontSize: 13 },
+  serviceCard: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#EEE",
+    borderRadius: 10,
+    padding: 10,
+    gap: 10,
+  },
+  serviceImage: {
+    width: 68,
+    height: 68,
+    borderRadius: 8,
+    backgroundColor: "#F4F1FF",
+  },
+  serviceImagePlaceholder: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  serviceName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 3,
+  },
+  serviceDescription: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 4,
+  },
+  servicePrice: {
+    fontSize: 12,
+    color: "#B59DFF",
+    fontWeight: "700",
+  },
   bottomBar: {
     flexDirection: "row",
     padding: 15,

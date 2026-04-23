@@ -355,7 +355,7 @@ export default function ProfileScreen() {
               onPress={() => {
                 setIsEditModalVisible(false);
                 router.push({
-                  pathname: "/(screens)/reset-password",
+                  pathname: "/(screens)/(account)/reset-password",
                   params: {
                     identifier: profile?.email || profile?.username || "",
                     userId: userId,

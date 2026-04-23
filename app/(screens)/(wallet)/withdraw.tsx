@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -45,7 +45,9 @@ export default function WithdrawScreen() {
   const [wallet, setWallet] = useState<any>(null);
   const [balance, setBalance] = useState(0);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -85,8 +87,7 @@ export default function WithdrawScreen() {
   const handleAmountChange = (text: string) => {
     const formatted = formatInputAmount(text);
     setDisplayAmount(formatted);
-    const rawValue = formatted.replace(/\./g, "");
-    setAmount(rawValue);
+    setAmount(formatted.replace(/\./g, ""));
   };
 
   const handleWithdraw = async () => {
@@ -120,8 +121,7 @@ export default function WithdrawScreen() {
         return;
       }
 
-      const decoded: any = jwtDecode(token);
-      const userId = decoded.sub;
+      jwtDecode(token);
 
       const res = await walletService.withdraw({
         amount: parseInt(amount),
@@ -173,7 +173,6 @@ export default function WithdrawScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Số tiền rút */}
           <View style={styles.section}>
             <Text style={styles.label}>Số tiền rút (VND)</Text>
             <View style={styles.amountInputWrap}>
@@ -192,7 +191,6 @@ export default function WithdrawScreen() {
               Tối thiểu 50.000đ · Có thể rút: {formatVND(wallet?.withdrawableBalance ?? balance)}
             </Text>
 
-            {/* Preset buttons */}
             <View style={styles.presetContainer}>
               {PRESET_AMOUNTS.map((val) => (
                 <TouchableOpacity
@@ -218,15 +216,15 @@ export default function WithdrawScreen() {
             </View>
           </View>
 
-          {/* Thông tin tài khoản ngân hàng */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Thông tin tài khoản nhận tiền</Text>
-
-            {/* Chọn ngân hàng */}
             <Text style={styles.label}>Ngân hàng</Text>
             <TouchableOpacity
               style={styles.selectInput}
-              onPress={() => { setShowBankModal(true); setBankSearch(""); }}
+              onPress={() => {
+                setShowBankModal(true);
+                setBankSearch("");
+              }}
             >
               <Text
                 style={[
@@ -239,7 +237,6 @@ export default function WithdrawScreen() {
               <Ionicons name="chevron-down" size={18} color="#8E7AB5" />
             </TouchableOpacity>
 
-            {/* Số tài khoản */}
             <Text style={styles.label}>Số tài khoản</Text>
             <TextInput
               style={styles.input}
@@ -250,7 +247,6 @@ export default function WithdrawScreen() {
               onChangeText={setBankAccountNumber}
             />
 
-            {/* Tên chủ tài khoản */}
             <Text style={styles.label}>Tên chủ tài khoản</Text>
             <TextInput
               style={styles.input}
@@ -262,7 +258,6 @@ export default function WithdrawScreen() {
             />
           </View>
 
-          {/* Nút rút tiền */}
           <TouchableOpacity
             style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]}
             onPress={handleWithdraw}
@@ -284,7 +279,6 @@ export default function WithdrawScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Modal chọn ngân hàng */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -294,12 +288,16 @@ export default function WithdrawScreen() {
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn ngân hàng</Text>
-              <TouchableOpacity onPress={() => { setShowBankModal(false); setBankSearch(""); }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowBankModal(false);
+                  setBankSearch("");
+                }}
+              >
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
 
-            {/* Search bar */}
             <View style={styles.bankSearchWrap}>
               <Ionicons name="search" size={16} color="#8E7AB5" />
               <TextInput
@@ -349,8 +347,6 @@ export default function WithdrawScreen() {
     </SafeAreaView>
   );
 }
-
-// Import Modal
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F5F7" },

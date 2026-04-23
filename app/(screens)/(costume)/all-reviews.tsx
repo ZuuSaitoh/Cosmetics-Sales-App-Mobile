@@ -52,7 +52,6 @@ export default function CostumeReviewsScreen() {
       const res = await reviewService.getByCostume(Number(costumeId));
       if (res.data.code === 0) {
         const reviews = res.data.result || [];
-        // Sắp xếp mới nhất trước
         const sorted = [...reviews].sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -158,7 +157,6 @@ export default function CostumeReviewsScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* AVG RATING HEADER */}
       {allReviews.length > 0 && (
         <View style={styles.avgSection}>
           <View style={styles.avgLeft}>
@@ -177,9 +175,7 @@ export default function CostumeReviewsScreen() {
         </View>
       )}
 
-      {/* FILTER CHIPS */}
       <View style={styles.filterSection}>
-        {/* Lọc sao */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -204,31 +200,9 @@ export default function CostumeReviewsScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-          <View style={styles.chipDivider} />
-          {IMAGE_FILTERS.map((f) => (
-            <TouchableOpacity
-              key={f.key}
-              style={[
-                styles.chip,
-                imageFilter === f.key && styles.chipActive,
-              ]}
-              onPress={() => setImageFilter(f.key as any)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  imageFilter === f.key && styles.chipTextActive,
-                ]}
-              >
-                {f.key === "with" ? "📷" : f.key === "without" ? "📭" : ""}{" "}
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
         </ScrollView>
       </View>
 
-      {/* REVIEWS LIST */}
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#B59DFF" />
@@ -268,14 +242,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0F0F0",
   },
   headerTitle: { fontSize: 17, fontWeight: "bold", color: "#4A3B6B" },
-  avgSection: {
-    backgroundColor: "#fff",
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
+  avgSection: { backgroundColor: "#fff", padding: 16 },
   avgLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
   avgNumber: {
     fontSize: 32,
@@ -284,12 +251,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   avgCount: { fontSize: 13, color: "#888", marginLeft: 10 },
-  filterSection: {
-    backgroundColor: "#fff",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
+  filterSection: { backgroundColor: "#fff", paddingVertical: 10 },
   chipRow: { paddingHorizontal: 15, flexDirection: "row", alignItems: "center" },
   chip: {
     paddingHorizontal: 14,
@@ -297,13 +259,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#F4F5F7",
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: "transparent",
   },
-  chipActive: { backgroundColor: "#F4F1FF", borderColor: "#B59DFF" },
+  chipActive: { backgroundColor: "#F4F1FF" },
   chipText: { fontSize: 13, color: "#666", fontWeight: "500" },
   chipTextActive: { color: "#B59DFF", fontWeight: "bold" },
-  chipDivider: { width: 1, height: 20, backgroundColor: "#E0E0E0", marginHorizontal: 6 },
   listContainer: { padding: 15, paddingBottom: 100 },
   reviewCard: {
     backgroundColor: "#fff",
@@ -311,10 +270,6 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
     elevation: 2,
-    shadowColor: "#B59DFF",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
   },
   reviewHeader: {
     flexDirection: "row",
@@ -335,19 +290,8 @@ const styles = StyleSheet.create({
   reviewerInfo: { flex: 1 },
   reviewerName: { fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 2 },
   reviewDate: { fontSize: 11, color: "#AAA" },
-  reviewComment: {
-    fontSize: 14,
-    color: "#555",
-    lineHeight: 20,
-    marginTop: 4,
-  },
-  reviewImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 8,
-    backgroundColor: "#F0F0F0",
-  },
+  reviewComment: { fontSize: 14, color: "#555", lineHeight: 20, marginTop: 4 },
+  reviewImage: { width: 80, height: 80, borderRadius: 8, marginRight: 8, backgroundColor: "#F0F0F0" },
   emptyContainer: { alignItems: "center", marginTop: 60 },
   emptyText: { marginTop: 10, color: "#8E7AB5", fontSize: 15, fontStyle: "italic" },
 });

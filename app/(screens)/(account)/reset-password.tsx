@@ -19,9 +19,7 @@ export default function ResetPasswordScreen() {
   const params = useLocalSearchParams();
   const token = (params.token as string) || "";
   const userId = params.userId as string | undefined;
-  // Nếu có token → quên mật khẩu (từ email). Không có token → đổi mật khẩu (từ profile)
   const isForgotPassword = !!token;
-  // Đổi mật khẩu từ profile cần có userId
   const isChangePassword = !!userId && !token;
 
   const [oldPassword, setOldPassword] = useState("");
@@ -33,7 +31,6 @@ export default function ResetPasswordScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleReset = async () => {
-    // Xác minh mật khẩu cũ (chỉ khi đổi mật khẩu từ profile)
     if (isChangePassword) {
       if (!oldPassword) {
         Alert.alert("Lỗi", "Vui lòng nhập mật khẩu cũ!");
@@ -59,13 +56,11 @@ export default function ResetPasswordScreen() {
       let response;
 
       if (isChangePassword) {
-        // Đổi mật khẩu từ profile → dùng API change-password (xác minh mk cũ trong body)
         response = await authService.changePassword(Number(userId), {
           oldPassword,
           newPassword,
         });
       } else if (isForgotPassword) {
-        // Quên mật khẩu (từ email) → dùng API password-reset
         response = await authService.passwordReset({
           token,
           newPassword,
@@ -134,84 +129,72 @@ export default function ResetPasswordScreen() {
               : "Nhập mật khẩu mới cho tài khoản của bạn."}
           </Text>
 
-          {/* Mật khẩu cũ — chỉ hiện khi đổi từ profile */}
           {!isForgotPassword && (
-            <View>
-              <View style={styles.passwordWrapper}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Mật khẩu cũ"
-                  placeholderTextColor="#A090C5"
-                  value={oldPassword}
-                  onChangeText={setOldPassword}
-                  secureTextEntry={!showOld}
-                  autoCapitalize="none"
+            <View style={styles.passwordWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="Mật khẩu cũ"
+                placeholderTextColor="#A090C5"
+                value={oldPassword}
+                onChangeText={setOldPassword}
+                secureTextEntry={!showOld}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setShowOld(!showOld)}
+              >
+                <Ionicons
+                  name={showOld ? "eye-off-outline" : "eye-outline"}
+                  size={22}
+                  color="#A090C5"
                 />
-                <TouchableOpacity
-                  style={styles.eyeBtn}
-                  onPress={() => setShowOld(!showOld)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={showOld ? "eye-off-outline" : "eye-outline"}
-                    size={22}
-                    color="#A090C5"
-                  />
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             </View>
           )}
 
-          {/* Mật khẩu mới */}
-          <View>
-            <View style={styles.passwordWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="Mật khẩu mới"
-                placeholderTextColor="#A090C5"
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
+          <View style={styles.passwordWrapper}>
+            <TextInput
+              style={styles.input}
+              placeholder="Mật khẩu mới"
+              placeholderTextColor="#A090C5"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off-outline" : "eye-outline"}
+                size={22}
+                color="#A090C5"
               />
-              <TouchableOpacity
-                style={styles.eyeBtn}
-                onPress={() => setShowPassword(!showPassword)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={22}
-                  color="#A090C5"
-                />
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </View>
 
-          {/* Xác nhận mật khẩu */}
-          <View>
-            <View style={styles.passwordWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="Xác nhận mật khẩu mới"
-                placeholderTextColor="#A090C5"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showConfirm}
-                autoCapitalize="none"
+          <View style={styles.passwordWrapper}>
+            <TextInput
+              style={styles.input}
+              placeholder="Xác nhận mật khẩu mới"
+              placeholderTextColor="#A090C5"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={!showConfirm}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setShowConfirm(!showConfirm)}
+            >
+              <Ionicons
+                name={showConfirm ? "eye-off-outline" : "eye-outline"}
+                size={22}
+                color="#A090C5"
               />
-              <TouchableOpacity
-                style={styles.eyeBtn}
-                onPress={() => setShowConfirm(!showConfirm)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={showConfirm ? "eye-off-outline" : "eye-outline"}
-                  size={22}
-                  color="#A090C5"
-                />
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity

@@ -344,7 +344,7 @@ export default function ProviderProfileScreen() {
         {/* WALLET CARD */}
         <TouchableOpacity
           style={styles.walletCard}
-          onPress={() => router.push("/(screens)/transaction-history")}
+          onPress={() => router.push("/(screens)/(wallet)/transaction-history")}
         >
           <View style={styles.walletLeft}>
             <View style={styles.walletIconWrap}>
@@ -436,7 +436,7 @@ export default function ProviderProfileScreen() {
         <View style={styles.actionSection}>
           <TouchableOpacity
             style={styles.actionBtn}
-            onPress={() => router.push("/(screens)/withdraw-history")}
+            onPress={() => router.push("/(screens)/(wallet)/withdraw-history")}
           >
             <View style={styles.actionLeft}>
               <View style={[styles.iconWrap, { backgroundColor: "#FFF3E0" }]}>

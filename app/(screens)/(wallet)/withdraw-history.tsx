@@ -27,10 +27,10 @@ type WithdrawRecord = {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  PENDING:   { label: "Chờ xử lý", color: "#FF9800" },
-  APPROVED:  { label: "Đã duyệt",   color: "#28A745" },
-  REJECTED:  { label: "Từ chối",    color: "#DC3545" },
-  COMPLETED: { label: "Hoàn thành",  color: "#28A745" },
+  PENDING: { label: "Chờ xử lý", color: "#FF9800" },
+  APPROVED: { label: "Đã duyệt", color: "#28A745" },
+  REJECTED: { label: "Từ chối", color: "#DC3545" },
+  COMPLETED: { label: "Hoàn thành", color: "#28A745" },
 };
 
 export default function WithdrawHistoryScreen() {
@@ -38,7 +38,9 @@ export default function WithdrawHistoryScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => { fetchWithdraws(); }, []);
+  useEffect(() => {
+    fetchWithdraws();
+  }, []);
 
   const fetchWithdraws = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -76,7 +78,9 @@ export default function WithdrawHistoryScreen() {
         <View style={styles.cardTop}>
           <View>
             <Text style={styles.amount}>{formatPrice(item.amount)}</Text>
-            <Text style={styles.bankInfo}>{item.bankName} - {item.bankAccountNumber}</Text>
+            <Text style={styles.bankInfo}>
+              {item.bankName} - {item.bankAccountNumber}
+            </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: cfg.color + "22" }]}>
             <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>

@@ -5,14 +5,13 @@ import {
     ActivityIndicator,
     FlatList,
     Image,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from "react-native";
 import { providerService } from "@/src/services/providerService";
-
+import { SafeAreaView } from "react-native-safe-area-context";
 // Định nghĩa Interface cho Provider
 interface Provider {
   id: number;

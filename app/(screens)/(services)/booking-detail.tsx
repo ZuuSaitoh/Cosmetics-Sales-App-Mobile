@@ -43,7 +43,6 @@ export default function BookingDetailScreen() {
 
     setIsLoading(true);
     try {
-      // Theo yêu cầu hiện tại: gọi /api/services/{id} với id nhận từ orderId.
       const res = await serviceControllerService.getServiceById(Number(id));
       if (res.data?.code === 0) {
         setService(res.data.result ?? null);
@@ -123,47 +122,6 @@ export default function BookingDetailScreen() {
           <Text style={styles.serviceType}>{service.serviceType || "-"}</Text>
           <Text style={styles.description}>{service.description || "Không có mô tả."}</Text>
         </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Thông tin giá</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Giá mỗi slot</Text>
-            <Text style={styles.value}>{formatPrice(service.pricePerSlot)}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Tiền cọc</Text>
-            <Text style={styles.value}>{formatPrice(service.depositAmount)}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Khấu hao thiết bị</Text>
-            <Text style={styles.value}>{formatPrice(service.equipmentDepreciationCost)}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Giá min - max</Text>
-            <Text style={styles.value}>
-              {formatPrice(service.minPrice)} - {formatPrice(service.maxPrice)}
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Thời lượng slot</Text>
-            <Text style={styles.value}>{service.slotDurationHours || 0} giờ</Text>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Khu vực hoạt động</Text>
-          <View style={styles.areasWrap}>
-            {(service.areas || []).length > 0 ? (
-              service.areas.map((area, index) => (
-                <View key={`${area}-${index}`} style={styles.areaChip}>
-                  <Text style={styles.areaText}>{area}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.emptyLabel}>Chưa có thông tin khu vực.</Text>
-            )}
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -199,28 +157,6 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 12, fontWeight: "700" },
   serviceType: { marginTop: 6, fontSize: 12, color: "#8E7AB5", textTransform: "uppercase" },
   description: { marginTop: 8, fontSize: 14, lineHeight: 20, color: "#555" },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#4A3B6B", marginBottom: 8 },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F6F6F6",
-  },
-  label: { fontSize: 14, color: "#666" },
-  value: { fontSize: 14, fontWeight: "700", color: "#4A3B6B" },
-  areasWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  areaChip: {
-    backgroundColor: "#F4F1FF",
-    borderColor: "#E0D7FF",
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  areaText: { color: "#7D61CC", fontSize: 13 },
-  emptyLabel: { color: "#999", fontSize: 13 },
   emptyText: { color: "#666", marginBottom: 12 },
   backBtn: { backgroundColor: "#B59DFF", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
   backBtnText: { color: "#fff", fontWeight: "700" },

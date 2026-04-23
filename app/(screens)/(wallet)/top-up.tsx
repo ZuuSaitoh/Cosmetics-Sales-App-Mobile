@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Linking from "expo-linking"; // 🚩 CHUYỂN SANG: Dùng Linking của expo
+import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useState } from "react";
@@ -34,12 +34,10 @@ export default function TopUpScreen() {
   const handleAmountChange = (text: string) => {
     const formatted = formatInputAmount(text);
     setDisplayAmount(formatted);
-    const rawValue = formatted.replace(/\./g, "");
-    setAmount(rawValue);
+    setAmount(formatted.replace(/\./g, ""));
   };
 
   const handleTopUp = async () => {
-    // 🚩 BƯỚC 1: Lấy Token và giải mã lấy userId
     const token = await AsyncStorage.getItem("cosmate_token");
     if (!token) {
       Alert.alert("Lỗi", "Vui lòng đăng nhập lại.");
@@ -55,8 +53,6 @@ export default function TopUpScreen() {
       return;
     }
 
-    // 🚩 BƯỚC 2: Cấu hình Link Return dẫn về Backend
-    // IP máy chủ Backend (xác nhận IP trước khi chạy)
     const SERVER_IP = "171.232.184.122";
     const backendReturnUrl =
       method === "vnpay"
@@ -71,27 +67,17 @@ export default function TopUpScreen() {
 
       if (response.data.code === 0 && response.data.result) {
         const result = response.data.result;
-        // result có thể là string (URL) hoặc object có url / paymentUrl / deeplink...
         let paymentUrl: string | null = null;
 
-        if (typeof result === "string") {
-          paymentUrl = result;
-        } else if (typeof result === "object") {
-          paymentUrl =
-            result.url ||
-            result.paymentUrl ||
-            result.deeplink ||
-            result.payUrl ||
-            result;
+        if (typeof result === "string") paymentUrl = result;
+        else if (typeof result === "object") {
+          paymentUrl = result.url || result.paymentUrl || result.deeplink || result.payUrl || result;
         }
 
         if (paymentUrl && typeof paymentUrl === "string") {
           await Linking.openURL(paymentUrl);
         } else {
-          Alert.alert(
-            "Lỗi",
-            "Backend trả về định dạng không hợp lệ. Xem console để debug.",
-          );
+          Alert.alert("Lỗi", "Backend trả về định dạng không hợp lệ.");
         }
       }
     } catch (error) {

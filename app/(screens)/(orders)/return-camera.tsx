@@ -21,16 +21,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ReturnCameraScreen() {
-  const { id } = useLocalSearchParams(); // Nhận id đơn hàng
+  const { id } = useLocalSearchParams();
   const [returnImage, setReturnImage] = useState<any>(null);
   const [trackingCode, setTrackingCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
 
-  // Mở Camera bắt buộc (chống gian lận)
   const takePicture = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-
     if (permissionResult.granted === false) {
       Alert.alert(
         "Cấp quyền",
@@ -39,7 +37,7 @@ export default function ReturnCameraScreen() {
       return;
     }
 
-    let result = await ImagePicker.launchCameraAsync({
+    const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
       quality: 0.7,
@@ -68,12 +66,10 @@ export default function ReturnCameraScreen() {
 
     setIsSubmitting(true);
     try {
-      // 🚩 Gọi API với đúng 3 tham số tách biệt: ID đơn, Mã vận đơn, và Link ảnh
-      // (Đảm bảo sếp đã cập nhật hàm returnItem trong orderService.ts như tui chỉ ở trên)
       const res = await orderService.returnItem(
         Number(id),
         trackingCode,
-        returnImage.uri, // Gửi trực tiếp đường dẫn ảnh để Service tự đóng gói FormData
+        returnImage.uri,
       );
 
       if (res.data.code === 0) {
@@ -84,8 +80,6 @@ export default function ReturnCameraScreen() {
         Alert.alert("Thông báo", res.data.message || "Không thể trả hàng.");
       }
     } catch (error: any) {
-      console.error("Lỗi trả hàng:", error);
-      // Hiển thị lỗi chi tiết hơn để dễ debug
       const errorMsg = error.response?.data?.message || "Lỗi kết nối Server";
       Alert.alert("Lỗi Hệ Thống", errorMsg);
     } finally {
@@ -94,7 +88,6 @@ export default function ReturnCameraScreen() {
   };
 
   const handleOpenScanner = async () => {
-    // Tái sử dụng quyền camera của ImagePicker hoặc expo-camera đều được
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Cấp quyền", "Cần cấp quyền camera để quét mã QR.");
@@ -178,7 +171,6 @@ export default function ReturnCameraScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-      {/* Modal Quét QR (Tương tự như bên Provider) */}
       <Modal
         visible={isScannerVisible}
         animationType="slide"
@@ -250,27 +242,6 @@ const styles = StyleSheet.create({
   },
   imagePreview: { width: "100%", height: "100%", resizeMode: "cover" },
   imageBoxText: { marginTop: 10, color: "#8E7AB5", fontWeight: "500" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E0D7FF",
-    borderRadius: 10,
-    padding: 15,
-    fontSize: 16,
-    backgroundColor: "#F8F9FA",
-    marginBottom: 30,
-    color: "#333",
-  },
-  btnSubmit: {
-    backgroundColor: "#FF9900",
-    paddingVertical: 15,
-    borderRadius: 12,
-    alignItems: "center",
-    shadowColor: "#FF9900",
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 4,
-  },
-  btnSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -282,6 +253,17 @@ const styles = StyleSheet.create({
   },
   inputText: { flex: 1, padding: 15, fontSize: 16, color: "#333" },
   qrScanBtn: { padding: 12, justifyContent: "center", alignItems: "center" },
+  btnSubmit: {
+    backgroundColor: "#FF9900",
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: "center",
+    shadowColor: "#FF9900",
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  btnSubmitText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   scannerContainer: { flex: 1, backgroundColor: "#000" },
   scannerOverlay: {
     ...StyleSheet.absoluteFillObject,

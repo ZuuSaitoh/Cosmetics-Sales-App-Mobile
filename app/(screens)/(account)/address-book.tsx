@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,20 +18,18 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { locationService } from "@/src/services/locationService";
 import { userService } from "@/src/services/userService";
 
 export default function AddressBookScreen() {
-  const [addresses, setAddresses] = useState([]);
+  const [addresses, setAddresses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [deletingAddressId, setDeletingAddressId] = useState<number | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
-  // Danh sách từ API
-  const [provinces, setProvinces] = useState([]);
-  const [wards, setWards] = useState([]);
-
-  // Modal quản lý việc chọn
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [wards, setWards] = useState<any[]>([]);
   const [pickerType, setPickerType] = useState<"city" | "ward" | null>(null);
   const [isPickerVisible, setIsPickerVisible] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -45,26 +43,50 @@ export default function AddressBookScreen() {
           item.name.toLowerCase().includes(searchText.toLowerCase()),
         );
 
-  // --- FORM DỮ LIỆU ĐẦY ĐỦ THEO THAM KHẢO ---
   const [formData, setFormData] = useState({
-    receiverName: "", // Tên người nhận
-    phone: "", // Số điện thoại
-    addressName: "", // Tên địa chỉ (Nhà, Công ty...)
-    city: "", // Tỉnh/Thành phố
-    ward: "", // Phường/Xã
-    detailAddress: "", // Số nhà, tên đường
+    receiverName: "",
+    phone: "",
+    addressName: "",
+    city: "",
+    ward: "",
+    detailAddress: "",
   });
+
+  const fetchAddresses = useCallback(async (uid: number) => {
+    try {
+      setIsLoading(true);
+      const res = await userService.getAddresses(uid);
+      if (res.data.code === 0) setAddresses(res.data.result);
+    } catch (err) {
+      console.error("Lỗi tải địa chỉ:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const getUserIdAndFetch = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (token) {
+        const decoded: any = jwtDecode(token);
+        const uid = Number(decoded.sub);
+        setUserId(uid);
+        fetchAddresses(uid);
+      }
+    } catch (err) {
+      console.error("Lỗi lấy thông tin user:", err);
+      setIsLoading(false);
+    }
+  }, [fetchAddresses]);
 
   useEffect(() => {
     getUserIdAndFetch();
-  }, []);
+  }, [getUserIdAndFetch]);
 
   useEffect(() => {
-    // 1. Lấy danh sách Tỉnh/Thành ngay khi mở app
     const fetchProvinces = async () => {
       try {
-        const res = await fetch("https://provinces.open-api.vn/api/v2/p");
-        const data = await res.json();
+        const data = await locationService.getProvinces();
         setProvinces(data);
       } catch (err) {
         console.error("Lỗi lấy Tỉnh:", err);
@@ -73,16 +95,12 @@ export default function AddressBookScreen() {
     fetchProvinces();
   }, []);
 
-  // 2. Khi bạn chọn Tỉnh -> Gọi lấy Phường/Xã
   const handleSelectProvince = async (pCode: number, pName: string) => {
-    setFormData({ ...formData, city: pName, ward: "", detailAddress: "" }); // Reset cấp dưới
+    setFormData({ ...formData, city: pName, ward: "", detailAddress: "" });
     setWards([]);
     setIsPickerVisible(false);
     try {
-      const res = await fetch(
-        `https://provinces.open-api.vn/api/v2/p/${pCode}?depth=2`,
-      );
-      const data = await res.json();
+      const data = await locationService.getProvinceDetail(pCode);
       if (data.wards) {
         setWards(data.wards);
       } else if (data.districts) {
@@ -96,34 +114,7 @@ export default function AddressBookScreen() {
       console.error("Lỗi lấy Phường/Xã:", err);
     }
   };
-  const getUserIdAndFetch = async () => {
-    try {
-      const token = await AsyncStorage.getItem("cosmate_token");
-      if (token) {
-        const decoded: any = jwtDecode(token);
-        const uid = Number(decoded.sub);
-        setUserId(uid);
-        fetchAddresses(uid);
-      }
-    } catch (err) {
-      console.error("Lỗi lấy thông tin user:", err);
-    }
-  };
-
-  const fetchAddresses = async (uid: number) => {
-    try {
-      setIsLoading(true);
-      const res = await userService.getAddresses(uid);
-      if (res.data.code === 0) setAddresses(res.data.result);
-    } catch (err) {
-      console.error("Lỗi tải địa chỉ:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleAddAddress = async () => {
-    // Kiểm tra các trường bắt buộc có dấu *
     if (!formData.receiverName || !formData.phone || !formData.detailAddress) {
       Alert.alert(
         "Thông báo",
@@ -134,7 +125,6 @@ export default function AddressBookScreen() {
 
     setIsSavingAddress(true);
     try {
-      // Gộp các thông tin địa chỉ thành một chuỗi hoặc gửi object tùy API Backend của bạn
       const payload = {
         ...formData,
         address: `${formData.detailAddress}, ${formData.ward}, ${formData.city}`,
@@ -154,7 +144,7 @@ export default function AddressBookScreen() {
         });
         fetchAddresses(userId!);
       }
-    } catch (err) {
+    } catch {
       Alert.alert("Lỗi", "Không thể lưu địa chỉ lúc này.");
     } finally {
       setIsSavingAddress(false);
@@ -205,7 +195,6 @@ export default function AddressBookScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER TÍM CHUẨN */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#4A3B6B" />
@@ -219,11 +208,14 @@ export default function AddressBookScreen() {
         renderItem={renderAddressItem}
         contentContainerStyle={{ padding: 15 }}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>Chưa có địa chỉ nào đâu bạn!</Text>
+          isLoading ? (
+            <ActivityIndicator size="large" color="#B59DFF" style={{ marginTop: 40 }} />
+          ) : (
+            <Text style={styles.emptyText}>Chưa có địa chỉ nào đâu bạn!</Text>
+          )
         }
       />
 
-      {/* NÚT THÊM MÀU TÍM */}
       <TouchableOpacity
         style={styles.addBtn}
         onPress={() => setIsModalVisible(true)}
@@ -232,7 +224,6 @@ export default function AddressBookScreen() {
         <Text style={styles.addBtnText}>Thêm địa chỉ mới</Text>
       </TouchableOpacity>
 
-      {/* MODAL THEO FORM THAM KHẢO NHƯNG MÀU TÍM */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -286,7 +277,6 @@ export default function AddressBookScreen() {
                   }
                 />
 
-                {/* Ô CHỌN TỈNH/THÀNH PHỐ */}
                 <Text style={styles.inputLabel}>
                   Tỉnh/Thành phố <Text style={{ color: "red" }}>*</Text>
                 </Text>
@@ -304,7 +294,6 @@ export default function AddressBookScreen() {
                   <Ionicons name="chevron-down" size={18} color="#B59DFF" />
                 </TouchableOpacity>
 
-                {/* Ô CHỌN PHƯỜNG/XÃ (Chỉ hiện khi đã chọn Tỉnh) */}
                 <Text style={styles.inputLabel}>
                   Phường/Xã <Text style={{ color: "red" }}>*</Text>
                 </Text>
@@ -323,7 +312,6 @@ export default function AddressBookScreen() {
                   <Ionicons name="chevron-down" size={18} color="#B59DFF" />
                 </TouchableOpacity>
 
-                {/* MODAL DANH SÁCH CHỌN */}
                 <Modal
                   visible={isPickerVisible}
                   animationType="slide"
@@ -410,7 +398,6 @@ export default function AddressBookScreen() {
                 >
                   <Text style={{ color: "#8E7AB5" }}>Hủy bỏ</Text>
                 </TouchableOpacity>
-                {/* NÚT LƯU MÀU TÍM CHUẨN */}
                 <TouchableOpacity
                   style={[styles.submitBtn, isSavingAddress && styles.submitBtnDisabled]}
                   onPress={handleAddAddress}
@@ -447,7 +434,6 @@ const styles = StyleSheet.create({
     marginLeft: 15,
     color: "#4A3B6B",
   },
-
   addressCard: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -466,7 +452,6 @@ const styles = StyleSheet.create({
   },
   addressPhone: { fontSize: 14, color: "#666", marginBottom: 2 },
   addressText: { fontSize: 14, color: "#8E7AB5" },
-
   addBtn: {
     position: "absolute",
     bottom: 20,
@@ -481,7 +466,6 @@ const styles = StyleSheet.create({
   },
   addBtnText: { color: "#fff", fontWeight: "bold", marginLeft: 10 },
   emptyText: { textAlign: "center", color: "#999", marginTop: 50 },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

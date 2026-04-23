@@ -11,7 +11,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { userService } from "@/src/services/userService";
@@ -60,19 +60,27 @@ export default function WishlistScreen() {
       if (res.data.code === 0) {
         setWishlist(wishlist.filter((item: any) => item.id !== wishlistId));
       }
-    } catch (err) {
+    } catch {
       Alert.alert("Lỗi", "Không thể bỏ yêu thích lúc này.");
     } finally {
       setRemovingWishlistId(null);
     }
   };
 
-  if (isLoading) return <SafeAreaView style={styles.center}><ActivityIndicator color="#B59DFF" /></SafeAreaView>;
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <ActivityIndicator color="#B59DFF" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color="#4A3B6B" /></TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#4A3B6B" />
+        </TouchableOpacity>
         <Text style={styles.title}>Yêu thích</Text>
         <View style={{ width: 24 }} />
       </View>
@@ -86,7 +94,9 @@ export default function WishlistScreen() {
             <Image source={{ uri: item.costume?.imageUrls?.[0] || "https://via.placeholder.com/100" }} style={styles.img} />
             <View style={styles.info}>
               <Text style={styles.name} numberOfLines={1}>{item.costume?.name}</Text>
-              <Text style={styles.price}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.costume?.pricePerDay || 0)}/ngày</Text>
+              <Text style={styles.price}>
+                {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(item.costume?.pricePerDay || 0)}/ngày
+              </Text>
             </View>
             <TouchableOpacity
               onPress={() => removeFromWishlist(item.id)}
@@ -117,5 +127,5 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   name: { fontSize: 15, fontWeight: "600", color: "#333" },
   price: { fontSize: 14, color: "#B59DFF", fontWeight: "bold", marginTop: 4 },
-  empty: { textAlign: "center", marginTop: 50, color: "#999", fontStyle: "italic" }
+  empty: { textAlign: "center", marginTop: 50, color: "#999", fontStyle: "italic" },
 });

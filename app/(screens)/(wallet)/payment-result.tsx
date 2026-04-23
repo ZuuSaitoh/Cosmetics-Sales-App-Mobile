@@ -18,19 +18,13 @@ type PaymentType = "order" | "topup";
 
 export default function PaymentResultScreen() {
   const params = useLocalSearchParams();
-
-  // 🔍 DEBUG: log tất cả params nhận được từ VNPay redirect
-
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentType, setPaymentType] = useState<PaymentType>("order");
   const [orderData, setOrderData] = useState<any>(null);
   const [topupData, setTopupData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Computed fresh on each render — NOT inside useCallback to avoid stale closure
-  // VNPAY: vnp_ResponseCode="00"
   const vnpaySuccess = params.vnp_ResponseCode === "00";
-  // MoMo (backend redirect): status=success/failed, transactionId, orderId
   const momoSuccess = params.status === "success";
 
   const fetchPaymentResult = useCallback(async () => {
@@ -38,8 +32,6 @@ export default function PaymentResultScreen() {
     const currentVnpaySuccess = currentParams.vnp_ResponseCode === "00";
     const currentMomoSuccess = currentParams.status === "success";
 
-    // Luồng nạp tiền: có vnp_TxnRef (VNPAY) HOẶC status=success nhưng KHÔNG có orderId
-    // Luồng order: có orderId hoặc order_id
     const hasOrderId = !!(currentParams.orderId || currentParams.order_id);
     const isTopupFlow = hasOrderId
       ? false
@@ -53,19 +45,15 @@ export default function PaymentResultScreen() {
       }
       jwtDecode(token);
 
-      // ✅ Fallback: nếu backend redirect không có orderId, dùng transaction history để phân biệt
-      // Kiểm tra transaction mới nhất trong ví — nếu có transaction liên quan đến order thì là luồng order
       if (!hasOrderId && currentMomoSuccess) {
         const decoded: any = jwtDecode(token);
         const uId = decoded.sub;
         const txRes = await walletService.getTransactions(uId);
         if (txRes.data.code === 0 && txRes.data.result.length > 0) {
           const latestTx = txRes.data.result[0];
-          // Nếu transaction mới nhất có trường orderId hoặc referenceOrderId → là luồng order
           if (latestTx.orderId || latestTx.referenceOrderId) {
             const detectedOrderId =
               latestTx.orderId || latestTx.referenceOrderId;
-            // Gọi luồng order với orderId tìm được
             setPaymentType("order");
             const orderRes = await orderService.getOrder(detectedOrderId);
             if (orderRes.data.code === 0) {
@@ -79,9 +67,7 @@ export default function PaymentResultScreen() {
       }
 
       if (isTopupFlow) {
-        // ====== LUỒNG NẠP TIỀN ======
         setPaymentType("topup");
-
         const decoded: any = jwtDecode(token);
         const uId = decoded.sub;
         const res = await walletService.getTransactions(uId);
@@ -94,25 +80,19 @@ export default function PaymentResultScreen() {
             amount: latestTx.amount,
             paymentMethod: isMomo ? "MOMO" : latestTx.paymentMethod || "VNPAY",
             createdAt: latestTx.createdAt,
-            // MoMo params từ backend redirect
             transId:
               currentParams.transactionId || currentParams.transId || null,
             resultCode:
               currentParams.status === "success" ? "0" : currentParams.status,
             message: currentParams.message || null,
-            // VNPAY fallback
             vnp_TransactionNo: params.vnp_TransactionNo || null,
             vnp_TxnRef: params.vnp_TxnRef || params.txnRef || null,
           });
         }
       } else {
-        // ====== LUỒNG THUÊ TRANG PHỤC / DỊCH VỤ ======
         setPaymentType("order");
-        // Backend MoMo gửi orderId, VNPAY gửi order_id
         const orderId = currentParams.orderId || currentParams.order_id;
-
         if (!orderId) {
-          console.warn("Không có orderId trong params");
           setIsLoading(false);
           return;
         }
@@ -121,7 +101,6 @@ export default function PaymentResultScreen() {
         if (orderRes.data.code === 0) {
           const order = orderRes.data.result;
           setOrderData(order);
-
           const dbStatus = order.status;
           if (dbStatus === "PAID") {
             setIsSuccess(true);
@@ -132,7 +111,7 @@ export default function PaymentResultScreen() {
                 await orderService.confirmPayment(Number(orderId));
                 confirmed = true;
                 break;
-              } catch (err: any) {
+              } catch {
                 await new Promise((resolve) => setTimeout(resolve, 1000));
               }
             }
@@ -154,15 +133,13 @@ export default function PaymentResultScreen() {
       setIsSuccess(true);
     }
     fetchPaymentResult();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Chỉ chạy 1 lần khi mount; fetchPaymentResult tự phụ thuộc params
+  }, [fetchPaymentResult, momoSuccess, vnpaySuccess]);
 
-  const formatPrice = (price: any) => {
-    return new Intl.NumberFormat("vi-VN", {
+  const formatPrice = (price: any) =>
+    new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
     }).format(Number(price) || 0);
-  };
 
   if (isLoading) {
     return (
@@ -171,8 +148,6 @@ export default function PaymentResultScreen() {
       </View>
     );
   }
-
-  // ============ RENDER THEO TỪNG LUỒNG ============
 
   const renderOrderDetail = () => {
     if (!orderData) return null;
@@ -194,27 +169,12 @@ export default function PaymentResultScreen() {
             {formatPrice(orderData.totalAmount)}
           </Text>
         </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Trạng thái:</Text>
-          <Text style={[styles.detailValue, { color: "#28A745" }]}>
-            {orderData.status}
-          </Text>
-        </View>
-        {orderData.rentStart && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Ngày thuê:</Text>
-            <Text style={styles.detailValue}>
-              {new Date(orderData.rentStart).toLocaleDateString("vi-VN")}
-            </Text>
-          </View>
-        )}
       </View>
     );
   };
 
   const renderTopupDetail = () => {
     if (!topupData) return null;
-    const isMomo = topupData.paymentMethod === "MOMO";
     return (
       <View style={styles.detailCard}>
         <View style={styles.detailRow}>
@@ -222,51 +182,11 @@ export default function PaymentResultScreen() {
           <Text style={styles.detailValue}>#{topupData.id}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Phương thức:</Text>
-          <Text style={[styles.detailValue, { textTransform: "uppercase" }]}>
-            {topupData.paymentMethod}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Số tiền nạp:</Text>
           <Text style={[styles.detailValue, { color: "#28A745" }]}>
             {formatPrice(topupData.amount)}
           </Text>
         </View>
-        {isMomo && topupData.transId && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mã MoMo:</Text>
-            <Text style={styles.detailValue}>{topupData.transId}</Text>
-          </View>
-        )}
-        {isMomo && topupData.message && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Thông báo:</Text>
-            <Text style={styles.detailValue}>{topupData.message}</Text>
-          </View>
-        )}
-        {!isMomo && topupData.vnp_TransactionNo && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mã VNPAY:</Text>
-            <Text style={styles.detailValue}>
-              {topupData.vnp_TransactionNo}
-            </Text>
-          </View>
-        )}
-        {!isMomo && topupData.vnp_TxnRef && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mã tham chiếu:</Text>
-            <Text style={styles.detailValue}>{topupData.vnp_TxnRef}</Text>
-          </View>
-        )}
-        {topupData.createdAt && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Thời gian:</Text>
-            <Text style={styles.detailValue}>
-              {new Date(topupData.createdAt).toLocaleString("vi-VN")}
-            </Text>
-          </View>
-        )}
       </View>
     );
   };
@@ -288,21 +208,8 @@ export default function PaymentResultScreen() {
         </View>
 
         <Text style={styles.resultTitle}>
-          {isSuccess
-            ? paymentType === "topup"
-              ? "Nạp tiền thành công!"
-              : "Thanh toán thành công!"
-            : "Giao dịch thất bại"}
+          {isSuccess ? "Thanh toán thành công!" : "Giao dịch thất bại"}
         </Text>
-
-        <Text style={styles.resultSubText}>
-          {isSuccess
-            ? paymentType === "topup"
-              ? "Cảm ơn bạn đã tin tưởng CosMate. Số dư ví đã được cập nhật."
-              : "Cảm ơn bạn đã thuê trang phục tại CosMate. Chúc bạn cosplay vui vẻ!"
-            : "Đã có lỗi xảy ra trong quá trình thanh toán. Vui lòng thử lại sau nhé!"}
-        </Text>
-
         {paymentType === "topup" ? renderTopupDetail() : renderOrderDetail()}
 
         <TouchableOpacity
@@ -311,23 +218,6 @@ export default function PaymentResultScreen() {
         >
           <Text style={styles.homeBtnText}>Quay lại trang cá nhân</Text>
         </TouchableOpacity>
-
-        {!isSuccess && (
-          <TouchableOpacity
-            style={styles.retryBtn}
-            onPress={() =>
-              router.replace(
-                paymentType === "topup"
-                  ? ("/(screens)/top-up" as any)
-                  : ("/(tabs)" as any),
-              )
-            }
-          >
-            <Text style={styles.retryBtnText}>
-              {paymentType === "topup" ? "Thử nạp lại" : "Quay về trang chủ"}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     </SafeAreaView>
   );
@@ -356,13 +246,6 @@ const styles = StyleSheet.create({
     color: "#4A3B6B",
     marginBottom: 10,
   },
-  resultSubText: {
-    fontSize: 14,
-    color: "#8E7AB5",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 30,
-  },
   detailCard: {
     backgroundColor: "#fff",
     width: "100%",
@@ -386,6 +269,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   homeBtnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  retryBtn: { marginTop: 15, padding: 10 },
-  retryBtnText: { color: "#B59DFF", fontSize: 15, fontWeight: "600" },
 });

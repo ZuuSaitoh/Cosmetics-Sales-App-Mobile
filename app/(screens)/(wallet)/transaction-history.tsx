@@ -26,14 +26,12 @@ type Transaction = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  // Các type cũ (giữ lại phòng hờ)
   DEPOSIT: "Cọc",
   RENT: "Thuê",
   REFUND: "Hoàn tiền",
   TOPUP: "Nạp tiền",
   WITHDRAW: "Rút tiền",
   PAYMENT: "Thanh toán",
-  // Các type mới từ Database
   CREDIT: "Nạp tiền / Nhận tiền",
   DEBIT: "Trừ tiền / Thanh toán",
   DEPOSIT_RETURN: "Hoàn tiền cọc",
@@ -47,10 +45,10 @@ const TYPE_COLORS: Record<string, string> = {
   TOPUP: "#2196F3",
   WITHDRAW: "#F44336",
   PAYMENT: "#9C27B0",
-  CREDIT: "#2196F3", // Xanh dương
-  DEBIT: "#F44336", // Đỏ
-  DEPOSIT_RETURN: "#28A745", // Xanh lá
-  PROVIDER_PAYOUT: "#9C27B0", // Tím
+  CREDIT: "#2196F3",
+  DEBIT: "#F44336",
+  DEPOSIT_RETURN: "#28A745",
+  PROVIDER_PAYOUT: "#9C27B0",
 };
 
 export default function TransactionHistoryScreen() {
@@ -107,7 +105,6 @@ export default function TransactionHistoryScreen() {
   };
 
   const renderItem = ({ item }: { item: Transaction }) => {
-    // 🚩 Định nghĩa các loại giao dịch được CỘNG TIỀN (+)
     const POSITIVE_TYPES = [
       "CREDIT",
       "DEPOSIT_RETURN",
@@ -124,7 +121,6 @@ export default function TransactionHistoryScreen() {
       <View style={styles.transactionCard}>
         <View style={styles.txLeft}>
           <View style={[styles.txIcon, { backgroundColor: typeColor + "20" }]}>
-            {/* Đổi icon: Tiền vào mũi tên chúi xuống, Tiền ra mũi tên bay lên */}
             <Ionicons
               name={isPositive ? "arrow-down" : "arrow-up"}
               size={18}
@@ -143,7 +139,7 @@ export default function TransactionHistoryScreen() {
           <Text
             style={[
               styles.txAmount,
-              { color: isPositive ? "#28A745" : "#DC3545" }, // Xanh lá cho cộng, Đỏ cho trừ
+              { color: isPositive ? "#28A745" : "#DC3545" },
             ]}
           >
             {isPositive ? "+" : "-"}
@@ -164,10 +160,10 @@ export default function TransactionHistoryScreen() {
               {item.status === "COMPLETED"
                 ? "Hoàn thành"
                 : item.status === "FAILED"
-                  ? "Thất bại"
-                  : item.status === "PENDING"
-                    ? "Đang xử lý"
-                    : item.status}
+                ? "Thất bại"
+                : item.status === "PENDING"
+                ? "Đang xử lý"
+                : item.status}
             </Text>
           </View>
         </View>

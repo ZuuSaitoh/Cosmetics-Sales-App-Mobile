@@ -110,6 +110,12 @@ export default function ProviderServiceTabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="service-detail"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

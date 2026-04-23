@@ -63,7 +63,6 @@ export default function ForgotPasswordScreen() {
         style={styles.flex}
       >
         <View style={styles.content}>
-          {/* Header */}
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => router.back()}

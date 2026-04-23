@@ -109,7 +109,6 @@ export default function CreateDisputeScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView showsVerticalScrollIndicator={false}>
-          {/* THÔNG BÁO */}
           <View style={styles.noticeCard}>
             <Ionicons name="information-circle" size={24} color="#FF9800" />
             <Text style={styles.noticeText}>
@@ -118,7 +117,6 @@ export default function CreateDisputeScreen() {
             </Text>
           </View>
 
-          {/* LÝ DO */}
           <View style={styles.section}>
             <Text style={styles.label}>Mô tả lý do khiếu nại *</Text>
             <TextInput
@@ -133,7 +131,6 @@ export default function CreateDisputeScreen() {
             />
           </View>
 
-          {/* HÌNH MINH CHỨNG */}
           <View style={styles.section}>
             <Text style={styles.label}>Hình ảnh minh chứng (tối đa 5)</Text>
             <View style={styles.imagesRow}>
@@ -164,7 +161,6 @@ export default function CreateDisputeScreen() {
             </View>
           </View>
 
-          {/* NÚT GỬI */}
           <TouchableOpacity
             style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
             onPress={handleSubmit}

@@ -4,15 +4,25 @@ export const serviceControllerService = {
   // service-controller
   getServiceById: (id: number) => axiosClient.get(`/services/${id}`),
 
-  updateService: (id: number, data: Record<string, unknown>) =>
-    axiosClient.put(`/services/${id}`, data),
+  updateService: (id: number, data: FormData | Record<string, unknown>) =>
+    axiosClient.put(`/services/${id}`, data, {
+      headers:
+        data instanceof FormData
+          ? { "Content-Type": "multipart/form-data" }
+          : undefined,
+    }),
 
   deleteService: (id: number) => axiosClient.delete(`/services/${id}`),
 
   getAllServices: () => axiosClient.get("/services"),
 
-  createService: (data: Record<string, unknown>) =>
-    axiosClient.post("/services", data),
+  createService: (data: FormData | Record<string, unknown>) =>
+    axiosClient.post("/services", data, {
+      headers:
+        data instanceof FormData
+          ? { "Content-Type": "multipart/form-data" }
+          : undefined,
+    }),
 
   getServicesByType: (serviceType: string) =>
     axiosClient.get(`/services/type/${serviceType}`),

@@ -5,13 +5,13 @@ import {
     ActivityIndicator,
     FlatList,
     Image,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from "react-native";
 import { providerService } from "@/src/services/providerService";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Định nghĩa Interface cho Provider
 interface Provider {
@@ -54,7 +54,7 @@ export default function AllEventStaffScreen() {
       style={styles.card}
       onPress={() =>
         router.push({
-          pathname: "/(provider-service-tabs)/photographer" as any,
+          pathname: "/(screens)/photographer" as any,
           params: { providerId: item.id },
         })
       }
