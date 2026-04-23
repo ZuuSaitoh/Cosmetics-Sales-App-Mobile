@@ -1,4 +1,5 @@
 import { serviceControllerService } from "@/src/services/serviceControllerService";
+import { API_BASE_URL } from "@/src/api/axiosClient";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
@@ -49,6 +50,7 @@ interface Booking {
 }
 
 export default function BookingHistoryScreen() {
+  const apiHost = API_BASE_URL.replace(/\/api$/, "");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -90,6 +92,12 @@ export default function BookingHistoryScreen() {
       style: "currency",
       currency: "VND",
     }).format(price || 0);
+
+  const resolveImageUrl = (uri?: string) => {
+    if (!uri || typeof uri !== "string" || !uri.trim()) return "";
+    if (uri.startsWith("http")) return uri;
+    return `${apiHost}${uri.startsWith("/") ? uri : `/${uri}`}`;
+  };
 
   const handleConfirmBooking = (bookingId: number) => {
     Alert.alert("Xác nhận đơn", "Chấp nhận đơn thuê này?", [
@@ -231,6 +239,10 @@ export default function BookingHistoryScreen() {
           }
           renderItem={({ item }) => (
             <View style={styles.card}>
+              {(() => {
+                const serviceImageUrl = resolveImageUrl(item.service?.imageUrls?.[0]);
+                return (
+                  <>
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.bookingId}>Đơn #{item.id}</Text>
@@ -258,9 +270,9 @@ export default function BookingHistoryScreen() {
               </View>
 
               <View style={styles.serviceRow}>
-                {item.service?.imageUrls?.[0] ? (
+                {serviceImageUrl ? (
                   <Image
-                    source={{ uri: item.service.imageUrls[0] }}
+                    source={{ uri: serviceImageUrl }}
                     style={styles.serviceImage}
                   />
                 ) : (
@@ -350,6 +362,9 @@ export default function BookingHistoryScreen() {
                   <Text style={styles.btnOutlineText}>Chi tiết</Text>
                 </TouchableOpacity>
               </View>
+                  </>
+                );
+              })()}
             </View>
           )}
           ListEmptyComponent={

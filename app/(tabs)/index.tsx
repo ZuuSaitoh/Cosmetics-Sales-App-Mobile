@@ -1,7 +1,9 @@
+import { costumeService } from "@/src/services/costumeService";
 import { orderService } from "@/src/services/orderService";
 import { providerService } from "@/src/services/providerService";
-import { costumeService } from "@/src/services/costumeService";
 import { reviewService } from "@/src/services/reviewService";
+import { serviceControllerService } from "@/src/services/serviceControllerService";
+import { API_BASE_URL } from "@/src/api/axiosClient";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -15,6 +17,7 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -25,6 +28,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function OrdersScreen() {
+  const apiHost = API_BASE_URL.replace(/\/api$/, "");
   const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,15 +40,18 @@ export default function OrdersScreen() {
   const [providerNames, setProviderNames] = useState<Record<number, string>>(
     {},
   );
-  const [costumeNames, setCostumeNames] = useState<Record<number, string>>(
-    {},
-  );
+  const [costumeNames, setCostumeNames] = useState<Record<number, string>>({});
 
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
   const [confirmOrderId, setConfirmOrderId] = useState<number | null>(null);
   const [confirmImage, setConfirmImage] = useState<any>(null);
   const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
-  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(
+    null,
+  );
+  const [confirmingServiceOrderId, setConfirmingServiceOrderId] = useState<
+    number | null
+  >(null);
   // Ref track review status — không trigger re-render trong lúc fetch
   const reviewedOrdersRef = React.useRef<Record<number, boolean>>({});
   const ORDER_STATUS_TABS = [
@@ -67,7 +74,7 @@ export default function OrdersScreen() {
     return order.status === selectedTab;
   });
 
-    const fetchOrdersSilentlyRef = React.useRef<() => void>(() => {});
+  const fetchOrdersSilentlyRef = React.useRef<() => void>(() => {});
 
   useFocusEffect(
     React.useCallback(() => {
@@ -112,7 +119,13 @@ export default function OrdersScreen() {
 
         // Load provider shop names
         const newProviderNames: Record<number, string> = { ...providerNames };
-        const uniqueProviderIds = [...new Set<number>(fetchedOrders.map((o: any) => o.providerId).filter(Boolean) as number[])];
+        const uniqueProviderIds = [
+          ...new Set<number>(
+            fetchedOrders
+              .map((o: any) => o.providerId)
+              .filter(Boolean) as number[],
+          ),
+        ];
         await Promise.all(
           uniqueProviderIds.map(async (pId: number) => {
             if (!newProviderNames[pId]) {
@@ -129,7 +142,15 @@ export default function OrdersScreen() {
 
         // Load costume names
         const newCostumeNames: Record<number, string> = { ...costumeNames };
-        const uniqueCostumeIds = [...new Set<number>(fetchedOrders.flatMap((o: any) => (o.details || []).map((d: any) => d.costumeId)).filter(Boolean) as number[])];
+        const uniqueCostumeIds = [
+          ...new Set<number>(
+            fetchedOrders
+              .flatMap((o: any) =>
+                (o.details || []).map((d: any) => d.costumeId),
+              )
+              .filter(Boolean) as number[],
+          ),
+        ];
         await Promise.all(
           uniqueCostumeIds.map(async (cId: number) => {
             if (!newCostumeNames[cId]) {
@@ -238,6 +259,34 @@ export default function OrdersScreen() {
     ]);
   };
 
+  const handleConfirmServiceOrder = async (orderId: number) => {
+    if (confirmingServiceOrderId === orderId) return;
+
+    try {
+      setConfirmingServiceOrderId(orderId);
+      const res = await serviceControllerService.confirmByCosplayer(orderId);
+      if (res.data?.code === 0) {
+        Alert.alert("Thành công", "Đã xác nhận đơn dịch vụ.");
+        await fetchOrders();
+      } else {
+        Alert.alert("Lỗi", res.data?.message || "Xác nhận đơn thất bại.");
+      }
+    } catch (error: any) {
+      Alert.alert(
+        "Lỗi",
+        error?.response?.data?.message || "Không thể xác nhận đơn dịch vụ.",
+      );
+    } finally {
+      setConfirmingServiceOrderId(null);
+    }
+  };
+
+  const resolveImageUri = (rawImage?: string) => {
+    if (!rawImage || typeof rawImage !== "string" || !rawImage.trim()) return "";
+    if (rawImage.startsWith("http")) return rawImage;
+    return `${apiHost}${rawImage.startsWith("/") ? rawImage : `/${rawImage}`}`;
+  };
+
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true); // Bắt đầu hiện icon xoay
     await fetchOrders(); // Gọi lại hàm lấy dữ liệu cũ của bạn
@@ -261,9 +310,13 @@ export default function OrdersScreen() {
               imgRes.data.result &&
               imgRes.data.result.length > 0
             ) {
-              newImageMap[cId] =
+              const rawImage =
                 imgRes.data.result[0].imageUrl || imgRes.data.result[0];
-              hasNewImages = true;
+              const normalizedImage = resolveImageUri(rawImage);
+              if (normalizedImage) {
+                newImageMap[cId] = normalizedImage;
+                hasNewImages = true;
+              }
             }
           } catch (err) {}
         }
@@ -431,17 +484,45 @@ export default function OrdersScreen() {
     }).format(price || 0);
   };
 
+  const handleOpenOrderDetail = (item: any) => {
+    if (item?.orderType === "RENT_SERVICE") {
+      router.push({
+        pathname: "/(screens)/(services)/booking-detail" as any,
+        params: { id: item.id, serviceId: item.serviceId },
+      });
+      return;
+    }
+
+    router.push({
+      pathname: "/(screens)/order-detail" as any,
+      params: { id: item?.id },
+    });
+  };
+
   const renderOrderItem = ({ item }: { item: any }) => {
     const isReviewed = !!reviewedOrdersRef.current[Number(item.id)];
     const firstItem =
       item.details && item.details.length > 0 ? item.details[0] : null;
     const costumeId = firstItem ? firstItem.costumeId : null;
+    const firstServiceImage = Array.isArray(item.images) ? item.images[0] : null;
+    const rawServiceImage =
+      typeof firstServiceImage === "string"
+        ? firstServiceImage
+        : firstServiceImage?.imageUrl;
+    const serviceImageUri =
+      item.orderType === "RENT_SERVICE" ? resolveImageUri(rawServiceImage) : "";
+    const costumeImageUri =
+      costumeId && costumeImages[costumeId] ? costumeImages[costumeId] : "";
     const coverImage =
-      costumeId && costumeImages[costumeId]
-        ? costumeImages[costumeId]
-        : "https://via.placeholder.com/200x200.png?text=Loading...";
-    const costumeName = costumeId ? (costumeNames[Number(costumeId)] || "Đơn hàng Cosplay") : "Đơn hàng Cosplay";
-    const shopName = item.providerId ? (providerNames[Number(item.providerId)] || "Shop") : "Shop";
+      serviceImageUri ||
+      costumeImageUri ||
+      "https://via.placeholder.com/200x200.png?text=Loading...";
+    const costumeName = costumeId
+      ? costumeNames[Number(costumeId)] || "Đơn hàng Cosplay"
+      : "Đơn hàng Cosplay";
+    const shopName = item.providerId
+      ? providerNames[Number(item.providerId)] || "Shop"
+      : "Shop";
 
     return (
       <View style={styles.card}>
@@ -460,7 +541,9 @@ export default function OrdersScreen() {
         <View style={styles.productInfo}>
           <Image source={{ uri: coverImage }} style={styles.productImage} />
           <View style={styles.productDetails}>
-            <Text style={styles.itemName} numberOfLines={2}>{costumeName}</Text>
+            <Text style={styles.itemName} numberOfLines={2}>
+              {costumeName}
+            </Text>
             {firstItem && firstItem.size && (
               <Text style={styles.itemSize}>Size: {firstItem.size}</Text>
             )}
@@ -469,6 +552,25 @@ export default function OrdersScreen() {
         </View>
 
         <View style={styles.actionRow}>
+          {item.status === "UNCONFIRM" && item.orderType === "RENT_SERVICE" && (
+            <TouchableOpacity
+              style={[
+                styles.btnOutline,
+                { borderColor: "#28A745", backgroundColor: "#F0FFF4" },
+                confirmingServiceOrderId === item.id && { opacity: 0.7 },
+              ]}
+              onPress={() => handleConfirmServiceOrder(item.id)}
+              disabled={confirmingServiceOrderId === item.id}
+            >
+              {confirmingServiceOrderId === item.id ? (
+                <ActivityIndicator size="small" color="#28A745" />
+              ) : (
+                <Text style={[styles.btnOutlineText, { color: "#28A745" }]}>
+                  Xác nhận đơn
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
           {/* NÚT THANH TOÁN LẠI: CHỈ HIỆN KHI ĐƠN CHƯA THANH TOÁN */}
           {item.status === "UNPAID" && (
             <TouchableOpacity
@@ -479,7 +581,7 @@ export default function OrdersScreen() {
               onPress={() => openRepayModal(item.id)}
             >
               <Text style={[styles.btnOutlineText, { color: "#28A745" }]}>
-                Thanh toán lại
+                Thanh toán
               </Text>
             </TouchableOpacity>
           )}
@@ -500,7 +602,7 @@ export default function OrdersScreen() {
                 <ActivityIndicator size="small" color="#FF4D4D" />
               ) : (
                 <Text style={[styles.btnOutlineText, { color: "#FF4D4D" }]}>
-                  Hủy đơn hàng
+                  Hủy đơn
                 </Text>
               )}
             </TouchableOpacity>
@@ -597,12 +699,7 @@ export default function OrdersScreen() {
 
           <TouchableOpacity
             style={styles.btnOutline}
-            onPress={() =>
-              router.push({
-                pathname: "/(screens)/order-detail" as any,
-                params: { id: item.id },
-              })
-            }
+            onPress={() => handleOpenOrderDetail(item)}
           >
             <Text style={styles.btnOutlineText}>Xem chi tiết</Text>
           </TouchableOpacity>
@@ -700,14 +797,19 @@ export default function OrdersScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.modalSubmitBtn, isConfirmingDelivery && { opacity: 0.7 }]}
+              style={[
+                styles.modalSubmitBtn,
+                isConfirmingDelivery && { opacity: 0.7 },
+              ]}
               onPress={submitConfirmDelivery}
               disabled={isConfirmingDelivery}
             >
               {isConfirmingDelivery ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.modalSubmitText}>Gửi xác nhận & Thuê đồ</Text>
+                <Text style={styles.modalSubmitText}>
+                  Gửi xác nhận & Thuê đồ
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -823,19 +925,29 @@ const styles = StyleSheet.create({
   price: { fontSize: 16, fontWeight: "bold", color: "#B59DFF" },
   actionRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "flex-end",
     marginTop: 15,
     gap: 10,
   },
   btnOutline: {
-    paddingVertical: 8,
+    minHeight: 36,
+    paddingVertical: 6,
     paddingHorizontal: 15,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#B59DFF",
     backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  btnOutlineText: { color: "#B59DFF", fontWeight: "bold" },
+  btnOutlineText: {
+    color: "#B59DFF",
+    fontWeight: "bold",
+    fontSize: 14,
+    lineHeight: 18,
+    ...(Platform.OS === "android" ? { includeFontPadding: false } : {}),
+  },
 
   // STYLES CHO MODAL MỚI THÊM
   modalOverlay: {

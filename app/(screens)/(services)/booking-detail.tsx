@@ -11,28 +11,24 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { serviceControllerService } from "@/src/services/serviceControllerService";
+import { orderService } from "@/src/services/orderService";
 
-interface ServiceDetail {
+interface OrderDetail {
   id: number;
-  serviceName: string;
-  serviceType: string;
-  description: string;
-  slotDurationHours: number;
-  pricePerSlot: number;
-  equipmentDepreciationCost: number;
-  status: string;
-  depositAmount: number;
+  cosplayerId: number;
   providerId: number;
-  areas: string[];
-  imageUrls: string[];
-  minPrice: number;
-  maxPrice: number;
+  orderType: string;
+  status: string;
+  totalAmount: number;
+  totalDepositAmount?: number;
+  createdAt?: string;
+  rentDate?: string;
+  images?: Array<{ imageUrl?: string } | string>;
 }
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [service, setService] = useState<ServiceDetail | null>(null);
+  const [order, setOrder] = useState<OrderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchDetail = useCallback(async () => {
@@ -43,12 +39,12 @@ export default function BookingDetailScreen() {
 
     setIsLoading(true);
     try {
-      const res = await serviceControllerService.getServiceById(Number(id));
+      const res = await orderService.getOrder(Number(id));
       if (res.data?.code === 0) {
-        setService(res.data.result ?? null);
+        setOrder(res.data.result ?? null);
       }
     } catch (error) {
-      console.error("Lỗi lấy chi tiết booking/service:", error);
+      console.error("Lỗi lấy chi tiết đơn hàng:", error);
     } finally {
       setIsLoading(false);
     }
@@ -65,14 +61,38 @@ export default function BookingDetailScreen() {
     switch (status) {
       case "ACTIVE":
       case "COMPLETED":
+      case "CONFIRMED":
         return "#22C55E";
       case "INACTIVE":
       case "CANCELLED":
         return "#EF4444";
+      case "UNCONFIRM":
+      case "UNPAID":
+      case "PAID":
+      case "PREPARING":
+      case "SHIPPING_OUT":
+      case "DELIVERING_OUT":
+      case "IN_USE":
+      case "SHIPPING_BACK":
+        return "#F59E0B";
       default:
         return "#B59DFF";
     }
   };
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString("vi-VN");
+  };
+
+  const coverImageUri = (() => {
+    const firstImage = order?.images?.[0];
+    if (!firstImage) return "https://via.placeholder.com/600x400";
+    if (typeof firstImage === "string") return firstImage;
+    return firstImage.imageUrl || "https://via.placeholder.com/600x400";
+  })();
 
   if (isLoading) {
     return (
@@ -82,7 +102,7 @@ export default function BookingDetailScreen() {
     );
   }
 
-  if (!service) {
+  if (!order) {
     return (
       <SafeAreaView style={styles.center}>
         <Text style={styles.emptyText}>Không tìm thấy dữ liệu chi tiết.</Text>
@@ -105,22 +125,29 @@ export default function BookingDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <Image
-          source={{ uri: service.imageUrls?.[0] || "https://via.placeholder.com/600x400" }}
+          source={{ uri: coverImageUri }}
           style={styles.coverImage}
         />
 
         <View style={styles.card}>
           <View style={styles.titleRow}>
-            <Text style={styles.serviceName}>{service.serviceName || "Dịch vụ"}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(service.status)}22` }]}>
-              <Text style={[styles.statusText, { color: getStatusColor(service.status) }]}>
-                {service.status || "UNKNOWN"}
+            <Text style={styles.serviceName}>Đơn #{order.id}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(order.status)}22` }]}>
+              <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>
+                {order.status || "UNKNOWN"}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.serviceType}>{service.serviceType || "-"}</Text>
-          <Text style={styles.description}>{service.description || "Không có mô tả."}</Text>
+          <Text style={styles.serviceType}>{order.orderType || "-"}</Text>
+          <Text style={styles.description}>Tổng tiền: {formatPrice(order.totalAmount)}</Text>
+          <Text style={styles.description}>
+            Tiền cọc: {formatPrice(order.totalDepositAmount || 0)}
+          </Text>
+          <Text style={styles.description}>Ngày tạo: {formatDateTime(order.createdAt)}</Text>
+          <Text style={styles.description}>Ngày thuê: {formatDateTime(order.rentDate)}</Text>
+          <Text style={styles.description}>Cosplayer ID: {order.cosplayerId ?? "-"}</Text>
+          <Text style={styles.description}>Provider ID: {order.providerId ?? "-"}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
