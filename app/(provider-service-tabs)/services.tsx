@@ -20,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { API_BASE_URL } from "@/src/api/axiosClient";
 import { locationService } from "@/src/services/locationService";
 import { providerService } from "@/src/services/providerService";
 import { serviceControllerService } from "@/src/services/serviceControllerService";
@@ -75,6 +76,7 @@ export default function ProviderServicesScreen() {
     depositAmount: "",
     areas: "",
   });
+  const apiHost = API_BASE_URL.replace(/\/api$/, "");
 
   useFocusEffect(
     useCallback(() => {
@@ -134,6 +136,12 @@ export default function ProviderServicesScreen() {
     if (type === "PHOTOGRAPHER") return "📸 Thợ ảnh";
     if (type === "EVENT_STAFF") return "🎪 Staff sự kiện";
     return type || "Không xác định";
+  };
+
+  const resolveImageUrl = (uri?: string | null) => {
+    if (!uri || typeof uri !== "string" || !uri.trim()) return "";
+    if (uri.startsWith("http")) return uri;
+    return `${apiHost}${uri.startsWith("/") ? uri : `/${uri}`}`;
   };
 
   const handleChangeCreateField = (field: keyof typeof createForm, value: string) => {
@@ -373,8 +381,11 @@ export default function ProviderServicesScreen() {
           renderItem={({ item }) => (
             <View style={styles.card}>
               <View style={styles.topRow}>
-                {item.imageUrls?.[0] ? (
-                  <Image source={{ uri: item.imageUrls[0] }} style={styles.serviceImage} />
+                {resolveImageUrl(item.imageUrls?.[0]) ? (
+                  <Image
+                    source={{ uri: resolveImageUrl(item.imageUrls?.[0]) }}
+                    style={styles.serviceImage}
+                  />
                 ) : (
                   <View style={[styles.serviceImage, styles.imagePlaceholder]}>
                     <Ionicons name="image-outline" size={24} color="#B59DFF" />

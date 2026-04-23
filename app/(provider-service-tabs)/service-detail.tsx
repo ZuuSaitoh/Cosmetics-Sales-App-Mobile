@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { API_BASE_URL } from "@/src/api/axiosClient";
 import { locationService } from "@/src/services/locationService";
 import { serviceControllerService } from "@/src/services/serviceControllerService";
 
@@ -48,6 +49,7 @@ export default function ProviderServiceDetailScreen() {
   const [pickerType, setPickerType] = useState<"city" | "district" | null>(null);
   const [isPickerVisible, setIsPickerVisible] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [isCoverImageError, setIsCoverImageError] = useState(false);
 
   const fetchDetail = async () => {
     try {
@@ -74,6 +76,13 @@ export default function ProviderServiceDetailScreen() {
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
       value || 0,
     );
+  const apiHost = API_BASE_URL.replace(/\/api$/, "");
+  const resolveImageUrl = (uri?: string | null) => {
+    if (!uri || typeof uri !== "string" || !uri.trim()) return "";
+    if (uri.startsWith("http")) return uri;
+    return `${apiHost}${uri.startsWith("/") ? uri : `/${uri}`}`;
+  };
+  const coverImageUri = resolveImageUrl(service?.imageUrls?.[0]);
 
   const areaLabels = Array.isArray(service?.areas)
     ? service.areas
@@ -295,10 +304,18 @@ export default function ProviderServiceDetailScreen() {
         <View style={{ width: 24 }} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 15 }}>
-        <Image
-          source={{ uri: service.imageUrls?.[0] || "https://via.placeholder.com/400x300" }}
-          style={styles.coverImage}
-        />
+        {coverImageUri && !isCoverImageError ? (
+          <Image
+            source={{ uri: coverImageUri }}
+            style={styles.coverImage}
+            onError={() => setIsCoverImageError(true)}
+          />
+        ) : (
+          <View style={styles.coverImagePlaceholder}>
+            <Ionicons name="image-outline" size={34} color="#B59DFF" />
+            <Text style={styles.coverImagePlaceholderText}>Chưa có ảnh dịch vụ</Text>
+          </View>
+        )}
         <Text style={styles.serviceName}>{service.serviceName}</Text>
         <Text style={styles.serviceType}>{String(service.serviceType || "").replace("_", " ")}</Text>
         <Text style={styles.description}>{service.description || "Không có mô tả."}</Text>
@@ -593,6 +610,21 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: "bold", color: "#4A3B6B" },
   coverImage: { width: "100%", height: 240, borderRadius: 12, marginBottom: 14 },
+  coverImagePlaceholder: {
+    width: "100%",
+    height: 240,
+    borderRadius: 12,
+    marginBottom: 14,
+    backgroundColor: "#F2EEFF",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  coverImagePlaceholderText: {
+    color: "#8E7AB5",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   serviceName: { fontSize: 21, fontWeight: "800", color: "#4A3B6B" },
   serviceType: {
     marginTop: 4,

@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { API_BASE_URL } from "@/src/api/axiosClient";
 import { providerService } from "@/src/services/providerService";
 import { serviceControllerService } from "@/src/services/serviceControllerService";
 
@@ -47,6 +48,7 @@ export default function ProviderProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [services, setServices] = useState<ProviderServiceItem[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
+  const apiHost = API_BASE_URL.replace(/\/api$/, "");
 
   const fetchProviderServices = useCallback(async (pid: number) => {
     try {
@@ -88,6 +90,11 @@ export default function ProviderProfileScreen() {
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
       price || 0,
     );
+  const resolveImageUrl = (uri?: string | null) => {
+    if (!uri || typeof uri !== "string" || !uri.trim()) return "";
+    if (uri.startsWith("http")) return uri;
+    return `${apiHost}${uri.startsWith("/") ? uri : `/${uri}`}`;
+  };
 
   if (isLoading) {
     return (
@@ -104,8 +111,7 @@ export default function ProviderProfileScreen() {
         <View style={styles.headerSection}>
           <Image
             source={{
-              uri:
-                provider?.coverImageUrl ||
+              uri: resolveImageUrl(provider?.coverImageUrl) ||
                 "https://via.placeholder.com/500x200",
             }}
             style={styles.coverImage}
@@ -122,7 +128,7 @@ export default function ProviderProfileScreen() {
         <View style={styles.profileInfoSection}>
           <Image
             source={{
-              uri: provider?.avatarUrl || "https://via.placeholder.com/150",
+              uri: resolveImageUrl(provider?.avatarUrl) || "https://via.placeholder.com/150",
             }}
             style={styles.avatar}
           />
@@ -186,8 +192,11 @@ export default function ProviderProfileScreen() {
                     } as any)
                   }
                 >
-                  {item.imageUrls?.[0] ? (
-                    <Image source={{ uri: item.imageUrls[0] }} style={styles.serviceImage} />
+                  {resolveImageUrl(item.imageUrls?.[0]) ? (
+                    <Image
+                      source={{ uri: resolveImageUrl(item.imageUrls?.[0]) }}
+                      style={styles.serviceImage}
+                    />
                   ) : (
                     <View style={[styles.serviceImage, styles.serviceImagePlaceholder]}>
                       <Ionicons name="image-outline" size={20} color="#B59DFF" />
