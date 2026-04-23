@@ -28,7 +28,7 @@ export default function ProviderServiceTabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: "#B59DFF",
-        tabBarInactiveTintColor: "#C4B9DF",
+        tabBarInactiveTintColor: "#999",
         tabBarStyle: {
           backgroundColor: "#ffffff",
           borderTopWidth: 1,
@@ -36,38 +36,23 @@ export default function ProviderServiceTabLayout() {
           height: Platform.OS === "ios" ? 100 : 80,
           paddingBottom: Platform.OS === "ios" ? 40 : 25,
           paddingTop: 12,
-          position: "relative",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          borderRadius: 0,
           elevation: 0,
           shadowOpacity: 0,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: "bold",
+          fontWeight: "600",
           marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginBottom: 0,
         },
       }}
     >
       <Tabs.Screen
-        name="service-management"
-        options={{
-          title: "Kho dịch vụ",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "briefcase" : "briefcase-outline"}
-              size={24}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="booking-history"
         options={{
-          title: "Lịch sử thuê",
+          title: "Lịch sử đặt",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "calendar" : "calendar-outline"}

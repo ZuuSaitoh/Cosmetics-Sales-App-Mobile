@@ -1,3 +1,4 @@
+import { authService } from "@/src/services/authService";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
@@ -14,7 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { authService } from "@/src/services/authService";
 
 const isValidEmail = (email: string) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -68,9 +68,9 @@ export default function LoginScreen() {
           roles.includes("PROVIDER_PHOTOGRAPHER") ||
           roles.includes("PROVIDER_STAFF")
         ) {
-          router.replace("/(provider-service-tabs)/service-management" as any);
+          router.replace("/(provider-service-tabs)/booking-history" as any);
         } else if (roles.includes("COSPLAYER")) {
-          router.replace("/(tabs)");
+          router.replace("/(tabs)/home");
         } else {
           Alert.alert("Lỗi phân quyền", "Tài khoản không hợp lệ!");
         }
