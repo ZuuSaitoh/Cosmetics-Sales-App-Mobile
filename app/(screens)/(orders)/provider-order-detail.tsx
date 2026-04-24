@@ -1,3 +1,8 @@
+import { chatService } from "@/src/services/chatService";
+import { costumeService } from "@/src/services/costumeService";
+import { orderService } from "@/src/services/orderService";
+import { reviewService } from "@/src/services/reviewService";
+import { userService } from "@/src/services/userService";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
@@ -17,11 +22,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { orderService } from "@/src/services/orderService";
-import { reviewService } from "@/src/services/reviewService";
-import { chatService } from "@/src/services/chatService";
-import { costumeService } from "@/src/services/costumeService";
-import { userService } from "@/src/services/userService";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -401,7 +401,7 @@ export default function ProviderOrderDetailScreen() {
               </View>
               <View>
                 <Text style={styles.disputeTitle}>Khiếu nại đang xử lý</Text>
-                <Text style={styles.disputeSub}>Xem chi tiết</Text>
+                <Text style={styles.disputeSub}>Chi tiết</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#CCC" />

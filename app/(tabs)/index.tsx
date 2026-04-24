@@ -1,9 +1,9 @@
+import { API_BASE_URL } from "@/src/api/axiosClient";
 import { costumeService } from "@/src/services/costumeService";
 import { orderService } from "@/src/services/orderService";
 import { providerService } from "@/src/services/providerService";
 import { reviewService } from "@/src/services/reviewService";
 import { serviceControllerService } from "@/src/services/serviceControllerService";
-import { API_BASE_URL } from "@/src/api/axiosClient";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -528,7 +528,7 @@ export default function OrdersScreen() {
     }
 
     router.push({
-      pathname: "/(screens)/order-detail" as any,
+      pathname: "/(screens)/(orders)/order-detail" as any,
       params: { id: item?.id },
     });
   };
@@ -746,7 +746,7 @@ export default function OrdersScreen() {
             style={styles.btnOutline}
             onPress={() => handleOpenOrderDetail(item)}
           >
-            <Text style={styles.btnOutlineText}>Xem chi tiết</Text>
+            <Text style={styles.btnOutlineText}>Chi tiết</Text>
           </TouchableOpacity>
         </View>
       </View>

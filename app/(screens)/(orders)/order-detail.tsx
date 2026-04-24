@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
@@ -14,12 +15,20 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { chatService } from "@/src/services/chatService";
 import { costumeService } from "@/src/services/costumeService";
+import {
+  canShowOrderExtend,
+  getOrderDetailRowId,
+  getOrderDetailRows,
+  isOrderStatusInUse,
+  orderExtendService,
+} from "@/src/services/orderExtendService";
 import { orderService } from "@/src/services/orderService";
 import { providerService } from "@/src/services/providerService";
 import { reviewService } from "@/src/services/reviewService";
@@ -75,6 +84,14 @@ export default function OrderDetailScreen() {
   const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
   const [openingChat, setOpeningChat] = useState(false);
 
+  const [extendModalVisible, setExtendModalVisible] = useState(false);
+  const [extendDetailId, setExtendDetailId] = useState<number | null>(null);
+  const [extendDaysInput, setExtendDaysInput] = useState("1");
+  const [extendPayMethod, setExtendPayMethod] = useState<"VNPAY" | "MOMO" | "WALLET" | null>(
+    null,
+  );
+  const [extendSubmitting, setExtendSubmitting] = useState(false);
+
   useEffect(() => {
     if (id) {
       fetchOrderDetail();
@@ -109,15 +126,16 @@ export default function OrderDetailScreen() {
         setOrder(orderData);
 
         // Load costume names
-        const details = orderData.details || [];
+        const details = getOrderDetailRows(orderData as Record<string, unknown>);
         const newNames: Record<number, string> = { ...costumeNames };
         await Promise.all(
           details.map(async (item: any) => {
-            if (item.costumeId && !newNames[item.costumeId]) {
+            const cid = Number(item.costumeId ?? item.costume_id);
+            if (cid && !newNames[cid]) {
               try {
-                const cRes = await costumeService.getById(item.costumeId);
+                const cRes = await costumeService.getById(cid);
                 if (cRes.data.code === 0 && cRes.data.result) {
-                  newNames[item.costumeId] = cRes.data.result.name || "Trang phục";
+                  newNames[cid] = cRes.data.result.name || "Trang phục";
                 }
               } catch {}
             }
@@ -218,6 +236,68 @@ export default function OrderDetailScreen() {
       style: "currency",
       currency: "VND",
     }).format(price || 0);
+
+  const openExtendModal = (detailId: number) => {
+    setExtendDetailId(detailId);
+    setExtendDaysInput("1");
+    setExtendPayMethod(null);
+    setExtendModalVisible(true);
+  };
+
+  const submitExtendRequest = async () => {
+    if (!order || extendDetailId == null) return;
+    const days = Math.floor(Number(extendDaysInput));
+    if (!Number.isFinite(days) || days < 1) {
+      Alert.alert("Thông báo", "Nhập số ngày gia hạn hợp lệ (tối thiểu 1).");
+      return;
+    }
+    if (!extendPayMethod) {
+      Alert.alert("Thông báo", "Vui lòng chọn phương thức thanh toán.");
+      return;
+    }
+    setExtendSubmitting(true);
+    try {
+      const SERVER_IP = "171.232.184.122";
+      const returnUrl =
+        extendPayMethod === "VNPAY"
+          ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
+          : extendPayMethod === "MOMO"
+            ? `http://${SERVER_IP}:8080/api/payment/api/momo/return`
+            : Linking.createURL("/");
+
+      const res = await orderExtendService.requestExtend(order.id, extendDetailId, {
+        extendDays: days,
+        paymentMethod: extendPayMethod,
+        returnUrl,
+        payNow: true,
+      });
+
+      if (res.data?.code === 0) {
+        const result = res.data.result as { paymentUrl?: string } | undefined;
+        const paymentUrl =
+          result?.paymentUrl &&
+          typeof result.paymentUrl === "string" &&
+          result.paymentUrl.trim()
+            ? result.paymentUrl.trim()
+            : "";
+
+        if (paymentUrl && extendPayMethod !== "WALLET") {
+          setExtendModalVisible(false);
+          await Linking.openURL(paymentUrl);
+        } else {
+          Alert.alert("Thành công", "Đã tạo yêu cầu gia hạn.");
+          setExtendModalVisible(false);
+          await fetchOrderDetail();
+        }
+      } else {
+        Alert.alert("Lỗi", res.data?.message || "Không thể gia hạn.");
+      }
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.response?.data?.message || "Không thể gia hạn lúc này.");
+    } finally {
+      setExtendSubmitting(false);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
@@ -451,24 +531,47 @@ export default function OrderDetailScreen() {
             <Ionicons name="shirt-outline" size={20} color="#B59DFF" />
             <Text style={styles.cardTitle}>Sản phẩm đã thuê</Text>
           </View>
-          {order.details?.map((item: any) => (
-            <View key={item.id} style={styles.itemRow}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>
-                  {costumeNames[item.costumeId] || `Trang phục ID: ${item.costumeId}`}
-                </Text>
-                <Text style={styles.itemSub}>
-                  Size: {item.size} | Số lượng: x{item.numberOfItems}
-                </Text>
-                <Text style={styles.itemSub}>
-                  Thời gian: {item.rentDay} ngày
-                </Text>
+          {getOrderDetailRows(order as Record<string, unknown>).map((raw: any, idx: number) => {
+            const rowId = getOrderDetailRowId(raw as Record<string, unknown>);
+            const costumeId = Number(raw.costumeId ?? raw.costume_id) || 0;
+            return (
+              <View key={rowId ?? `detail-${idx}`} style={styles.itemRow}>
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>
+                    {costumeNames[costumeId] || `Trang phục ID: ${costumeId || "—"}`}
+                  </Text>
+                  <Text style={styles.itemSub}>
+                    Size: {raw.size} | Số lượng: x{raw.numberOfItems ?? raw.quantity ?? 1}
+                  </Text>
+                  <Text style={styles.itemSub}>
+                    Thời gian: {raw.rentDay} ngày
+                  </Text>
+                </View>
+                <View style={styles.itemRightCol}>
+                  <Text style={styles.itemPrice}>
+                    {formatPrice(Number(raw.rentAmount ?? raw.amount ?? 0))}
+                  </Text>
+                  {isOrderStatusInUse(order.status) && canShowOrderExtend(order as Record<string, unknown>) && (
+                    <TouchableOpacity
+                      style={styles.extendChip}
+                      onPress={() => {
+                        if (rowId == null) {
+                          Alert.alert(
+                            "Lỗi",
+                            "Không xác định được dòng đơn để gia hạn. Vui lòng thử lại sau.",
+                          );
+                          return;
+                        }
+                        openExtendModal(rowId);
+                      }}
+                    >
+                      <Text style={styles.extendChipText}>Gia hạn</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-              <Text style={styles.itemPrice}>
-                {formatPrice(item.rentAmount)}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
           <View style={styles.divider} />
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Tiền cọc (Hoàn trả sau):</Text>
@@ -629,6 +732,73 @@ export default function OrderDetailScreen() {
       {/* MODAL XÁC NHẬN NHẬN ĐỒ */}
       <Modal
         animationType="fade"
+        transparent
+        visible={extendModalVisible}
+        onRequestClose={() => {
+          if (!extendSubmitting) setExtendModalVisible(false);
+        }}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <View style={styles.confirmModalContainer}>
+            <View style={styles.confirmModalHeader}>
+              <Text style={styles.confirmModalTitle}>Gia hạn thuê</Text>
+              <TouchableOpacity
+                onPress={() => !extendSubmitting && setExtendModalVisible(false)}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.confirmModalSub}>
+              Nhập số ngày muốn gia hạn và chọn cách thanh toán phần gia hạn.
+            </Text>
+            <Text style={styles.extendLabel}>Số ngày gia hạn</Text>
+            <TextInput
+              style={styles.extendInput}
+              value={extendDaysInput}
+              onChangeText={setExtendDaysInput}
+              keyboardType="number-pad"
+              placeholder="VD: 2"
+              placeholderTextColor="#A090C5"
+            />
+            <Text style={[styles.extendLabel, { marginTop: 12 }]}>Thanh toán</Text>
+            <View style={styles.extendPayRow}>
+              {(["VNPAY", "MOMO", "WALLET"] as const).map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  style={[
+                    styles.extendPayChip,
+                    extendPayMethod === m && styles.extendPayChipActive,
+                  ]}
+                  onPress={() => setExtendPayMethod(m)}
+                >
+                  <Text
+                    style={[
+                      styles.extendPayChipText,
+                      extendPayMethod === m && styles.extendPayChipTextActive,
+                    ]}
+                  >
+                    {m === "VNPAY" ? "VNPAY" : m === "MOMO" ? "MoMo" : "Ví CosMate"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={[styles.confirmSubmitBtn, extendSubmitting && { opacity: 0.7 }]}
+              onPress={submitExtendRequest}
+              disabled={extendSubmitting}
+            >
+              {extendSubmitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.confirmSubmitText}>Xác nhận gia hạn</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="fade"
         transparent={true}
         visible={isConfirmModalVisible}
         onRequestClose={() => setIsConfirmModalVisible(false)}
@@ -764,6 +934,43 @@ const styles = StyleSheet.create({
   },
   itemSub: { fontSize: 13, color: "#888", marginBottom: 2 },
   itemPrice: { fontSize: 15, fontWeight: "600", color: "#4A3B6B" },
+  itemRightCol: { alignItems: "flex-end", minWidth: 88 },
+  extendChip: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#B59DFF",
+    backgroundColor: "#F4F1FF",
+  },
+  extendChipText: { fontSize: 12, fontWeight: "700", color: "#6F58A8" },
+  extendLabel: { fontSize: 13, fontWeight: "600", color: "#4A3B6B", marginBottom: 6 },
+  extendInput: {
+    borderWidth: 1,
+    borderColor: "#E6DBFF",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: "#333",
+    backgroundColor: "#FAF9FF",
+  },
+  extendPayRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+  extendPayChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0D7FF",
+    backgroundColor: "#fff",
+  },
+  extendPayChipActive: {
+    borderColor: "#B59DFF",
+    backgroundColor: "#F4F1FF",
+  },
+  extendPayChipText: { fontSize: 12, fontWeight: "600", color: "#666" },
+  extendPayChipTextActive: { color: "#6F58A8" },
   divider: { height: 1, backgroundColor: "#F0F0F0", marginVertical: 15 },
   totalRow: {
     flexDirection: "row",
