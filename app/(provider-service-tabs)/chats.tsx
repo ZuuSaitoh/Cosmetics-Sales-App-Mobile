@@ -214,7 +214,7 @@ export default function ChatInboxScreen() {
     };
   }, [searchText]);
 
-  const handleCreateOrGetRoom = async (partnerId: number) => {
+  const handleCreateOrGetRoom = async (partner: UserListItem) => {
     try {
       const resolvedUserId = currentUserId;
       if (!resolvedUserId) {
@@ -224,12 +224,20 @@ export default function ChatInboxScreen() {
 
       const response = await chatService.getOrCreateRoom(
         Number(resolvedUserId),
-        partnerId,
+        partner.id,
       );
       const roomId = toNumber(response.data?.result?.id ?? response.data?.id);
       if (!roomId) return;
 
-      router.push(`/chat/${roomId}` as any);
+      router.push({
+        pathname: "/chat/[roomId]",
+        params: {
+          roomId: String(roomId),
+          partnerId: String(partner.id),
+          partnerName: partner.fullName,
+          partnerAvatar: partner.avatarUrl ?? "",
+        },
+      } as any);
     } catch (err) {
       console.warn("handleCreateOrGetRoom error", err);
     }
@@ -267,7 +275,7 @@ export default function ChatInboxScreen() {
   const renderUserResult = ({ item }: { item: UserListItem }) => (
     <Pressable
       style={styles.resultItem}
-      onPress={() => handleCreateOrGetRoom(item.id)}
+      onPress={() => handleCreateOrGetRoom(item)}
     >
       {item.avatarUrl ? (
         <Image source={{ uri: item.avatarUrl }} style={styles.resultAvatar} />

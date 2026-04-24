@@ -1,20 +1,20 @@
+import { API_BASE_URL } from "@/src/api/axiosClient";
+import { providerService } from "@/src/services/providerService";
+import { serviceControllerService } from "@/src/services/serviceControllerService";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    FlatList,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { API_BASE_URL } from "@/src/api/axiosClient";
-import { providerService } from "@/src/services/providerService";
-import { serviceControllerService } from "@/src/services/serviceControllerService";
 
 // Định nghĩa Interface cho Provider
 interface ProviderDetail {
@@ -227,30 +227,6 @@ export default function ProviderProfileScreen() {
           )}
         </View>
       </ScrollView>
-
-      {/* 5. Bottom Action Bar */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.chatBtn}
-          onPress={() =>
-            router.push({
-              pathname: "/(screens)/chat",
-              params: { providerId: provider?.id },
-            } as any)
-          }
-        >
-          <Ionicons
-            name="chatbubble-ellipses-outline"
-            size={22}
-            color="#B59DFF"
-          />
-          <Text style={styles.chatBtnText}>Nhắn tin</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.bookBtn}>
-          <Text style={styles.bookBtnText}>Đặt thợ ngay</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }

@@ -127,6 +127,15 @@ const isProviderRole = (value: unknown) => {
   return normalized.includes("PROVIDER_") || normalized.includes("ROLE_PROVIDER");
 };
 
+/** Role có thể tạo đơn dịch vụ (thợ ảnh / event staff), không gồm PROVIDER_RENTAL. */
+const isPhotographerOrEventStaffServiceRole = (value: unknown) => {
+  if (typeof value !== "string") return false;
+  const u = value.toUpperCase().replace(/^ROLE_/, "");
+  if (u.includes("PROVIDER_PHOTOGRAPH")) return true;
+  if (u.includes("PROVIDER_EVENT_STAFF")) return true;
+  return false;
+};
+
 const TIME_SLOT_OPTIONS = [
   "08:00-10:00",
   "10:00-12:00",
@@ -144,6 +153,8 @@ export default function ChatRoomScreen() {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [isProviderUser, setIsProviderUser] = useState(false);
+  const [hasServicePhotographerStaffRole, setHasServicePhotographerStaffRole] = useState(false);
+  const [loggedInUserProviderId, setLoggedInUserProviderId] = useState<number | null>(null);
   const [providerServices, setProviderServices] = useState<ProviderServiceItem[]>([]);
   const [isLoadingProviderServices, setIsLoadingProviderServices] = useState(false);
   const [isOrderModalVisible, setIsOrderModalVisible] = useState(false);
@@ -289,6 +300,9 @@ export default function ChatRoomScreen() {
             ];
             const providerFlag = roleCandidates.some(isProviderRole);
             setIsProviderUser(providerFlag);
+            setHasServicePhotographerStaffRole(
+              roleCandidates.some(isPhotographerOrEventStaffServiceRole),
+            );
             if (userId !== undefined && userId !== null) {
               const normalizedUserId = String(userId);
               setCurrentUserId(normalizedUserId);
@@ -318,10 +332,14 @@ export default function ChatRoomScreen() {
     void init();
   }, [roomKey]);
 
+  const canShowProviderCreateOrder =
+    hasServicePhotographerStaffRole && loggedInUserProviderId !== null;
+
   useEffect(() => {
     const loadProviderServices = async () => {
       if (!currentUserId) {
         setProviderServices([]);
+        setLoggedInUserProviderId(null);
         return;
       }
 
@@ -331,11 +349,13 @@ export default function ChatRoomScreen() {
         const providerId = Number(providerRes.data?.result?.id);
         if (!providerId) {
           setIsProviderUser(false);
+          setLoggedInUserProviderId(null);
           setProviderServices([]);
           return;
         }
 
         setIsProviderUser(true);
+        setLoggedInUserProviderId(providerId);
         const servicesRes = await serviceControllerService.getServicesByProvider(providerId);
         const services = Array.isArray(servicesRes.data?.result) ? servicesRes.data.result : [];
         setProviderServices(
@@ -349,6 +369,7 @@ export default function ChatRoomScreen() {
       } catch (error) {
         console.warn("Load provider services failed", error);
         setIsProviderUser(false);
+        setLoggedInUserProviderId(null);
         setProviderServices([]);
       } finally {
         setIsLoadingProviderServices(false);
@@ -681,14 +702,14 @@ export default function ChatRoomScreen() {
             </View>
           </View>
 
-          {!!currentUserId && (
+          {canShowProviderCreateOrder ? (
             <Pressable
               onPress={() => setIsOrderModalVisible(true)}
               style={styles.createOrderBtn}
             >
               <Ionicons name="document-text-outline" size={17} color="#6F58A8" />
             </Pressable>
-          )}
+          ) : null}
         </View>
 
         {loading ? (
