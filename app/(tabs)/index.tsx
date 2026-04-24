@@ -27,6 +27,40 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const isRentServiceOrderType = (orderType: unknown) =>
+  String(orderType ?? "")
+    .toUpperCase()
+    .replace(/-/g, "_") === "RENT_SERVICE";
+
+const getUserOrderStatusLabelVi = (status?: string) => {
+  switch (status) {
+    case "WAITING_SERVICE_DATE":
+      return "Chờ đến ngày dịch vụ";
+    case "UNCONFIRM":
+      return "Chờ xác nhận";
+    case "UNPAID":
+      return "Chưa thanh toán";
+    case "PAID":
+      return "Đã thanh toán";
+    case "PREPARING":
+      return "Đang chuẩn bị";
+    case "SHIPPING_OUT":
+      return "Đang gửi hàng";
+    case "DELIVERING_OUT":
+      return "Đang giao";
+    case "IN_USE":
+      return "Đang thuê";
+    case "SHIPPING_BACK":
+      return "Đang trả đồ";
+    case "COMPLETED":
+      return "Hoàn thành";
+    case "CANCELLED":
+      return "Đã hủy";
+    default:
+      return status?.trim() || "Đang xử lý";
+  }
+};
+
 export default function OrdersScreen() {
   const apiHost = API_BASE_URL.replace(/\/api$/, "");
   const router = useRouter();
@@ -485,7 +519,7 @@ export default function OrdersScreen() {
   };
 
   const handleOpenOrderDetail = (item: any) => {
-    if (item?.orderType === "RENT_SERVICE") {
+    if (isRentServiceOrderType(item?.orderType)) {
       router.push({
         pathname: "/(screens)/(services)/booking-detail" as any,
         params: { id: item.id, serviceId: item.serviceId },
@@ -501,25 +535,25 @@ export default function OrdersScreen() {
 
   const renderOrderItem = ({ item }: { item: any }) => {
     const isReviewed = !!reviewedOrdersRef.current[Number(item.id)];
+    const isRentServiceOrder = isRentServiceOrderType(item?.orderType);
     const firstItem =
       item.details && item.details.length > 0 ? item.details[0] : null;
     const costumeId = firstItem ? firstItem.costumeId : null;
-    const firstServiceImage = Array.isArray(item.images) ? item.images[0] : null;
-    const rawServiceImage =
-      typeof firstServiceImage === "string"
-        ? firstServiceImage
-        : firstServiceImage?.imageUrl;
-    const serviceImageUri =
-      item.orderType === "RENT_SERVICE" ? resolveImageUri(rawServiceImage) : "";
     const costumeImageUri =
       costumeId && costumeImages[costumeId] ? costumeImages[costumeId] : "";
     const coverImage =
-      serviceImageUri ||
       costumeImageUri ||
       "https://via.placeholder.com/200x200.png?text=Loading...";
     const costumeName = costumeId
       ? costumeNames[Number(costumeId)] || "Đơn hàng Cosplay"
       : "Đơn hàng Cosplay";
+    const rentServiceName =
+      item?.service?.serviceName ??
+      item?.serviceName ??
+      (item?.service && typeof item.service === "object" && item.service?.name
+        ? String(item.service.name)
+        : null) ??
+      "Dịch vụ";
     const shopName = item.providerId
       ? providerNames[Number(item.providerId)] || "Shop"
       : "Shop";
@@ -534,25 +568,36 @@ export default function OrdersScreen() {
               { color: item.status === "COMPLETED" ? "#28A745" : "#B59DFF" },
             ]}
           >
-            {item.status || "Đang xử lý"}
+            {getUserOrderStatusLabelVi(item.status)}
           </Text>
         </View>
 
         <View style={styles.productInfo}>
-          <Image source={{ uri: coverImage }} style={styles.productImage} />
-          <View style={styles.productDetails}>
-            <Text style={styles.itemName} numberOfLines={2}>
-              {costumeName}
-            </Text>
-            {firstItem && firstItem.size && (
-              <Text style={styles.itemSize}>Size: {firstItem.size}</Text>
-            )}
-            <Text style={styles.price}>{formatPrice(item.totalAmount)}</Text>
-          </View>
+          {isRentServiceOrder ? (
+            <View style={styles.serviceOrderTextOnly}>
+              <Text style={styles.itemName} numberOfLines={2}>
+                {rentServiceName}
+              </Text>
+              <Text style={styles.price}>{formatPrice(item.totalAmount)}</Text>
+            </View>
+          ) : (
+            <>
+              <Image source={{ uri: coverImage }} style={styles.productImage} />
+              <View style={styles.productDetails}>
+                <Text style={styles.itemName} numberOfLines={2}>
+                  {costumeName}
+                </Text>
+                {firstItem && firstItem.size && (
+                  <Text style={styles.itemSize}>Size: {firstItem.size}</Text>
+                )}
+                <Text style={styles.price}>{formatPrice(item.totalAmount)}</Text>
+              </View>
+            </>
+          )}
         </View>
 
         <View style={styles.actionRow}>
-          {item.status === "UNCONFIRM" && item.orderType === "RENT_SERVICE" && (
+          {item.status === "UNCONFIRM" && isRentServiceOrderType(item?.orderType) && (
             <TouchableOpacity
               style={[
                 styles.btnOutline,
@@ -912,6 +957,7 @@ const styles = StyleSheet.create({
   shopName: { fontSize: 14, fontWeight: "bold", color: "#4A3B6B" },
   statusText: { fontSize: 12, fontWeight: "bold" },
   productInfo: { flexDirection: "row", marginBottom: 15 },
+  serviceOrderTextOnly: { flex: 1, justifyContent: "center", gap: 6 },
   productImage: {
     width: 80,
     height: 80,

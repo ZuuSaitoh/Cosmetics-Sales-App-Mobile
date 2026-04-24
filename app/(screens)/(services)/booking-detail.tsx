@@ -74,9 +74,34 @@ export default function BookingDetailScreen() {
       case "DELIVERING_OUT":
       case "IN_USE":
       case "SHIPPING_BACK":
+      case "WAITING_SERVICE_DATE":
         return "#F59E0B";
       default:
         return "#B59DFF";
+    }
+  };
+
+  const getServiceOrderStatusLabelVi = (status?: string) => {
+    switch (status) {
+      case "WAITING_SERVICE_DATE":
+        return "Chờ đến ngày dịch vụ";
+      case "UNCONFIRM":
+        return "Chờ xác nhận";
+      case "UNPAID":
+        return "Chưa thanh toán";
+      case "PAID":
+        return "Đã thanh toán";
+      case "CONFIRMED":
+        return "Đã xác nhận";
+      case "IN_SERVICE":
+      case "IN_PROGRESS":
+        return "Đang thực hiện";
+      case "COMPLETED":
+        return "Hoàn thành";
+      case "CANCELLED":
+        return "Đã hủy";
+      default:
+        return status || "—";
     }
   };
 
@@ -134,7 +159,7 @@ export default function BookingDetailScreen() {
             <Text style={styles.serviceName}>Đơn #{order.id}</Text>
             <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(order.status)}22` }]}>
               <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>
-                {order.status || "UNKNOWN"}
+                {getServiceOrderStatusLabelVi(order.status)}
               </Text>
             </View>
           </View>

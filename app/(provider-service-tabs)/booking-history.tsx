@@ -1,20 +1,18 @@
-import { API_BASE_URL } from "@/src/api/axiosClient";
 import { serviceControllerService } from "@/src/services/serviceControllerService";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -50,7 +48,6 @@ interface Booking {
 }
 
 export default function BookingHistoryScreen() {
-  const apiHost = API_BASE_URL.replace(/\/api$/, "");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,6 +81,12 @@ export default function BookingHistoryScreen() {
     if (selectedStatus === "ALL") return true;
     if (selectedStatus === "PENDING")
       return b.status === "PENDING" || b.status === "PAID";
+    if (selectedStatus === "IN_PROGRESS")
+      return (
+        b.status === "IN_PROGRESS" ||
+        b.status === "IN_SERVICE" ||
+        b.status === "WAITING_SERVICE_DATE"
+      );
     return b.status === selectedStatus;
   });
 
@@ -93,10 +96,32 @@ export default function BookingHistoryScreen() {
       currency: "VND",
     }).format(price || 0);
 
-  const resolveImageUrl = (uri?: string) => {
-    if (!uri || typeof uri !== "string" || !uri.trim()) return "";
-    if (uri.startsWith("http")) return uri;
-    return `${apiHost}${uri.startsWith("/") ? uri : `/${uri}`}`;
+  const handleProviderComplete = (bookingId: number) => {
+    Alert.alert("Hoàn thành dịch vụ", "Xác nhận đã hoàn thành dịch vụ cho đơn này?", [
+      { text: "Hủy", style: "cancel" },
+      {
+        text: "Hoàn thành",
+        onPress: async () => {
+          setProcessingBookingId(bookingId);
+          try {
+            const res = await serviceControllerService.providerComplete(bookingId);
+            if (res.data?.code === 0) {
+              Alert.alert("Thành công", "Đã hoàn thành dịch vụ.");
+              fetchBookings();
+            } else {
+              Alert.alert("Lỗi", res.data?.message || "Không thể hoàn thành đơn.");
+            }
+          } catch (e: any) {
+            Alert.alert(
+              "Lỗi",
+              e?.response?.data?.message || "Không thể hoàn thành đơn lúc này.",
+            );
+          } finally {
+            setProcessingBookingId(null);
+          }
+        },
+      },
+    ]);
   };
 
   const handleConfirmBooking = (bookingId: number) => {
@@ -157,9 +182,12 @@ export default function BookingHistoryScreen() {
       case "CANCELLED":
         return "#FF4D4D";
       case "IN_PROGRESS":
+      case "IN_SERVICE":
         return "#FF9900";
       case "CONFIRMED":
         return "#4A90D9";
+      case "WAITING_SERVICE_DATE":
+        return "#F59E0B";
       default:
         return "#B59DFF";
     }
@@ -173,8 +201,12 @@ export default function BookingHistoryScreen() {
         return "Đã thanh toán";
       case "CONFIRMED":
         return "Đã xác nhận";
+      case "WAITING_SERVICE_DATE":
+        return "Chờ đến ngày dịch vụ";
       case "IN_PROGRESS":
         return "Đang thực hiện";
+      case "IN_SERVICE":
+        return "Đang phục vụ";
       case "COMPLETED":
         return "Hoàn thành";
       case "CANCELLED":
@@ -239,10 +271,6 @@ export default function BookingHistoryScreen() {
           }
           renderItem={({ item }) => (
             <View style={styles.card}>
-              {(() => {
-                const serviceImageUrl = resolveImageUrl(item.service?.imageUrls?.[0]);
-                return (
-                  <>
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.bookingId}>Đơn #{item.id}</Text>
@@ -269,32 +297,17 @@ export default function BookingHistoryScreen() {
                 </View>
               </View>
 
-              <View style={styles.serviceRow}>
-                {serviceImageUrl ? (
-                  <Image
-                    source={{ uri: serviceImageUrl }}
-                    style={styles.serviceImage}
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.serviceImage,
-                      styles.serviceImagePlaceholder,
-                    ]}
-                  >
-                    <Ionicons name="camera-outline" size={24} color="#B59DFF" />
-                  </View>
-                )}
-                <View style={styles.serviceInfo}>
-                  <Text style={styles.serviceName} numberOfLines={2}>
-                    {item.service?.serviceName || "Dịch vụ"}
-                  </Text>
-                  <Text style={styles.serviceType}>
-                    {item.service?.serviceType === "PHOTOGRAPHER"
-                      ? "📸 Thợ ảnh"
-                      : "🎪 Staff sự kiện"}
-                  </Text>
-                </View>
+              <View style={styles.serviceSummary}>
+                <Text style={styles.serviceName} numberOfLines={2}>
+                  {item.service?.serviceName || "Dịch vụ"}
+                </Text>
+                <Text style={styles.serviceType}>
+                  {item.service?.serviceType === "PHOTOGRAPHER"
+                    ? "📸 Thợ ảnh"
+                    : item.service?.serviceType === "EVENT_STAFF"
+                      ? "🎪 Staff sự kiện"
+                      : item.service?.serviceType || ""}
+                </Text>
               </View>
 
               <View style={styles.priceRow}>
@@ -350,6 +363,22 @@ export default function BookingHistoryScreen() {
                     </TouchableOpacity>
                   </>
                 )}
+                {item.status === "IN_SERVICE" && (
+                  <TouchableOpacity
+                    style={[
+                      styles.btnComplete,
+                      processingBookingId === item.id && { opacity: 0.7 },
+                    ]}
+                    onPress={() => handleProviderComplete(item.id)}
+                    disabled={processingBookingId === item.id}
+                  >
+                    {processingBookingId === item.id ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.btnCompleteText}>Hoàn thành</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={styles.btnOutline}
                   onPress={() =>
@@ -362,9 +391,6 @@ export default function BookingHistoryScreen() {
                   <Text style={styles.btnOutlineText}>Chi tiết</Text>
                 </TouchableOpacity>
               </View>
-                  </>
-                );
-              })()}
             </View>
           )}
           ListEmptyComponent={
@@ -429,14 +455,7 @@ const styles = StyleSheet.create({
   bookingDate: { fontSize: 12, color: "#888", marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 12, fontWeight: "bold" },
-  serviceRow: { flexDirection: "row", marginBottom: 12 },
-  serviceImage: { width: 70, height: 70, borderRadius: 10, marginRight: 12 },
-  serviceImagePlaceholder: {
-    backgroundColor: "#F4F1FF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  serviceInfo: { flex: 1, justifyContent: "center" },
+  serviceSummary: { marginBottom: 12 },
   serviceName: {
     fontSize: 15,
     fontWeight: "600",
@@ -476,6 +495,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#B59DFF",
   },
   btnPrimaryText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
+  btnComplete: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    backgroundColor: "#28A745",
+  },
+  btnCompleteText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
   emptyContainer: {
     alignItems: "center",
     marginTop: 80,
