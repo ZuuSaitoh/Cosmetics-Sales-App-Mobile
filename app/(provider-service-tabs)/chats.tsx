@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import { SafeAreaView } from "react-native-safe-area-context";
 import React, {
   useCallback,
   useEffect,
@@ -23,6 +22,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export interface UserListItem {
   id: number;
