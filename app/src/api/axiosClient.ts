@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios, { InternalAxiosRequestConfig } from "axios";
 
-export const API_BASE_URL = "http://10.88.54.25:8080/api"; // export const API_BASE_URL = "http://
-export const WS_BASE_URL = "ws://10.88.54.25:8080/ws-mobile";
+export const API_BASE_URL = "https://api.cosmate.site/api";
+export const WS_BASE_URL = "wss://api.cosmate.site/ws-mobile";
 
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,

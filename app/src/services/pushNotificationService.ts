@@ -25,6 +25,10 @@ function getExpoProjectId() {
 }
 
 export async function registerForPushNotificationsAsync() {
+  if (Platform.OS === "web") {
+    return { token: null, error: null };
+  }
+
   if (!Device.isDevice) {
     return { token: null, error: "Push notification requires a physical device." };
   }
@@ -50,14 +54,19 @@ export async function registerForPushNotificationsAsync() {
     return { token: null, error: "Notification permission not granted." };
   }
 
-  const projectId = getExpoProjectId();
-  const pushTokenResponse = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined,
-  );
-  const token = pushTokenResponse.data;
+  try {
+    const projectId = getExpoProjectId();
+    const pushTokenResponse = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
+    const token = pushTokenResponse.data;
 
-  await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
-  return { token, error: null };
+    await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+    return { token, error: null };
+  } catch (error) {
+    console.error("Failed to get Expo push token:", error);
+    return { token: null, error: "Failed to register push notifications." };
+  }
 }
 
 export async function getStoredPushToken() {

@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -34,13 +35,95 @@ interface Provider {
   totalReviews: number;
 }
 
+type CostumeRow = {
+  id: number;
+  name?: string;
+  pricePerDay?: number;
+  status?: string;
+  size?: string;
+  city?: string;
+  district?: string;
+  province?: string;
+  address?: string;
+  location?: string;
+  pickupAddress?: string;
+  imageUrls?: string[];
+  provider?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+type PriceFilterKey = "all" | "lt200k" | "200k-500k" | "500k-1m" | "gt1m";
+type StatusFilterKey = "all" | "available" | "rented";
+
+const PRICE_FILTER_OPTIONS: { key: PriceFilterKey; label: string }[] = [
+  { key: "all", label: "Tất cả" },
+  { key: "lt200k", label: "< 200k" },
+  { key: "200k-500k", label: "200k–500k" },
+  { key: "500k-1m", label: "500k–1tr" },
+  { key: "gt1m", label: "> 1tr" },
+];
+
+function isCostumeAvailable(item: CostumeRow) {
+  return item.status !== "RENTED";
+}
+
+function costumeMatchesPrice(item: CostumeRow, key: PriceFilterKey) {
+  const p = Number(item.pricePerDay) || 0;
+  switch (key) {
+    case "all":
+      return true;
+    case "lt200k":
+      return p < 200_000;
+    case "200k-500k":
+      return p >= 200_000 && p < 500_000;
+    case "500k-1m":
+      return p >= 500_000 && p < 1_000_000;
+    case "gt1m":
+      return p >= 1_000_000;
+    default:
+      return true;
+  }
+}
+
+function costumeLocationText(item: CostumeRow) {
+  const prov = item.provider;
+  const fromProvider: string[] = [];
+  if (prov && typeof prov === "object") {
+    const p = prov as Record<string, unknown>;
+    for (const k of ["city", "district", "province", "address", "shopAddress", "location"] as const) {
+      const v = p[k];
+      if (typeof v === "string" && v.trim()) fromProvider.push(v);
+    }
+  }
+  const parts = [
+    ...fromProvider,
+    item.city,
+    item.district,
+    item.province,
+    item.address,
+    item.location,
+    item.pickupAddress,
+  ].filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+  return parts.join(" ").toLowerCase();
+}
+
+function normalizeSizeLabel(size: string | undefined) {
+  const s = (size ?? "").trim();
+  return s.length ? s : "Freesize";
+}
+
 export default function UserHomeScreen() {
-  const [costumes, setCostumes] = useState<any[]>([]);
+  const [costumeCatalog, setCostumeCatalog] = useState<CostumeRow[]>([]);
   const [photographers, setPhotographers] = useState<Provider[]>([]);
   const [staffs, setStaffs] = useState<Provider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [priceFilter, setPriceFilter] = useState<PriceFilterKey>("all");
+  const [sizeFilter, setSizeFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilterKey>("all");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [costumeFiltersVisible, setCostumeFiltersVisible] = useState(false);
 
   const fetchDataSilentlyRef = useRef<() => void>(() => {});
 
@@ -52,30 +135,40 @@ export default function UserHomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchData();
+    await fetchData(false);
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (showFullScreenLoading = false) => {
     try {
-      setIsLoading(true);
+      if (showFullScreenLoading) {
+        setIsLoading(true);
+      }
       const [costumeRes, photoRes, staffRes] = await Promise.all([
         costumeService.getAll(),
         providerService.getByRole("PROVIDER_PHOTOGRAPH"),
         providerService.getByRole("PROVIDER_EVENT_STAFF"),
       ]);
 
-      if (costumeRes.data.code === 0) setCostumes(costumeRes.data.result || []);
+      if (costumeRes.data.code === 0) {
+        setCostumeCatalog((costumeRes.data.result || []) as CostumeRow[]);
+      }
       if (photoRes.data.code === 0) setPhotographers(photoRes.data.result || []);
       if (staffRes.data.code === 0) setStaffs(staffRes.data.result || []);
     } catch (error) {
       console.error("Lỗi tải dữ liệu Home:", error);
     } finally {
-      setIsLoading(false);
+      if (showFullScreenLoading) {
+        setIsLoading(false);
+      }
       setRefreshing(false);
     }
   };
 
   fetchDataSilentlyRef.current = fetchData;
+
+  useEffect(() => {
+    fetchData(true);
+  }, []);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -85,7 +178,9 @@ export default function UserHomeScreen() {
     try {
       setIsLoading(true);
       const response = await costumeService.search({ keyword: searchQuery });
-      if (response.data.code === 0) setCostumes(response.data.result || []);
+      if (response.data.code === 0) {
+        setCostumeCatalog((response.data.result || []) as CostumeRow[]);
+      }
     } catch (error) {
       console.error("Lỗi tìm kiếm:", error);
     } finally {
@@ -96,6 +191,45 @@ export default function UserHomeScreen() {
   const handleCameraSearch = () => {
     router.push("/ai/image-search" as any);
   };
+
+  const resetCostumeFilters = useCallback(() => {
+    setPriceFilter("all");
+    setSizeFilter(null);
+    setStatusFilter("all");
+    setLocationQuery("");
+  }, []);
+
+  const sizeOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of costumeCatalog) {
+      set.add(normalizeSizeLabel(typeof c.size === "string" ? c.size : undefined));
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [costumeCatalog]);
+
+  const filteredCostumes = useMemo(() => {
+    const q = locationQuery.trim().toLowerCase();
+    return costumeCatalog.filter((item) => {
+      if (!costumeMatchesPrice(item, priceFilter)) return false;
+      if (sizeFilter != null) {
+        const itemSize = normalizeSizeLabel(typeof item.size === "string" ? item.size : undefined);
+        if (itemSize.toLowerCase() !== sizeFilter.toLowerCase()) return false;
+      }
+      if (statusFilter === "available" && !isCostumeAvailable(item)) return false;
+      if (statusFilter === "rented" && isCostumeAvailable(item)) return false;
+      if (q.length > 0 && !costumeLocationText(item).includes(q)) return false;
+      return true;
+    });
+  }, [costumeCatalog, priceFilter, sizeFilter, statusFilter, locationQuery]);
+
+  const hasActiveCostumeFilters = useMemo(() => {
+    return (
+      priceFilter !== "all" ||
+      sizeFilter != null ||
+      statusFilter !== "all" ||
+      locationQuery.trim().length > 0
+    );
+  }, [priceFilter, sizeFilter, statusFilter, locationQuery]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -137,7 +271,7 @@ export default function UserHomeScreen() {
   );
 
   // UI cho từng trang phục
-  const renderCostumeItem = ({ item }: { item: any }) => {
+  const renderCostumeItem = ({ item }: { item: CostumeRow }) => {
     const coverImage = item.imageUrls?.[0] || "https://via.placeholder.com/200";
     const isAvailable = item.status !== "RENTED";
 
@@ -181,20 +315,126 @@ export default function UserHomeScreen() {
       </View>
 
       <View style={styles.header}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm kiếm trang phục, nháy, staff..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-          />
-          <TouchableOpacity onPress={handleCameraSearch} style={styles.cameraButton} hitSlop={8}>
+        <View style={styles.searchRow}>
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Tìm kiếm trang phục, nháy, staff..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+            />
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.searchSideButton,
+              costumeFiltersVisible && styles.searchSideButtonActive,
+            ]}
+            onPress={() => setCostumeFiltersVisible((v) => !v)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Mở bộ lọc trang phục"
+          >
+            <Ionicons
+              name="options-outline"
+              size={22}
+              color={costumeFiltersVisible || hasActiveCostumeFilters ? "#B59DFF" : "#666"}
+            />
+            {hasActiveCostumeFilters ? <View style={styles.filterActiveDot} /> : null}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleCameraSearch} style={styles.searchSideButton} hitSlop={8}>
             <Ionicons name="camera" size={20} color="#B59DFF" />
           </TouchableOpacity>
         </View>
+
+        {costumeFiltersVisible ? (
+        <View style={styles.filterSection}>
+          <View style={styles.filterSectionTitleRow}>
+            <Text style={styles.filterSectionTitle}>Lọc trang phục</Text>
+            <TouchableOpacity onPress={resetCostumeFilters} hitSlop={10}>
+              <Text style={styles.filterResetText}>Đặt lại</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.filterLabel}>Giá / ngày</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterChipsRow}
+          >
+            {PRICE_FILTER_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.filterChip, priceFilter === opt.key && styles.filterChipActive]}
+                onPress={() => setPriceFilter(opt.key)}
+              >
+                <Text style={[styles.filterChipText, priceFilter === opt.key && styles.filterChipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.filterLabel}>Size</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterChipsRow}
+          >
+            <TouchableOpacity
+              style={[styles.filterChip, sizeFilter === null && styles.filterChipActive]}
+              onPress={() => setSizeFilter(null)}
+            >
+              <Text style={[styles.filterChipText, sizeFilter === null && styles.filterChipTextActive]}>Tất cả</Text>
+            </TouchableOpacity>
+            {sizeOptions.map((sz) => (
+              <TouchableOpacity
+                key={sz}
+                style={[styles.filterChip, sizeFilter === sz && styles.filterChipActive]}
+                onPress={() => setSizeFilter(sz)}
+              >
+                <Text style={[styles.filterChipText, sizeFilter === sz && styles.filterChipTextActive]}>{sz}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.filterLabel}>Tình trạng</Text>
+          <View style={styles.filterChipsRowStatic}>
+            {(
+              [
+                { key: "all" as const, label: "Tất cả" },
+                { key: "available" as const, label: "Sẵn sàng" },
+                { key: "rented" as const, label: "Đang thuê" },
+              ] as const
+            ).map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.filterChip, statusFilter === opt.key && styles.filterChipActive]}
+                onPress={() => setStatusFilter(opt.key)}
+              >
+                <Text style={[styles.filterChipText, statusFilter === opt.key && styles.filterChipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.filterLabel}>Vị trí</Text>
+          <View style={styles.locationInputWrap}>
+            <Ionicons name="location-outline" size={18} color="#888" style={styles.locationIcon} />
+            <TextInput
+              style={styles.locationInput}
+              placeholder="Tỉnh/thành, quận, địa chỉ..."
+              placeholderTextColor="#aaa"
+              value={locationQuery}
+              onChangeText={setLocationQuery}
+              returnKeyType="done"
+            />
+          </View>
+        </View>
+        ) : null}
       </View>
 
       <View style={styles.sectionHeader}>
@@ -242,7 +482,7 @@ export default function UserHomeScreen() {
       ) : (
         <FlatList
           ListHeaderComponent={ListHeader}
-          data={costumes}
+          data={filteredCostumes}
           keyExtractor={(item) => "costume-" + item.id}
           renderItem={renderCostumeItem}
           numColumns={2}
@@ -282,18 +522,92 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F4F5F7",
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    paddingRight: 6,
+    paddingRight: 10,
+    minWidth: 0,
   },
   searchIcon: { paddingHorizontal: 10 },
   searchInput: { flex: 1, height: 40, fontSize: 14 },
-  cameraButton: { width: 36, height: 36, justifyContent: "center", alignItems: "center" },
+  searchSideButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F4F5F7",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  searchSideButtonActive: {
+    backgroundColor: "#EDE8FF",
+    borderColor: "#B59DFF",
+  },
+  filterActiveDot: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#B59DFF",
+    borderWidth: 1,
+    borderColor: "#fff",
+  },
+  filterSection: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  filterSectionTitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  filterSectionTitle: { fontSize: 14, fontWeight: "700", color: "#4A3B6B" },
+  filterResetText: { fontSize: 13, color: "#B59DFF", fontWeight: "600" },
+  filterLabel: { fontSize: 12, color: "#888", marginBottom: 8, marginTop: 4 },
+  filterChipsRow: { flexDirection: "row", alignItems: "center", paddingBottom: 4, gap: 8 },
+  filterChipsRowStatic: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 4 },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F4F5F7",
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
+  },
+  filterChipActive: {
+    backgroundColor: "#EDE8FF",
+    borderColor: "#B59DFF",
+  },
+  filterChipText: { fontSize: 13, color: "#555", fontWeight: "500" },
+  filterChipTextActive: { color: "#4A3B6B", fontWeight: "700" },
+  locationInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4F5F7",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    paddingHorizontal: 10,
+    marginBottom: 4,
+  },
+  locationIcon: { marginRight: 4 },
+  locationInput: { flex: 1, height: 40, fontSize: 14, color: "#333" },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
