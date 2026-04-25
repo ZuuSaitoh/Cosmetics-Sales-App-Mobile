@@ -18,6 +18,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AiFeaturesFab } from "@/components/AiFeaturesFab";
 import { costumeService } from "@/src/services/costumeService";
 import { providerService } from "@/src/services/providerService";
 import { userService } from "@/src/services/userService";
@@ -338,7 +339,7 @@ export default function UserHomeScreen() {
     <View>
       <View style={styles.homeHeader}>
         <Text style={styles.brandText}>CosMate</Text>
-        <TouchableOpacity onPress={() => router.push("/profile" as any)} style={styles.avatarButton}>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/profile" as any)} style={styles.avatarButton}>
           {headerAvatarUri ? (
             <Image
               source={{ uri: headerAvatarUri }}
@@ -514,28 +515,32 @@ export default function UserHomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {isLoading && !refreshing ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#B59DFF" />
-        </View>
-      ) : (
-        <FlatList
-          ListHeaderComponent={ListHeader}
-          data={filteredCostumes}
-          keyExtractor={(item) => "costume-" + item.id}
-          renderItem={renderCostumeItem}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#B59DFF"]} />}
-        />
-      )}
+      <View style={styles.homeContentWrap}>
+        {isLoading && !refreshing ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="#B59DFF" />
+          </View>
+        ) : (
+          <FlatList
+            ListHeaderComponent={ListHeader}
+            data={filteredCostumes}
+            keyExtractor={(item) => "costume-" + item.id}
+            renderItem={renderCostumeItem}
+            numColumns={2}
+            columnWrapperStyle={styles.row}
+            contentContainerStyle={styles.listContainer}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#B59DFF"]} />}
+          />
+        )}
+        <AiFeaturesFab />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FB" },
+  homeContentWrap: { flex: 1 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   homeHeader: {
     flexDirection: "row",

@@ -83,14 +83,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="pose-battle"
         options={{
+          href: null,
           title: "Pose Battle",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "body" : "body-outline"}
-              size={24}
-              color={color}
-            />
-          ),
         }}
       />
 
@@ -114,6 +108,20 @@ export default function TabsLayout() {
           title: "Tin nhắn",
           tabBarIcon: ({ color, focused }) => (
             <ChatTabIcon color={color} focused={focused} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Hồ sơ",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
