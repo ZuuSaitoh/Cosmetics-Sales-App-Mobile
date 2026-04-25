@@ -379,72 +379,80 @@ export default function ChatInboxScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.avatarStripScroll}
         contentContainerStyle={styles.avatarRow}
       >
         {rooms.slice(0, 10).map(renderRoomAvatar)}
       </ScrollView>
 
-      <View style={styles.filterRow}>
-        <Pressable
-          style={[
-            styles.filterBadge,
-            filter === "all" && styles.filterBadgeActive,
-          ]}
-          onPress={() => setFilter("all")}
-        >
-          <Text
+      <View style={styles.chatListSection}>
+        <View style={styles.filterRow}>
+          <Pressable
             style={[
-              styles.filterText,
-              filter === "all" && styles.filterTextActive,
+              styles.filterBadge,
+              filter === "all" && styles.filterBadgeActive,
             ]}
+            onPress={() => setFilter("all")}
           >
-            Tất cả
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.filterBadge,
-            filter === "unread" && styles.filterBadgeActive,
-          ]}
-          onPress={() => setFilter("unread")}
-        >
-          <Text
+            <Text
+              style={[
+                styles.filterText,
+                filter === "all" && styles.filterTextActive,
+              ]}
+            >
+              Tất cả
+            </Text>
+          </Pressable>
+          <Pressable
             style={[
-              styles.filterText,
-              filter === "unread" && styles.filterTextActive,
+              styles.filterBadge,
+              filter === "unread" && styles.filterBadgeActive,
             ]}
+            onPress={() => setFilter("unread")}
           >
-            Chưa đọc
-          </Text>
-        </Pressable>
-      </View>
+            <Text
+              style={[
+                styles.filterText,
+                filter === "unread" && styles.filterTextActive,
+              ]}
+            >
+              Chưa đọc
+            </Text>
+          </Pressable>
+        </View>
 
-      {loadingRooms ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#B59DFF" />
-        </View>
-      ) : error ? (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredRooms}
-          keyExtractor={(item) => String(item.roomId)}
-          renderItem={renderRoomItem}
-          contentContainerStyle={
-            filteredRooms.length === 0 ? styles.emptyList : styles.roomList
-          }
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            loadRooms();
-          }}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>Chưa có cuộc trò chuyện nào.</Text>
-          }
-        />
-      )}
+        {loadingRooms ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#B59DFF" />
+          </View>
+        ) : error ? (
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : (
+          <FlatList
+            style={styles.roomFlatList}
+            data={filteredRooms}
+            keyExtractor={(item) => String(item.roomId)}
+            renderItem={renderRoomItem}
+            contentContainerStyle={
+              filteredRooms.length === 0 ? styles.emptyList : styles.roomList
+            }
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadRooms();
+            }}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                {rooms.length === 0
+                  ? "Chưa có cuộc trò chuyện nào."
+                  : "Không có tin nhắn chưa đọc."}
+              </Text>
+            }
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -511,7 +519,17 @@ const styles = StyleSheet.create({
   resultContent: { flex: 1 },
   resultName: { color: "#2E2446", fontWeight: "700" },
   resultHint: { marginTop: 2, color: "#7A6B98", fontSize: 12 },
-  avatarRow: { paddingHorizontal: 16, gap: 10, paddingBottom: 10 },
+  /** Tránh ScrollView ngang chiếm flex dọc → khoảng trắng giữa avatar và filter. */
+  avatarStripScroll: { flexGrow: 0, flexShrink: 0 },
+  avatarRow: {
+    paddingHorizontal: 16,
+    gap: 10,
+    paddingBottom: 10,
+    alignItems: "flex-start",
+  },
+  /** Toàn bộ filter + danh sách room chiếm phần còn lại; list bám từ trên xuống. */
+  chatListSection: { flex: 1, minHeight: 0 },
+  roomFlatList: { flex: 1 },
   avatarItem: { width: 68, alignItems: "center" },
   avatar: {
     width: 54,
@@ -537,6 +555,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingHorizontal: 16,
+    paddingTop: 4,
     paddingBottom: 10,
   },
   filterBadge: {
@@ -550,12 +569,19 @@ const styles = StyleSheet.create({
   filterBadgeActive: { backgroundColor: "#B59DFF" },
   filterText: { color: "#7A6B98", fontWeight: "700" },
   filterTextActive: { color: "#FFFFFF" },
-  roomList: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
+  roomList: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 24,
+    gap: 10,
+    flexGrow: 0,
+  },
   emptyList: {
-    flexGrow: 1,
-    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
     alignItems: "center",
-    padding: 24,
+    flexGrow: 0,
   },
   roomItem: {
     flexDirection: "row",
