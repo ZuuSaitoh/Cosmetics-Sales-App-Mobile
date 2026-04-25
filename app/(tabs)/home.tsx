@@ -1,5 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 import React, { useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect } from "react";
@@ -18,6 +20,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { costumeService } from "@/src/services/costumeService";
 import { providerService } from "@/src/services/providerService";
+import { userService } from "@/src/services/userService";
 
 interface Provider {
   id: number;
@@ -124,19 +127,48 @@ export default function UserHomeScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>("all");
   const [locationQuery, setLocationQuery] = useState("");
   const [costumeFiltersVisible, setCostumeFiltersVisible] = useState(false);
+  const [headerAvatarUri, setHeaderAvatarUri] = useState<string | null>(null);
 
   const fetchDataSilentlyRef = useRef<() => void>(() => {});
+
+  const loadHeaderAvatar = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (!token) {
+        setHeaderAvatarUri(null);
+        return;
+      }
+      const decoded: { sub?: string | number } = jwtDecode(token);
+      const rawId = decoded.sub;
+      const userId = typeof rawId === "number" ? rawId : Number(rawId);
+      if (!Number.isFinite(userId)) {
+        setHeaderAvatarUri(null);
+        return;
+      }
+      const profileRes = await userService.getProfile(userId);
+      if (profileRes.data?.code === 0 && profileRes.data.result?.avatarUrl) {
+        const uri = String(profileRes.data.result.avatarUrl).trim();
+        setHeaderAvatarUri(uri.length > 0 ? uri : null);
+      } else {
+        setHeaderAvatarUri(null);
+      }
+    } catch (e) {
+      console.warn("Home: không tải avatar", e);
+      setHeaderAvatarUri(null);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       fetchDataSilentlyRef.current();
-    }, [])
+      void loadHeaderAvatar();
+    }, [loadHeaderAvatar])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchData(false);
-  }, []);
+    await Promise.all([fetchData(false), loadHeaderAvatar()]);
+  }, [loadHeaderAvatar]);
 
   const fetchData = async (showFullScreenLoading = false) => {
     try {
@@ -307,10 +339,17 @@ export default function UserHomeScreen() {
       <View style={styles.homeHeader}>
         <Text style={styles.brandText}>CosMate</Text>
         <TouchableOpacity onPress={() => router.push("/profile" as any)} style={styles.avatarButton}>
-          <Image
-            source={{ uri: "https://via.placeholder.com/72x72.png?text=U" }}
-            style={styles.avatar}
-          />
+          {headerAvatarUri ? (
+            <Image
+              source={{ uri: headerAvatarUri }}
+              style={styles.avatar}
+              onError={() => setHeaderAvatarUri(null)}
+            />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Ionicons name="person" size={20} color="#9A8BB8" />
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -516,6 +555,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#F4F5F7",
   },
   avatar: { width: 36, height: 36, borderRadius: 18 },
+  avatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#EDE8FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   header: {
     backgroundColor: "#fff",
     padding: 15,
