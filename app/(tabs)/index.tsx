@@ -78,7 +78,7 @@ export default function OrdersScreen() {
 
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
   const [confirmOrderId, setConfirmOrderId] = useState<number | null>(null);
-  const [confirmImage, setConfirmImage] = useState<any>(null);
+  const [confirmImages, setConfirmImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(
     null,
@@ -452,11 +452,17 @@ export default function OrdersScreen() {
 
   const openConfirmModal = (orderId: number) => {
     setConfirmOrderId(orderId);
-    setConfirmImage(null);
+    setConfirmImages([]);
     setIsConfirmModalVisible(true);
   };
 
   const pickImage = async () => {
+    const remainSlots = 5 - confirmImages.length;
+    if (remainSlots <= 0) {
+      Alert.alert("Đã đủ ảnh", "Bạn chỉ có thể chụp tối đa 5 ảnh bằng chứng.");
+      return;
+    }
+
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (permissionResult.granted === false) {
       Alert.alert(
@@ -472,11 +478,20 @@ export default function OrdersScreen() {
       quality: 0.7,
     });
 
-    if (!result.canceled) setConfirmImage(result.assets[0]);
+    if (!result.canceled) {
+      setConfirmImages((prev) => {
+        const merged = [...prev, ...result.assets];
+        return merged.slice(0, 5);
+      });
+    }
+  };
+
+  const removeConfirmImage = (index: number) => {
+    setConfirmImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const submitConfirmDelivery = async () => {
-    if (!confirmImage) {
+    if (confirmImages.length === 0) {
       Alert.alert(
         "Thông báo",
         "Vui lòng chụp ảnh tình trạng đồ để làm bằng chứng.",
@@ -486,17 +501,15 @@ export default function OrdersScreen() {
 
     setIsConfirmingDelivery(true);
     try {
-      const formData = new FormData();
-      const localUri = confirmImage.uri;
-      const filename = localUri.split("/").pop() || "image.jpg";
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : `image/jpeg`;
+      const files = confirmImages.map((img, idx) => {
+        const localUri = img.uri;
+        const filename = localUri.split("/").pop() || `image-${idx + 1}.jpg`;
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : "image/jpeg";
+        return { uri: localUri, name: filename, type };
+      });
 
-      formData.append("images", { uri: localUri, name: filename, type } as any);
-
-      const res = await orderService.confirmDelivery(confirmOrderId!, [
-        { uri: localUri, name: filename, type },
-      ]);
+      const res = await orderService.confirmDelivery(confirmOrderId!, files);
 
       if (res.data.code === 0) {
         Alert.alert("Thành công", "Đã xác nhận nhận hàng!");
@@ -825,21 +838,43 @@ export default function OrdersScreen() {
               bạn nhé!
             </Text>
 
-            <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
-              {confirmImage ? (
-                <Image
-                  source={{ uri: confirmImage.uri }}
-                  style={styles.previewImage}
-                />
+            <View style={styles.uploadSection}>
+              <View style={styles.uploadHeader}>
+                <Text style={styles.uploadTitle}>Ảnh bằng chứng</Text>
+                <Text style={styles.uploadHint}>{confirmImages.length}/5 ảnh</Text>
+              </View>
+
+              {confirmImages.length === 0 ? (
+                <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
+                  <View style={{ alignItems: "center" }}>
+                    <Ionicons name="camera-outline" size={40} color="#A090C5" />
+                    <Text style={{ marginTop: 8, color: "#8E7AB5" }}>
+                      Bấm để mở Camera
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               ) : (
-                <View style={{ alignItems: "center" }}>
-                  <Ionicons name="camera-outline" size={40} color="#A090C5" />
-                  <Text style={{ marginTop: 8, color: "#8E7AB5" }}>
-                    Bấm để mở Camera
-                  </Text>
+                <View style={styles.imageGrid}>
+                  {confirmImages.map((img, index) => (
+                    <View key={`${img.uri}-${index}`} style={styles.imageCell}>
+                      <Image source={{ uri: img.uri }} style={styles.previewImage} />
+                      <TouchableOpacity
+                        style={styles.removeImageBtn}
+                        onPress={() => removeConfirmImage(index)}
+                      >
+                        <Ionicons name="close" size={14} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {confirmImages.length < 5 ? (
+                    <TouchableOpacity style={styles.addMoreCell} onPress={pickImage}>
+                      <Ionicons name="add" size={24} color="#8E7AB5" />
+                      <Text style={styles.addMoreText}>Thêm ảnh</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               )}
-            </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               style={[
@@ -1023,6 +1058,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 18,
   },
+  uploadSection: { marginBottom: 20 },
+  uploadHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  uploadTitle: { fontSize: 14, fontWeight: "700", color: "#4A3B6B" },
+  uploadHint: { fontSize: 12, color: "#8E7AB5", fontWeight: "600" },
   uploadBox: {
     height: 160,
     borderWidth: 1,
@@ -1035,7 +1079,49 @@ const styles = StyleSheet.create({
     backgroundColor: "#FAF9FF",
     overflow: "hidden",
   },
+  imageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  imageCell: {
+    width: "31%",
+    aspectRatio: 1,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#EEE7FF",
+    position: "relative",
+  },
   previewImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  removeImageBtn: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addMoreCell: {
+    width: "31%",
+    aspectRatio: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "#CFC1F7",
+    backgroundColor: "#FAF9FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addMoreText: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "#8E7AB5",
+    fontWeight: "600",
+  },
   modalSubmitBtn: {
     backgroundColor: "#B59DFF",
     paddingVertical: 15,

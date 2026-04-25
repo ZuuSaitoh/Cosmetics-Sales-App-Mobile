@@ -1,12 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import { CameraView } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import React, { useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
-import { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,10 +23,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { costumeService } from "@/src/services/costumeService";
 import { orderService } from "@/src/services/orderService";
 import { providerService } from "@/src/services/providerService";
 import { userService } from "@/src/services/userService";
-import { costumeService } from "@/src/services/costumeService";
 
 const RENTAL_STATUSES = [
   { key: "ALL", label: "Tất cả" },
@@ -56,7 +55,7 @@ export default function OrderManagementScreen() {
   const [isShipModalVisible, setIsShipModalVisible] = useState(false);
   const [shipOrderId, setShipOrderId] = useState<number | null>(null);
   const [trackingCode, setTrackingCode] = useState("");
-  const [shipImage, setShipImage] = useState<any>(null);
+  const [shipImages, setShipImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [scannedCode, setScannedCode] = useState<string | null>(null);
 
@@ -245,7 +244,7 @@ export default function OrderManagementScreen() {
   const openShipModal = (orderId: number) => {
     setShipOrderId(orderId);
     setTrackingCode("");
-    setShipImage(null);
+    setShipImages([]);
     setIsShipModalVisible(true);
   };
 
@@ -272,14 +271,33 @@ export default function OrderManagementScreen() {
   };
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const remainSlots = 5 - shipImages.length;
+    if (remainSlots <= 0) {
+      Alert.alert("Đã đủ ảnh", "Bạn chỉ có thể tải tối đa 5 ảnh bằng chứng.");
+      return;
+    }
+
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Quyền truy cập", "Cần cấp quyền camera để chụp ảnh bằng chứng.");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
       quality: 0.8,
     });
     if (!result.canceled) {
-      setShipImage(result.assets[0]);
+      setShipImages((prev) => {
+        const merged = [...prev, ...result.assets];
+        return merged.slice(0, 5);
+      });
     }
+  };
+
+  const removeShipImage = (index: number) => {
+    setShipImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const submitShipOrder = async () => {
@@ -290,20 +308,18 @@ export default function OrderManagementScreen() {
     try {
       const formData = new FormData();
 
-      if (shipImage) {
+      shipImages.forEach((img, idx) => {
         const localUri =
-          Platform.OS === "ios"
-            ? shipImage.uri.replace("file://", "")
-            : shipImage.uri;
-        const filename = localUri.split("/").pop() || "image.jpg";
+          Platform.OS === "ios" ? img.uri.replace("file://", "") : img.uri;
+        const filename = localUri.split("/").pop() || `image-${idx + 1}.jpg`;
         const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : `image/jpeg`;
+        const type = match ? `image/${match[1]}` : "image/jpeg";
         formData.append("images", {
           uri: localUri,
           name: filename,
           type,
         } as any);
-      }
+      });
 
       const res = await orderService.shipOrder(Number(shipOrderId), formData, {
         trackingCode: trackingCode,
@@ -607,19 +623,39 @@ export default function OrderManagementScreen() {
                 <Ionicons name="qr-code-outline" size={20} color="#B59DFF" />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
-              {shipImage ? (
-                <Image
-                  source={{ uri: shipImage.uri }}
-                  style={styles.previewImage}
-                />
-              ) : (
-                <>
+            <View style={styles.uploadSection}>
+              <View style={styles.uploadHeader}>
+                <Text style={styles.uploadTitle}>Ảnh bằng chứng</Text>
+                <Text style={styles.uploadHint}>{shipImages.length}/5 ảnh</Text>
+              </View>
+
+              {shipImages.length === 0 ? (
+                <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
                   <Ionicons name="camera-outline" size={30} color="#A090C5" />
-                  <Text style={styles.uploadText}>Tải ảnh bằng chứng</Text>
-                </>
+                  <Text style={styles.uploadText}>Chụp ảnh bằng chứng (tối đa 5)</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.imageGrid}>
+                  {shipImages.map((img, index) => (
+                    <View key={`${img.uri}-${index}`} style={styles.imageCell}>
+                      <Image source={{ uri: img.uri }} style={styles.previewImage} />
+                      <TouchableOpacity
+                        style={styles.removeImageBtn}
+                        onPress={() => removeShipImage(index)}
+                      >
+                        <Ionicons name="close" size={14} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {shipImages.length < 5 ? (
+                    <TouchableOpacity style={styles.addMoreCell} onPress={pickImage}>
+                      <Ionicons name="add" size={24} color="#8E7AB5" />
+                      <Text style={styles.addMoreText}>Thêm ảnh</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               )}
-            </TouchableOpacity>
+            </View>
             <TouchableOpacity
               style={styles.modalSubmitBtn}
               onPress={submitShipOrder}
@@ -821,6 +857,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
+  uploadSection: { marginBottom: 20 },
+  uploadHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  uploadTitle: { fontSize: 14, fontWeight: "700", color: "#4A3B6B" },
+  uploadHint: { fontSize: 12, color: "#8E7AB5", fontWeight: "600" },
   uploadBox: {
     height: 120,
     borderWidth: 1,
@@ -834,7 +879,49 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   uploadText: { marginTop: 8, color: "#8E7AB5", fontSize: 14 },
+  imageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  imageCell: {
+    width: "31%",
+    aspectRatio: 1,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#EEE7FF",
+    position: "relative",
+  },
   previewImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  removeImageBtn: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addMoreCell: {
+    width: "31%",
+    aspectRatio: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "#CFC1F7",
+    backgroundColor: "#FAF9FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addMoreText: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "#8E7AB5",
+    fontWeight: "600",
+  },
   modalSubmitBtn: {
     backgroundColor: "#B59DFF",
     paddingVertical: 15,

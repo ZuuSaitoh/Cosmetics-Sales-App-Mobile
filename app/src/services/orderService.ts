@@ -64,16 +64,21 @@ export const orderService = {
   confirmPayment: (orderId: number) =>
     axiosClient.post(`/orders/${orderId}/confirm-payment`),
 
-  returnItem: (orderId: number, trackingCode: string, imageUri: string) => {
+  returnItem: (
+    orderId: number,
+    trackingCode: string,
+    imageInput: string | string[],
+  ) => {
     const formData = new FormData();
+    const imageUris = Array.isArray(imageInput) ? imageInput : [imageInput];
 
-    // Xử lý file ảnh từ URI
-    const filename = imageUri.split("/").pop() || "return-image.jpg";
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : "image/jpeg";
-
-    // Append đúng tên 'images' như Swagger yêu cầu
-    formData.append("images", { uri: imageUri, name: filename, type } as any);
+    imageUris.forEach((imageUri, idx) => {
+      const filename =
+        imageUri.split("/").pop() || `return-image-${idx + 1}.jpg`;
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : "image/jpeg";
+      formData.append("images", { uri: imageUri, name: filename, type } as any);
+    });
 
     return axiosClient.post(`/orders/${orderId}/return`, formData, {
       params: {

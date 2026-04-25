@@ -22,12 +22,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ReturnCameraScreen() {
   const { id } = useLocalSearchParams();
-  const [returnImage, setReturnImage] = useState<any>(null);
+  const [returnImages, setReturnImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [trackingCode, setTrackingCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
 
   const takePicture = async () => {
+    const remainSlots = 5 - returnImages.length;
+    if (remainSlots <= 0) {
+      Alert.alert("Đã đủ ảnh", "Bạn chỉ có thể chụp tối đa 5 ảnh bằng chứng.");
+      return;
+    }
+
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (permissionResult.granted === false) {
       Alert.alert(
@@ -44,12 +50,19 @@ export default function ReturnCameraScreen() {
     });
 
     if (!result.canceled) {
-      setReturnImage(result.assets[0]);
+      setReturnImages((prev) => {
+        const merged = [...prev, ...result.assets];
+        return merged.slice(0, 5);
+      });
     }
   };
 
+  const removeReturnImage = (index: number) => {
+    setReturnImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const submitReturn = async () => {
-    if (!returnImage) {
+    if (returnImages.length === 0) {
       Alert.alert(
         "Thiếu thông tin",
         "Bạn phải chụp ảnh tình trạng đồ trước khi gửi trả để bảo vệ tiền cọc nhé!",
@@ -69,7 +82,7 @@ export default function ReturnCameraScreen() {
       const res = await orderService.returnItem(
         Number(id),
         trackingCode,
-        returnImage.uri,
+        returnImages.map((img) => img.uri),
       );
 
       if (res.data.code === 0) {
@@ -127,19 +140,41 @@ export default function ReturnCameraScreen() {
           </View>
 
           <Text style={styles.label}>Ảnh minh chứng (Bắt buộc)</Text>
-          <TouchableOpacity style={styles.imageBox} onPress={takePicture}>
-            {returnImage ? (
-              <Image
-                source={{ uri: returnImage.uri }}
-                style={styles.imagePreview}
-              />
+          <View style={styles.imageSection}>
+            <View style={styles.imageSectionHeader}>
+              <Text style={styles.imageCounterLabel}>Ảnh bằng chứng</Text>
+              <Text style={styles.imageCounterText}>{returnImages.length}/5 ảnh</Text>
+            </View>
+
+            {returnImages.length === 0 ? (
+              <TouchableOpacity style={styles.imageBox} onPress={takePicture}>
+                <>
+                  <Ionicons name="camera" size={40} color="#B59DFF" />
+                  <Text style={styles.imageBoxText}>Bấm để mở Camera</Text>
+                </>
+              </TouchableOpacity>
             ) : (
-              <>
-                <Ionicons name="camera" size={40} color="#B59DFF" />
-                <Text style={styles.imageBoxText}>Bấm để mở Camera</Text>
-              </>
+              <View style={styles.imageGrid}>
+                {returnImages.map((img, index) => (
+                  <View key={`${img.uri}-${index}`} style={styles.imageCell}>
+                    <Image source={{ uri: img.uri }} style={styles.imagePreview} />
+                    <TouchableOpacity
+                      style={styles.removeImageBtn}
+                      onPress={() => removeReturnImage(index)}
+                    >
+                      <Ionicons name="close" size={14} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {returnImages.length < 5 ? (
+                  <TouchableOpacity style={styles.addMoreCell} onPress={takePicture}>
+                    <Ionicons name="add" size={24} color="#8E7AB5" />
+                    <Text style={styles.addMoreText}>Thêm ảnh</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             )}
-          </TouchableOpacity>
+          </View>
 
           <Text style={styles.label}>Mã vận đơn hoàn trả (Bắt buộc)</Text>
           <View style={styles.inputContainer}>
@@ -228,6 +263,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   label: { fontSize: 15, fontWeight: "bold", color: "#333", marginBottom: 10 },
+  imageSection: { marginBottom: 25 },
+  imageSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  imageCounterLabel: { fontSize: 14, fontWeight: "700", color: "#4A3B6B" },
+  imageCounterText: { fontSize: 12, color: "#8E7AB5", fontWeight: "600" },
   imageBox: {
     height: 180,
     backgroundColor: "#F4F1FF",
@@ -240,7 +284,44 @@ const styles = StyleSheet.create({
     marginBottom: 25,
     overflow: "hidden",
   },
+  imageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  imageCell: {
+    width: "31%",
+    aspectRatio: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#EDE6FF",
+    position: "relative",
+  },
   imagePreview: { width: "100%", height: "100%", resizeMode: "cover" },
+  removeImageBtn: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addMoreCell: {
+    width: "31%",
+    aspectRatio: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "#D1C4E9",
+    backgroundColor: "#FAF9FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addMoreText: { marginTop: 4, color: "#8E7AB5", fontSize: 11, fontWeight: "600" },
   imageBoxText: { marginTop: 10, color: "#8E7AB5", fontWeight: "500" },
   inputContainer: {
     flexDirection: "row",
