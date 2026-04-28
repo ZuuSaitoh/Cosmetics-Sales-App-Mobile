@@ -83,6 +83,12 @@ type ProviderServiceItem = {
   serviceName: string;
 };
 
+type PendingImage = {
+  uri: string;
+  filename: string;
+  mimeType: string;
+};
+
 const normalizeId = (value: unknown) => (value === undefined || value === null ? "" : String(value));
 
 const parseNumber = (value: unknown) => {
@@ -151,6 +157,7 @@ export default function ChatRoomScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [isProviderUser, setIsProviderUser] = useState(false);
   const [hasServicePhotographerStaffRole, setHasServicePhotographerStaffRole] = useState(false);
@@ -465,46 +472,102 @@ export default function ChatRoomScreen() {
     client?.activate();
   };
 
+  const uploadChatImage = async (
+    image: PendingImage,
+    targetRoomId: number,
+    token: string,
+  ) => {
+    const formData = new FormData();
+    formData.append("roomId", String(targetRoomId));
+
+    if (Platform.OS === "web") {
+      const res = await fetch(image.uri);
+      const blob = await res.blob();
+      formData.append("file", blob, image.filename);
+    } else {
+      formData.append("file", {
+        uri: image.uri,
+        name: image.filename,
+        type: image.mimeType,
+      } as any);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/chat/upload-image`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token,
+        Accept: "application/json",
+      },
+      body: formData,
+    });
+    const data = await response.json();
+    const imageUrl = data?.result?.url || data?.result || data?.url;
+    if (!imageUrl || typeof imageUrl !== "string") {
+      throw new Error("Backend không trả về URL ảnh hợp lệ.");
+    }
+
+    return imageUrl;
+  };
+
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || roomKey === null) return;
+    if ((!text && pendingImages.length === 0) || roomKey === null) return;
+    if (sending || isUploadingImage) return;
+
+    const currentId = Number(currentUserId);
+    if (!currentUserId || !currentId) {
+      Alert.alert("Lỗi", "Không xác định được người gửi.");
+      return;
+    }
 
     setSending(true);
     try {
-      const payload: ChatMessageRequest = {
-        roomId: roomKey,
-        senderId: Number(currentUserId),
-        messageType: "TEXT",
-        content: text,
-      };
+      if (pendingImages.length > 0) {
+        const token = await AsyncStorage.getItem("cosmate_token");
+        if (!token) {
+          Alert.alert("Chưa đăng nhập", "Không có token để tải ảnh lên.");
+          return;
+        }
 
-      await chatService.sendMessage(payload);
-      setInput("");
+        setIsUploadingImage(true);
+        try {
+          for (const image of pendingImages) {
+            const imageUrl = await uploadChatImage(image, roomKey, token);
+            await chatService.sendMessage({
+              roomId: roomKey,
+              senderId: currentId,
+              messageType: "IMAGE",
+              content: imageUrl,
+            });
+          }
+          setPendingImages([]);
+        } finally {
+          setIsUploadingImage(false);
+        }
+      }
+
+      if (text) {
+        const payload: ChatMessageRequest = {
+          roomId: roomKey,
+          senderId: currentId,
+          messageType: "TEXT",
+          content: text,
+        };
+        await chatService.sendMessage(payload);
+        setInput("");
+      }
+
       await fetchChatHistory(roomKey);
     } catch (error) {
       console.warn("Lỗi gửi tin nhắn:", error);
-      Alert.alert("Lỗi", "Không thể gửi tin nhắn lúc này.");
+      Alert.alert("Lỗi", "Không thể gửi tin nhắn hoặc ảnh lúc này.");
     } finally {
       setSending(false);
     }
   };
 
-  const handlePickAndSendImage = async () => {
-    if (roomKey === null) return;
-    if (isUploadingImage) return;
-
-    const token = await AsyncStorage.getItem("cosmate_token");
-    if (!token) {
-      console.error("Missing token for image upload");
-      Alert.alert("Chưa đăng nhập", "Không có token để tải ảnh lên.");
-      return;
-    }
-
-    const currentId = Number(currentUserId);
-    if (!currentUserId || !currentId) {
-      console.error("Missing currentUserId for image upload");
-      return;
-    }
+  const handlePickImage = async () => {
+    if (sending || isUploadingImage) return;
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -515,64 +578,28 @@ export default function ChatRoomScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: false,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
       quality: 0.7,
     });
 
     if (result.canceled || !result.assets?.length) return;
 
-    const asset = result.assets[0];
-    const uri = asset.uri;
-    const filename = asset.fileName ?? `chat-${Date.now()}.jpg`;
-    const match = /\.([A-Za-z0-9]+)$/.exec(filename);
-    const ext = match?.[1]?.toLowerCase();
-    const mimeType = asset.mimeType ?? (ext === "png" ? "image/png" : "image/jpeg");
+    const newImages: PendingImage[] = result.assets.map((asset, index) => {
+      const uri = asset.uri;
+      const filename = asset.fileName ?? `chat-${Date.now()}-${index}.jpg`;
+      const match = /\.([A-Za-z0-9]+)$/.exec(filename);
+      const ext = match?.[1]?.toLowerCase();
+      const mimeType = asset.mimeType ?? (ext === "png" ? "image/png" : "image/jpeg");
 
-    setIsUploadingImage(true);
-    try {
-      const formData = new FormData();
-      formData.append("roomId", String(roomKey));
+      return { uri, filename, mimeType };
+    });
 
-      if (Platform.OS === "web") {
-        const res = await fetch(uri);
-        const blob = await res.blob();
-        formData.append("file", blob, filename);
-      } else {
-        formData.append("file", {
-          uri,
-          name: filename,
-          type: mimeType,
-        } as any);
-      }
-
-      const response = await fetch(`${API_BASE_URL}/chat/upload-image`, {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + token,
-          Accept: "application/json",
-        },
-        body: formData,
-      });
-      const data = await response.json();
-      const imageUrl = data?.result?.url || data?.result || data?.url;
-      if (!imageUrl || typeof imageUrl !== "string") {
-        console.warn("Upload image response missing url", data);
-        Alert.alert("Upload ảnh thất bại", "Backend không trả về URL ảnh hợp lệ.");
-        return;
-      }
-
-      await chatService.sendMessage({
-        roomId: roomKey,
-        senderId: currentId,
-        messageType: "IMAGE",
-        content: imageUrl,
-      });
-      await fetchChatHistory(roomKey);
-    } catch (error) {
-      console.warn("Upload image failed", error);
-      Alert.alert("Upload ảnh lỗi", "Không upload được ảnh. Hãy kiểm tra mạng và backend.");
-    } finally {
-      setIsUploadingImage(false);
-    }
+    setPendingImages((prev) => {
+      const uriSet = new Set(prev.map((item) => item.uri));
+      const uniqueNew = newImages.filter((item) => !uriSet.has(item.uri));
+      return [...prev, ...uniqueNew];
+    });
   };
 
   const handleCreateServiceOrder = async () => {
@@ -730,37 +757,68 @@ export default function ChatRoomScreen() {
         )}
 
         {loading ? null : (
-          <View style={styles.inputBar}>
-            <Pressable
-              style={[styles.mediaBtn, isUploadingImage && { opacity: 0.6 }]}
-              onPress={handlePickAndSendImage}
-              disabled={isUploadingImage || sending}
-            >
-              {isUploadingImage ? (
-                <ActivityIndicator size="small" color="#8E7AB5" />
-              ) : (
-                <Ionicons name="camera" size={20} color="#8E7AB5" />
-              )}
-            </Pressable>
-            <TextInput
-              style={styles.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder="Nhập tin nhắn..."
-              placeholderTextColor="#A090C5"
-              multiline
-            />
-            <Pressable
-              style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
-              onPress={handleSend}
-              disabled={!input.trim() || sending || isUploadingImage}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons name="send" size={18} color="#FFFFFF" />
-              )}
-            </Pressable>
+          <View style={styles.inputWrap}>
+            {pendingImages.length > 0 ? (
+              <FlatList
+                horizontal
+                data={pendingImages}
+                keyExtractor={(item, index) => `${item.uri}-${index}`}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.previewList}
+                renderItem={({ item }) => (
+                  <View style={styles.previewContainer}>
+                    <Image source={{ uri: item.uri }} style={styles.previewImage} />
+                    <Pressable
+                      style={styles.removePreviewBtn}
+                      onPress={() =>
+                        setPendingImages((prev) => prev.filter((image) => image.uri !== item.uri))
+                      }
+                      disabled={sending || isUploadingImage}
+                    >
+                      <Ionicons name="close" size={15} color="#FFFFFF" />
+                    </Pressable>
+                  </View>
+                )}
+              />
+            ) : null}
+
+            <View style={styles.inputBar}>
+              <Pressable
+                style={[styles.mediaBtn, (isUploadingImage || sending) && { opacity: 0.6 }]}
+                onPress={handlePickImage}
+                disabled={isUploadingImage || sending}
+              >
+                {isUploadingImage ? (
+                  <ActivityIndicator size="small" color="#8E7AB5" />
+                ) : (
+                  <Ionicons name="camera" size={20} color="#8E7AB5" />
+                )}
+              </Pressable>
+              <TextInput
+                style={styles.input}
+                value={input}
+                onChangeText={setInput}
+                placeholder="Nhập tin nhắn..."
+                placeholderTextColor="#A090C5"
+                multiline
+              />
+              <Pressable
+                style={[
+                  styles.sendButton,
+                  (!input.trim() && pendingImages.length === 0) || sending || isUploadingImage
+                    ? styles.sendButtonDisabled
+                    : null,
+                ]}
+                onPress={handleSend}
+                disabled={(!input.trim() && pendingImages.length === 0) || sending || isUploadingImage}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="send" size={18} color="#FFFFFF" />
+                )}
+              </Pressable>
+            </View>
           </View>
         )}
       </KeyboardAvoidingView>
@@ -938,14 +996,47 @@ const styles = StyleSheet.create({
   messageImage: { width: 220, height: 220, borderRadius: 14, backgroundColor: "#EEE7FF" },
   mineText: { color: "#FFFFFF" },
   otherText: { color: "#2E2446" },
+  inputWrap: {
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#EEE7FF",
+    paddingTop: 8,
+  },
+  previewList: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  previewContainer: {
+    width: 84,
+    height: 84,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E6DBFF",
+    backgroundColor: "#F8F5FF",
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  removePreviewBtn: {
+    position: "absolute",
+    right: 6,
+    top: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 10,
-    padding: 12,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#EEE7FF",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
   },
   mediaBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#F3EEFF", alignItems: "center", justifyContent: "center" },
   input: {
