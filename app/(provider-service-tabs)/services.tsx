@@ -424,7 +424,7 @@ export default function ProviderServicesScreen() {
                   })
                 }
               >
-                <Text style={styles.detailBtnText}>Xem chi tiết</Text>
+                <Text style={styles.detailBtnText}>Chi tiết</Text>
               </TouchableOpacity>
             </View>
           )}

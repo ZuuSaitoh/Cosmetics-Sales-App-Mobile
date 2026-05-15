@@ -497,7 +497,7 @@ export default function OrderDetailScreen() {
               </View>
               <View>
                 <Text style={styles.disputeTitle}>Khiếu nại đang xử lý</Text>
-                <Text style={styles.disputeSub}>Xem chi tiết</Text>
+                <Text style={styles.disputeSub}>Chi tiết</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#CCC" />

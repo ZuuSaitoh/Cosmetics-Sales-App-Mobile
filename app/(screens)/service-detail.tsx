@@ -1,4 +1,5 @@
 /* eslint-disable import/no-unresolved */
+import axiosClient from "@/src/api/axiosClient";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
@@ -17,7 +18,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../api/axiosClient";
 
 export default function ServiceDetailScreen() {
   const { id } = useLocalSearchParams();
