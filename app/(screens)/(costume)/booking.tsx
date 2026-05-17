@@ -29,7 +29,6 @@ export default function BookingScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBooking, setIsBooking] = useState(false); // Loading khi bấm thuê
 
-  const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
   const [selectedAccessoryIds, setSelectedAccessoryIds] = useState<number[]>(
     [],
   );
@@ -116,16 +115,12 @@ export default function BookingScreen() {
       return {
         total: 0,
         rent: 0,
-        options: 0,
         accessories: 0,
         surcharges: 0,
         deposit: 0,
       };
 
     const baseRent = costume.pricePerDay * actualNumDays;
-    const optionPrice =
-      costume.rentalOptions?.find((o: any) => o.id === selectedOptionId)
-        ?.price || 0;
     const accessoriesPrice =
       costume.accessories
         ?.filter((a: any) => selectedAccessoryIds.includes(a.id))
@@ -137,12 +132,10 @@ export default function BookingScreen() {
 
     return {
       rent: baseRent,
-      options: optionPrice,
       accessories: accessoriesPrice,
       surcharges: surchargesPrice,
       deposit: deposit,
-      total:
-        baseRent + optionPrice + accessoriesPrice + surchargesPrice + deposit,
+      total: baseRent + accessoriesPrice + surchargesPrice + deposit,
     };
   };
 
@@ -189,7 +182,7 @@ export default function BookingScreen() {
         returnUrl: returnUrl,
         cosplayerAddressId: selectedAddress.id,
         selectedAccessoryIds: selectedAccessoryIds,
-        selectedRentalOptionId: selectedOptionId || null,
+        selectedRentalOptionId: null,
       };
 
       // Gọi API POST /api/orders với tham số cosplayerId trên Query String
@@ -267,30 +260,6 @@ export default function BookingScreen() {
           )}
           <Feather name="chevron-right" size={20} color="#B59DFF" />
         </TouchableOpacity>
-
-        {/* CHỌN GÓI THUÊ */}
-        <Text style={styles.label}>Gói thuê</Text>
-        <View style={styles.chipContainer}>
-          {costume.rentalOptions?.map((opt: any) => (
-            <TouchableOpacity
-              key={opt.id}
-              style={[
-                styles.chip,
-                selectedOptionId === opt.id && styles.chipActive,
-              ]}
-              onPress={() => setSelectedOptionId(opt.id)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  selectedOptionId === opt.id && styles.chipTextActive,
-                ]}
-              >
-                {opt.name} ({new Intl.NumberFormat("vi-VN").format(opt.price)}đ)
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* THỜI GIAN THUÊ */}
         <Text style={styles.label}>Thời gian thuê</Text>
@@ -410,12 +379,6 @@ export default function BookingScreen() {
           <View style={styles.priceLine}>
             <Text>Giá thuê ({actualNumDays} ngày)</Text>
             <Text>{new Intl.NumberFormat("vi-VN").format(prices.rent)}đ</Text>
-          </View>
-          <View style={styles.priceLine}>
-            <Text>Gói thuê</Text>
-            <Text>
-              +{new Intl.NumberFormat("vi-VN").format(prices.options)}đ
-            </Text>
           </View>
           <View style={styles.priceLine}>
             <Text>Phụ kiện & Phí</Text>
@@ -549,17 +512,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "#4A3B6B",
   },
-  chipContainer: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#DDD",
-  },
-  chipActive: { backgroundColor: "#F4F1FF", borderColor: "#B59DFF" },
-  chipText: { fontSize: 13, color: "#666" },
-  chipTextActive: { color: "#B59DFF", fontWeight: "bold" },
   row: { flexDirection: "row", alignItems: "center" },
 
   datePickerBtn: {

@@ -1,3 +1,4 @@
+import { paymentService } from "@/src/services/paymentService";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
@@ -15,7 +16,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { paymentService } from "@/src/services/paymentService";
 
 const PRESET_AMOUNTS = [50000, 100000, 200000, 500000, 1000000];
 
@@ -53,7 +53,7 @@ export default function TopUpScreen() {
       return;
     }
 
-    const SERVER_IP = "171.232.184.122";
+    const SERVER_IP = "192.168.1.13";
     const backendReturnUrl =
       method === "vnpay"
         ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
