@@ -1,4 +1,6 @@
 import { authService } from "@/src/services/authService";
+import { resumePendingConfirmDeliveryAfterLogin } from "@/src/utils/confirmDeliveryNavigation";
+import { resumePendingQrLoginAfterLogin } from "@/src/utils/qrLoginNavigation";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
@@ -61,6 +63,14 @@ export default function LoginScreen() {
 
         const decoded: any = jwtDecode(token);
         const roles = decoded.roles || [];
+
+        const resumedPending =
+          (await resumePendingQrLoginAfterLogin()) ||
+          (await resumePendingConfirmDeliveryAfterLogin());
+
+        if (resumedPending) {
+          return;
+        }
 
         if (roles.includes("PROVIDER_RENTAL")) {
           router.replace("/(provider-tabs)/items");

@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "cosmateapp",
+    "scheme": ["cosmateapp", "cosmate"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

@@ -35,9 +35,12 @@ const resolveDevHost = (): string => {
 
 const devHost = resolveDevHost();
 
-export const API_BASE_URL = USE_LOCAL_BACKEND
-  ? `http://${devHost}:${LOCAL_API_PORT}/api`
-  : "https://api.cosmate.site/api";
+/** Gốc server (Swagger paths như /ws-image/* không có prefix /api). */
+export const API_ORIGIN = USE_LOCAL_BACKEND
+  ? `http://${devHost}:${LOCAL_API_PORT}`
+  : "https://api.cosmate.site";
+
+export const API_BASE_URL = `${API_ORIGIN}/api`;
 
 export const WS_BASE_URL = USE_LOCAL_BACKEND
   ? `ws://${devHost}:${LOCAL_API_PORT}/ws-mobile`
@@ -45,21 +48,37 @@ export const WS_BASE_URL = USE_LOCAL_BACKEND
 
 if (__DEV__ && USE_LOCAL_BACKEND) {
   console.log("[API] baseURL =", API_BASE_URL);
+  console.log("[API] origin =", API_ORIGIN);
 }
+
+const attachAuthInterceptor = (
+  client: ReturnType<typeof axios.create>,
+) => {
+  client.interceptors.request.use(
+    async (config: InternalAxiosRequestConfig) => {
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+  );
+};
 
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
-axiosClient.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
-    const token = await AsyncStorage.getItem("cosmate_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-);
+/** REST dưới /api/orders, ... */
+attachAuthInterceptor(axiosClient);
+
+/** REST gốc server: /ws-image/upload, /ws-image/view/{id} (không có /api). */
+export const rootAxiosClient = axios.create({
+  baseURL: API_ORIGIN,
+  headers: { "Content-Type": "application/json" },
+});
+
+attachAuthInterceptor(rootAxiosClient);
 
 export default axiosClient;

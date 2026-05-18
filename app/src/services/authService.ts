@@ -15,4 +15,8 @@ export const authService = {
 
   changePassword: (userId: number, data: { oldPassword: string; newPassword: string }) =>
     axiosClient.post(`/users/${userId}/change-password`, data),
+
+  /** Xác nhận đăng nhập web qua QR (user đã login app). */
+  approveQrLogin: (loginSessionToken: string) =>
+    axiosClient.post("/auth/qr/approve", { loginSessionToken }),
 };
