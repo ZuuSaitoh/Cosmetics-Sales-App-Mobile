@@ -1,18 +1,23 @@
 import axiosClient from "../api/axiosClient";
 
+/** Service orders — thay cho API /bookings cũ (đã gỡ trên BE mới). */
 export const bookingService = {
-  getByProvider: (providerId: number) =>
-    axiosClient.get(`/bookings/provider/${providerId}`),
+  getByProvider: () => axiosClient.get("/service-orders/provider"),
 
-  create: (cosplayerId: number, data: Record<string, unknown>) =>
-    axiosClient.post(`/bookings?cosplayerId=${cosplayerId}`, data),
+  create: (data: Record<string, unknown>) =>
+    axiosClient.post("/service-orders/provider-create", data),
 
-  pay: (bookingId: number, params: { cosplayerId: number; paymentMethod: string; returnUrl: string }) =>
-    axiosClient.post(`/bookings/${bookingId}/pay`, null, { params }),
+  pay: (
+    serviceOrderId: number,
+    params: { paymentMethod: string; returnUrl: string; isMobile?: boolean },
+  ) =>
+    axiosClient.post(`/service-orders/${serviceOrderId}/pay`, null, {
+      params: { isMobile: true, ...params },
+    }),
 
-  confirm: (bookingId: number) =>
-    axiosClient.post(`/bookings/${bookingId}/confirm`),
+  confirm: (serviceOrderId: number) =>
+    axiosClient.post(`/service-orders/${serviceOrderId}/confirm-by-cosplayer`),
 
-  cancel: (bookingId: number) =>
-    axiosClient.post(`/bookings/${bookingId}/cancel`),
+  cancel: (serviceOrderId: number) =>
+    axiosClient.post(`/service-orders/${serviceOrderId}/cancel`),
 };

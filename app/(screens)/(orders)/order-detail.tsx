@@ -20,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getPaymentReturnUrl } from "@/src/api/axiosClient";
 import { chatService } from "@/src/services/chatService";
 import { costumeService } from "@/src/services/costumeService";
 import {
@@ -257,12 +258,11 @@ export default function OrderDetailScreen() {
     }
     setExtendSubmitting(true);
     try {
-      const SERVER_IP = "171.232.184.122";
       const returnUrl =
         extendPayMethod === "VNPAY"
-          ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
+          ? getPaymentReturnUrl("VNPAY")
           : extendPayMethod === "MOMO"
-            ? `http://${SERVER_IP}:8080/api/payment/api/momo/return`
+            ? getPaymentReturnUrl("MOMO")
             : Linking.createURL("/");
 
       const res = await orderExtendService.requestExtend(order.id, extendDetailId, {

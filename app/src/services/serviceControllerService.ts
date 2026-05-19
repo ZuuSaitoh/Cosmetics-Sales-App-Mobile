@@ -43,8 +43,13 @@ export const serviceControllerService = {
   providerComplete: (id: number) =>
     axiosClient.post(`/service-orders/${id}/provider-complete`),
 
-  payServiceOrder: (id: number, data?: Record<string, unknown>) =>
-    axiosClient.post(`/service-orders/${id}/pay`, data ?? {}),
+  payServiceOrder: (
+    id: number,
+    params?: { paymentMethod?: string; returnUrl?: string; isMobile?: boolean },
+  ) =>
+    axiosClient.post(`/service-orders/${id}/pay`, null, {
+      params: { isMobile: true, ...params },
+    }),
 
   confirmByCosplayer: (id: number) =>
     axiosClient.post(`/service-orders/${id}/confirm-by-cosplayer`),

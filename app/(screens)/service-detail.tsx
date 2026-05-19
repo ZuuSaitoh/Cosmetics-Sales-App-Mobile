@@ -1,5 +1,7 @@
 /* eslint-disable import/no-unresolved */
-import axiosClient from "@/src/api/axiosClient";
+import { getPaymentReturnUrl } from "@/src/api/axiosClient";
+import { bookingService } from "@/src/services/bookingService";
+import { serviceControllerService } from "@/src/services/serviceControllerService";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
@@ -44,7 +46,7 @@ export default function ServiceDetailScreen() {
   const fetchService = async () => {
     try {
       setIsLoading(true);
-      const res = await axiosClient.get(`/services`);
+      const res = await serviceControllerService.getAllServices();
       if (res.data.code === 0) {
         const found = (res.data.result || []).find(
           (s: any) => s.id === Number(id),
@@ -80,16 +82,13 @@ export default function ServiceDetailScreen() {
 
       const payload = {
         serviceId: Number(id),
-        bookingDate: selectedDate.toISOString(),
-        numberOfSlots: numSlots,
-        paymentMethod: selectedPaymentMethod,
-        cosplayerAddressId: 1, // TODO: cho user chọn địa chỉ
+        bookingDate: selectedDate.toISOString().split("T")[0],
+        timeSlot: "09:00-12:00",
+        numberOfHuman: numSlots,
+        cosplayerId,
       };
 
-      const res = await axiosClient.post(
-        `/bookings?cosplayerId=${cosplayerId}`,
-        payload,
-      );
+      const res = await bookingService.create(payload);
 
       if (res.data.code === 0) {
         const bookingId = res.data.result?.id || res.data.result;
@@ -99,23 +98,14 @@ export default function ServiceDetailScreen() {
           selectedPaymentMethod === "VNPAY" ||
           selectedPaymentMethod === "MOMO"
         ) {
-          const SERVER_IP = "10.88.54.16";
-          const returnUrl =
-            selectedPaymentMethod === "VNPAY"
-              ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
-              : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
-
-          const paymentRes = await axiosClient.post(
-            `/bookings/${bookingId}/pay`,
-            null,
-            {
-              params: {
-                cosplayerId: cosplayerId,
-                paymentMethod: selectedPaymentMethod,
-                returnUrl: returnUrl,
-              },
-            },
+          const returnUrl = getPaymentReturnUrl(
+            selectedPaymentMethod as "VNPAY" | "MOMO",
           );
+
+          const paymentRes = await bookingService.pay(bookingId, {
+            paymentMethod: selectedPaymentMethod,
+            returnUrl,
+          });
 
           if (paymentRes.data.code === 0) {
             const result = paymentRes.data.result;

@@ -105,17 +105,21 @@ export default function PaymentResultScreen() {
           if (dbStatus === "PAID") {
             setIsSuccess(true);
           } else if (dbStatus === "UNPAID") {
-            let confirmed = false;
+            let paid = false;
             for (let attempt = 0; attempt < 3; attempt++) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
               try {
-                await orderService.confirmPayment(Number(orderId));
-                confirmed = true;
-                break;
+                const retryRes = await orderService.getOrder(Number(orderId));
+                if (retryRes.data.code === 0 && retryRes.data.result?.status === "PAID") {
+                  paid = true;
+                  setOrderData(retryRes.data.result);
+                  break;
+                }
               } catch {
-                await new Promise((resolve) => setTimeout(resolve, 1000));
+                // retry
               }
             }
-            if (confirmed || currentVnpaySuccess || currentMomoSuccess) {
+            if (paid || currentVnpaySuccess || currentMomoSuccess) {
               setIsSuccess(true);
             }
           }

@@ -43,7 +43,7 @@ async function fetchPoseScore(
     throw new Error("Vui lòng đăng nhập để dùng tính năng này.");
   }
 
-  const response = await fetch(`${axiosClient.defaults.baseURL}/pose-score`, {
+  const response = await fetch(`${axiosClient.defaults.baseURL}/search/pose-score`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

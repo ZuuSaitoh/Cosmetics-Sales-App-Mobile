@@ -17,7 +17,10 @@ export const orderService = {
   repayOrder: (
     orderId: number,
     params: { cosplayerId: number; paymentMethod: string; returnUrl: string },
-  ) => axiosClient.post(`/orders/${orderId}/pay`, null, { params }),
+  ) =>
+    axiosClient.post(`/orders/${orderId}/pay`, null, {
+      params: { ...params, isMobile: true },
+    }),
 
   confirmDelivery: (
     orderId: number,
@@ -60,9 +63,6 @@ export const orderService = {
 
   getOrderTracking: (orderId: number) =>
     axiosClient.get(`/order-tracking/order/${orderId}`),
-
-  confirmPayment: (orderId: number) =>
-    axiosClient.post(`/orders/${orderId}/confirm-payment`),
 
   returnItem: (
     orderId: number,

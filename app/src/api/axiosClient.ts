@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 /** Bật khi dev với backend local (Swagger: http://localhost:8080/swagger-ui) */
-const USE_LOCAL_BACKEND = true;
+const USE_LOCAL_BACKEND = false;
 
 /** Ghi đè thủ công nếu auto-detect sai (vd. "192.168.1.13") */
 const DEV_HOST_OVERRIDE: string | null = null;
@@ -45,6 +45,17 @@ export const API_BASE_URL = `${API_ORIGIN}/api`;
 export const WS_BASE_URL = USE_LOCAL_BACKEND
   ? `ws://${devHost}:${LOCAL_API_PORT}/ws-mobile`
   : "wss://api.cosmate.site/ws-mobile";
+
+export type PaymentGateway = "VNPAY" | "MOMO";
+
+/** URL callback sau thanh toán VNPay/MoMo (backend redirect về app qua deep link). */
+export const getPaymentReturnUrl = (gateway: PaymentGateway): string => {
+  const path =
+    gateway === "VNPAY"
+      ? "/api/payment/api/vnpay/return"
+      : "/api/payment/api/momo/return";
+  return `${API_ORIGIN}${path}`;
+};
 
 if (__DEV__ && USE_LOCAL_BACKEND) {
   console.log("[API] baseURL =", API_BASE_URL);

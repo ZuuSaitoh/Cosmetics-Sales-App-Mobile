@@ -19,6 +19,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getPaymentReturnUrl } from "@/src/api/axiosClient";
 import { orderService } from "@/src/services/orderService";
 import { userService } from "@/src/services/userService";
 import { costumeService } from "@/src/services/costumeService";
@@ -164,14 +165,9 @@ export default function BookingScreen() {
       const decoded: any = jwtDecode(token);
       const cosplayerId = Number(decoded.sub);
 
-      // IP máy chủ Backend (xác nhận IP trước khi chạy)
-      const SERVER_IP = "171.232.184.122";
-
-      // Xây dựng returnUrl chuẩn để Backend xử lý Redirect sau thanh toán
-      const returnUrl =
-        selectedPaymentMethod === "VNPAY"
-          ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
-          : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
+      const returnUrl = getPaymentReturnUrl(
+        selectedPaymentMethod === "VNPAY" ? "VNPAY" : "MOMO",
+      );
 
       // Payload được đóng gói đúng theo Request Body của Swagger
       const payload = {

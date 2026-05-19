@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/src/api/axiosClient";
+import { API_BASE_URL, getPaymentReturnUrl } from "@/src/api/axiosClient";
 import { costumeService } from "@/src/services/costumeService";
 import { orderService } from "@/src/services/orderService";
 import { providerService } from "@/src/services/providerService";
@@ -406,11 +406,9 @@ export default function OrdersScreen() {
       }
       const decoded: any = jwtDecode(token);
       const cosplayerId = decoded.sub;
-      const SERVER_IP = "171.232.184.122";
-      const returnUrl =
-        selectedRepayMethod === "VNPAY"
-          ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
-          : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
+      const returnUrl = getPaymentReturnUrl(
+        selectedRepayMethod === "VNPAY" ? "VNPAY" : "MOMO",
+      );
 
       const res = await orderService.repayOrder(repayOrderId, {
         cosplayerId,

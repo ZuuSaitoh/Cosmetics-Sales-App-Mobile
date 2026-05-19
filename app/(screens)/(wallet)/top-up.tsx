@@ -1,3 +1,4 @@
+import { getPaymentReturnUrl } from "@/src/api/axiosClient";
 import { paymentService } from "@/src/services/paymentService";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -53,11 +54,9 @@ export default function TopUpScreen() {
       return;
     }
 
-    const SERVER_IP = "192.168.1.13";
-    const backendReturnUrl =
-      method === "vnpay"
-        ? `http://${SERVER_IP}:8080/api/payment/api/vnpay/return`
-        : `http://${SERVER_IP}:8080/api/payment/api/momo/return`;
+    const backendReturnUrl = getPaymentReturnUrl(
+      method === "vnpay" ? "VNPAY" : "MOMO",
+    );
 
     setIsLoading(true);
     try {
