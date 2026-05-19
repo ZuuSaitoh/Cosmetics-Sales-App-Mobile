@@ -436,6 +436,19 @@ export default function ProviderProfileScreen() {
         <View style={styles.actionSection}>
           <TouchableOpacity
             style={styles.actionBtn}
+            onPress={() => router.push("/(screens)/qr-scan" as any)}
+          >
+            <View style={styles.actionLeft}>
+              <View style={[styles.iconWrap, { backgroundColor: "#FFF3E0" }]}>
+                <Ionicons name="qr-code-outline" size={20} color="#FF9900" />
+              </View>
+              <Text style={styles.actionText}>Quét QR</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionBtn}
             onPress={() => router.push("/(screens)/(wallet)/withdraw-history")}
           >
             <View style={styles.actionLeft}>
