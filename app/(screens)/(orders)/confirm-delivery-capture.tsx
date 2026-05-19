@@ -18,8 +18,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const MAX_IMAGES = 5;
 
 export default function ConfirmDeliveryCaptureScreen() {
-  const { token } = useLocalSearchParams<{ token?: string }>();
+  const { token, apiBase } = useLocalSearchParams<{
+    token?: string;
+    apiBase?: string;
+  }>();
   const sessionToken = typeof token === "string" ? token.trim() : "";
+  const qrApiBase = typeof apiBase === "string" ? apiBase.trim() : "";
 
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,6 +87,7 @@ export default function ConfirmDeliveryCaptureScreen() {
       await wsImageService.uploadConfirmDeliveryImages(
         sessionToken,
         images.map((img) => img.uri),
+        qrApiBase || undefined,
       );
 
       Alert.alert(

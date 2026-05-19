@@ -1,6 +1,8 @@
 import { authService } from "@/src/services/authService";
 import { Ionicons } from "@expo/vector-icons";
+import { getAppAccessToken } from "@/src/utils/appAccessToken";
 import { router, useLocalSearchParams } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,7 +16,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 function mapApproveError(error: any): string {
   const status = error.response?.status;
-  const message = error.response?.data?.message;
+  const message =
+    error.response?.data?.message ||
+    error.response?.data?.error ||
+    error.message;
 
   if (status === 410) {
     return "Phiên QR đã hết hạn. Vui lòng quét lại mã trên máy tính.";
@@ -22,16 +27,58 @@ function mapApproveError(error: any): string {
   if (status === 403) {
     return message || "Bạn không có quyền xác nhận đăng nhập này.";
   }
-  if (status === 401) {
-    return "Phiên đăng nhập app đã hết hạn. Vui lòng đăng nhập lại.";
+  if (status === 404) {
+    return "Không tìm thấy phiên QR. Kiểm tra mã QR mới hoặc apiBase trên mã.";
   }
-  if (message) return message;
+  if (status === 401) {
+    if (error.message === "APP_JWT_EXPIRED") {
+      return "Phiên đăng nhập app đã hết hạn. Vui lòng đăng nhập lại.";
+    }
+    if (message && typeof message === "string" && message.trim()) {
+      return message;
+    }
+    return "Không xác thực được. Vui lòng đăng nhập lại app và thử lại.";
+  }
+  if (message && typeof message === "string") return message;
   return "Không thể xác nhận. Vui lòng thử lại.";
 }
 
+async function assertAppJwtValid(): Promise<void> {
+  const token = await getAppAccessToken();
+  if (!token) {
+    const err = new Error("NOT_LOGGED_IN") as Error & {
+      response?: { status: number };
+    };
+    err.response = { status: 401 };
+    throw err;
+  }
+
+  try {
+    const decoded = jwtDecode<{ exp?: number }>(token);
+    if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+      const err = new Error("APP_JWT_EXPIRED") as Error & {
+        response?: { status: number };
+      };
+      err.response = { status: 401 };
+      throw err;
+    }
+  } catch (e) {
+    if ((e as Error).message === "APP_JWT_EXPIRED") throw e;
+    const err = new Error("APP_JWT_INVALID") as Error & {
+      response?: { status: number };
+    };
+    err.response = { status: 401 };
+    throw err;
+  }
+}
+
 export default function QrLoginApproveScreen() {
-  const { sessionId } = useLocalSearchParams<{ sessionId?: string }>();
+  const { sessionId, apiBase } = useLocalSearchParams<{
+    sessionId?: string;
+    apiBase?: string;
+  }>();
   const qrSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
+  const qrApiBase = typeof apiBase === "string" ? apiBase.trim() : undefined;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -44,11 +91,13 @@ export default function QrLoginApproveScreen() {
   }, [qrSessionId]);
 
   const handleApprove = async () => {
-    if (!qrSessionId) return;
+    if (!qrSessionId || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
-      const res = await authService.approveQrLogin(qrSessionId);
+      await assertAppJwtValid();
+
+      const res = await authService.approveQrLogin(qrSessionId, qrApiBase);
 
       if (res.data?.code !== undefined && res.data.code !== 0) {
         Alert.alert("Thông báo", res.data.message || "Không thể xác nhận.");
@@ -61,6 +110,18 @@ export default function QrLoginApproveScreen() {
         [{ text: "OK", onPress: () => router.back() }],
       );
     } catch (error: any) {
+      if (
+        error.message === "NOT_LOGGED_IN" ||
+        error.message === "APP_JWT_EXPIRED" ||
+        error.message === "APP_JWT_INVALID"
+      ) {
+        Alert.alert("Lỗi", mapApproveError(error), [
+          { text: "Đăng nhập", onPress: () => router.replace("/(auth)/login") },
+          { text: "Hủy", style: "cancel" },
+        ]);
+        return;
+      }
+
       Alert.alert("Lỗi", mapApproveError(error));
     } finally {
       setIsSubmitting(false);

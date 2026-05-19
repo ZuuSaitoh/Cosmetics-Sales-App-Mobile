@@ -1,21 +1,24 @@
 import { authService } from "@/src/services/authService";
+import {
+  extractAccessTokenFromLoginResult,
+  saveAppAccessToken,
+} from "@/src/utils/appAccessToken";
 import { resumePendingConfirmDeliveryAfterLogin } from "@/src/utils/confirmDeliveryNavigation";
 import { resumePendingQrLoginAfterLogin } from "@/src/utils/qrLoginNavigation";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 const isValidEmail = (email: string) => {
@@ -58,10 +61,19 @@ export default function LoginScreen() {
       });
 
       if (response.data.code === 0) {
-        const token = response.data.result.token;
-        await AsyncStorage.setItem("cosmate_token", token);
+        const accessToken = extractAccessTokenFromLoginResult(
+          response.data.result,
+        );
+        if (!accessToken) {
+          Alert.alert(
+            "Lỗi",
+            "Server không trả access token hợp lệ. Vui lòng thử lại hoặc liên hệ hỗ trợ.",
+          );
+          return;
+        }
+        await saveAppAccessToken(accessToken);
 
-        const decoded: any = jwtDecode(token);
+        const decoded: any = jwtDecode(accessToken);
         const roles = decoded.roles || [];
 
         const resumedPending =

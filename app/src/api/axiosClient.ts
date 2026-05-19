@@ -1,7 +1,7 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios, { InternalAxiosRequestConfig } from "axios";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import { getAppAccessToken } from "@/src/utils/appAccessToken";
 
 /** Bật khi dev với backend local (Swagger: http://localhost:8080/swagger-ui) */
 const USE_LOCAL_BACKEND = false;
@@ -49,6 +49,18 @@ export const WS_BASE_URL = USE_LOCAL_BACKEND
 export type PaymentGateway = "VNPAY" | "MOMO";
 
 /** URL callback sau thanh toán VNPay/MoMo (backend redirect về app qua deep link). */
+/** Chuẩn hóa apiBase từ QR (có thể kèm hoặc không kèm `/api`). */
+export const normalizeApiOrigin = (apiBase?: string | null): string => {
+  const fallback = API_ORIGIN;
+  if (!apiBase?.trim()) return fallback;
+
+  let origin = apiBase.trim().replace(/\/+$/, "");
+  if (origin.endsWith("/api")) {
+    origin = origin.slice(0, -4);
+  }
+  return origin || fallback;
+};
+
 export const getPaymentReturnUrl = (gateway: PaymentGateway): string => {
   const path =
     gateway === "VNPAY"
@@ -67,9 +79,9 @@ const attachAuthInterceptor = (
 ) => {
   client.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
-      const token = await AsyncStorage.getItem("cosmate_token");
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      const accessToken = await getAppAccessToken();
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`;
       }
       return config;
     },

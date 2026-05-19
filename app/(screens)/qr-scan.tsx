@@ -1,11 +1,11 @@
+import {
+    navigateToConfirmDeliveryCapture,
+    savePendingConfirmDeliveryToken,
+} from "@/src/utils/confirmDeliveryNavigation";
 import { parseCosmateQr } from "@/src/utils/parseCosmateQr";
 import {
-  navigateToConfirmDeliveryCapture,
-  savePendingConfirmDeliveryToken,
-} from "@/src/utils/confirmDeliveryNavigation";
-import {
-  navigateToQrLoginApprove,
-  savePendingQrLoginSessionId,
+    navigateToQrLoginApprove,
+    savePendingQrLogin,
 } from "@/src/utils/qrLoginNavigation";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -14,11 +14,11 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
 import {
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -57,20 +57,23 @@ export default function QrScanScreen() {
 
       if (payload.type === "confirm-delivery") {
         if (!authToken) {
-          await savePendingConfirmDeliveryToken(payload.token);
+          await savePendingConfirmDeliveryToken(payload.token, payload.apiBase);
           router.replace("/(auth)/login");
           return;
         }
-        navigateToConfirmDeliveryCapture(payload.token);
+        navigateToConfirmDeliveryCapture(payload.token, payload.apiBase);
         return;
       }
 
       if (!authToken) {
-        await savePendingQrLoginSessionId(payload.sessionId);
+        await savePendingQrLogin({
+          sessionId: payload.sessionId,
+          apiBase: payload.apiBase,
+        });
         router.replace("/(auth)/login");
         return;
       }
-      navigateToQrLoginApprove(payload.sessionId);
+      navigateToQrLoginApprove(payload.sessionId, payload.apiBase);
     } catch {
       hasHandledScanRef.current = false;
       Alert.alert("Lỗi", "Không thể xử lý mã QR. Vui lòng thử lại.");
