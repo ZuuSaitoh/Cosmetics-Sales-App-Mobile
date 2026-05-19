@@ -30,26 +30,25 @@ function mapApproveError(error: any): string {
 }
 
 export default function QrLoginApproveScreen() {
-  const { sessionToken } = useLocalSearchParams<{ sessionToken?: string }>();
-  const loginSessionToken =
-    typeof sessionToken === "string" ? sessionToken.trim() : "";
+  const { sessionId } = useLocalSearchParams<{ sessionId?: string }>();
+  const qrSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loginSessionToken) {
+    if (!qrSessionId) {
       Alert.alert("Lỗi", "Phiên đăng nhập không hợp lệ. Vui lòng quét lại mã QR.", [
         { text: "OK", onPress: () => router.back() },
       ]);
     }
-  }, [loginSessionToken]);
+  }, [qrSessionId]);
 
   const handleApprove = async () => {
-    if (!loginSessionToken) return;
+    if (!qrSessionId) return;
 
     setIsSubmitting(true);
     try {
-      const res = await authService.approveQrLogin(loginSessionToken);
+      const res = await authService.approveQrLogin(qrSessionId);
 
       if (res.data?.code !== undefined && res.data.code !== 0) {
         Alert.alert("Thông báo", res.data.message || "Không thể xác nhận.");
@@ -68,7 +67,7 @@ export default function QrLoginApproveScreen() {
     }
   };
 
-  if (!loginSessionToken) {
+  if (!qrSessionId) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#B59DFF" />

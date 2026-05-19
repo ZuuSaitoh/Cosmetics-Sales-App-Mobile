@@ -5,7 +5,7 @@ import {
 } from "@/src/utils/confirmDeliveryNavigation";
 import {
   navigateToQrLoginApprove,
-  savePendingQrLoginSessionToken,
+  savePendingQrLoginSessionId,
 } from "@/src/utils/qrLoginNavigation";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -66,11 +66,11 @@ export default function QrScanScreen() {
       }
 
       if (!authToken) {
-        await savePendingQrLoginSessionToken(payload.sessionToken);
+        await savePendingQrLoginSessionId(payload.sessionId);
         router.replace("/(auth)/login");
         return;
       }
-      navigateToQrLoginApprove(payload.sessionToken);
+      navigateToQrLoginApprove(payload.sessionId);
     } catch {
       hasHandledScanRef.current = false;
       Alert.alert("Lỗi", "Không thể xử lý mã QR. Vui lòng thử lại.");

@@ -1,6 +1,6 @@
 export type CosmateQrPayload =
   | { type: "confirm-delivery"; token: string }
-  | { type: "qr-login"; sessionToken: string };
+  | { type: "qr-login"; sessionId: string };
 
 function normalizeQrUrl(raw: string): URL | null {
   const trimmed = raw.trim();
@@ -29,8 +29,10 @@ export function parseCosmateQr(raw: string): CosmateQrPayload | null {
   }
 
   if (path.includes("qr-login")) {
-    const sessionToken = url.searchParams.get("sessionToken")?.trim();
-    return sessionToken ? { type: "qr-login", sessionToken } : null;
+    const sessionId =
+      url.searchParams.get("sessionId")?.trim() ||
+      url.searchParams.get("sessionToken")?.trim();
+    return sessionId ? { type: "qr-login", sessionId } : null;
   }
 
   return null;
