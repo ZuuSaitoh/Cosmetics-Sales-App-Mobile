@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image as ExpoImage } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
@@ -281,7 +282,12 @@ export default function UserHomeScreen() {
         })
       }
     >
-      <Image source={{ uri: item.coverImageUrl || item.avatarUrl || "https://via.placeholder.com/150" }} style={styles.serviceImage} />
+      <ExpoImage
+        source={{ uri: item.coverImageUrl || item.avatarUrl || "https://via.placeholder.com/150" }}
+        style={styles.serviceImage}
+        contentFit="cover"
+        contentPosition="top"
+      />
       <View style={styles.serviceInfo}>
         <View style={styles.serviceNameRow}>
           <Text style={styles.serviceName} numberOfLines={1}>
@@ -318,7 +324,12 @@ export default function UserHomeScreen() {
           })
         }
       >
-        <Image source={{ uri: coverImage }} style={styles.cardImage} />
+        <ExpoImage
+          source={{ uri: coverImage }}
+          style={styles.cardImage}
+          contentFit="cover"
+          contentPosition="top"
+        />
         <View style={[styles.badge, { backgroundColor: isAvailable ? "#28A745" : "#FF6B6B" }]}>
           <Text style={styles.badgeText}>{isAvailable ? "Sẵn sàng" : "Đang thuê"}</Text>
         </View>
