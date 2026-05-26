@@ -92,6 +92,17 @@ export function AiFeaturesFab() {
             />
             <View style={styles.menuDivider} />
             <AiMenuRow
+              icon="time-outline"
+              title="Lịch sử Pose"
+              subtitle="Xem lại điểm & nhận xét AI"
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                closeMenu();
+                router.push("/ai/pose-history" as never);
+              }}
+            />
+            <View style={styles.menuDivider} />
+            <AiMenuRow
               icon="camera-outline"
               title="AI Image Search"
               subtitle="Tìm trang phục bằng ảnh"

@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 
 export type PickedImage = {
   uri: string;
@@ -21,6 +21,26 @@ function getMimeType(uri: string) {
   return "image/jpeg";
 }
 
+/**
+ * Chuẩn hóa URI cho FormData trên Android.
+ * Android cần `file://` prefix, iOS trả sẵn.
+ */
+function normalizeUri(uri: string): string {
+  if (Platform.OS === "android" && !uri.startsWith("file://")) {
+    return `file://${uri}`;
+  }
+  return uri;
+}
+
+function assetToPickedImage(asset: ImagePicker.ImagePickerAsset): PickedImage {
+  const uri = normalizeUri(asset.uri);
+  return {
+    uri,
+    name: asset.fileName || getFileName(asset.uri),
+    type: asset.mimeType || getMimeType(asset.uri),
+  };
+}
+
 export function usePickedImage() {
   const [image, setImage] = useState<PickedImage | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
@@ -34,22 +54,16 @@ export function usePickedImage() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         quality: 0.7,
         allowsEditing: false,
       });
 
       if (result.canceled || !result.assets?.length) return null;
 
-      const asset = result.assets[0];
-      const picked = {
-        uri: asset.uri,
-        name: getFileName(asset.uri),
-        type: asset.mimeType || getMimeType(asset.uri),
-      };
-
+      const picked = assetToPickedImage(result.assets[0]);
       setImage(picked);
-      setPreviewUri(asset.uri);
+      setPreviewUri(result.assets[0].uri);
       return picked;
     } catch (error) {
       Alert.alert("Lỗi", "Không thể chọn ảnh từ thư viện.");
@@ -72,15 +86,9 @@ export function usePickedImage() {
 
       if (result.canceled || !result.assets?.length) return null;
 
-      const asset = result.assets[0];
-      const picked = {
-        uri: asset.uri,
-        name: getFileName(asset.uri),
-        type: asset.mimeType || getMimeType(asset.uri),
-      };
-
+      const picked = assetToPickedImage(result.assets[0]);
       setImage(picked);
-      setPreviewUri(asset.uri);
+      setPreviewUri(result.assets[0].uri);
       return picked;
     } catch (error) {
       Alert.alert("Lỗi", "Không thể chụp ảnh từ camera.");
