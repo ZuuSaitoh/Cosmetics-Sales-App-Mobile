@@ -21,6 +21,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { clearPendingConfirmDelivery } from "@/src/utils/confirmDeliveryNavigation";
 import { userService } from "@/src/services/userService";
 import { walletService } from "@/src/services/walletService";
 
@@ -147,6 +148,7 @@ export default function ProfileScreen() {
         text: "Thoát",
         style: "destructive",
         onPress: async () => {
+          await clearPendingConfirmDelivery();
           await AsyncStorage.removeItem("cosmate_token");
           router.replace("/(auth)/login");
         },

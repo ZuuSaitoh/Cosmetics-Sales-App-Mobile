@@ -1,8 +1,10 @@
 import { wsImageService } from "@/src/services/wsImageService";
+import { assertConfirmDeliveryQrOwner } from "@/src/utils/confirmDeliveryAccess";
+import { alertOnce } from "@/src/utils/alertOnce";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,23 +20,63 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const MAX_IMAGES = 5;
 
 export default function ConfirmDeliveryCaptureScreen() {
-  const { token, apiBase } = useLocalSearchParams<{
+  const { token, apiBase, userId } = useLocalSearchParams<{
     token?: string;
     apiBase?: string;
+    userId?: string;
   }>();
   const sessionToken = typeof token === "string" ? token.trim() : "";
   const qrApiBase = typeof apiBase === "string" ? apiBase.trim() : "";
+  const qrUserId = typeof userId === "string" ? userId.trim() : "";
 
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+  const [canCapture, setCanCapture] = useState(false);
+  const alertGuardRef = useRef(false);
+  const verifyStartedRef = useRef(false);
+
+  const denyAndLeave = useCallback((message: string) => {
+    alertOnce(alertGuardRef, "Không thể tiếp tục", message, () =>
+      router.back(),
+    );
+  }, []);
 
   useEffect(() => {
-    if (!sessionToken) {
-      Alert.alert("Lỗi", "Phiên xác nhận không hợp lệ. Vui lòng quét lại mã QR.", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
-    }
-  }, [sessionToken]);
+    if (verifyStartedRef.current) return;
+    verifyStartedRef.current = true;
+
+    let cancelled = false;
+
+    const verify = async () => {
+      if (!sessionToken) {
+        denyAndLeave("Phiên xác nhận không hợp lệ. Vui lòng quét lại mã QR.");
+        return;
+      }
+      if (!qrUserId) {
+        denyAndLeave(
+          "Mã QR thiếu thông tin tài khoản. Vui lòng tạo mã mới trên web.",
+        );
+        return;
+      }
+
+      const access = await assertConfirmDeliveryQrOwner(qrUserId);
+      if (cancelled) return;
+
+      if (!access.ok) {
+        denyAndLeave(access.message);
+        return;
+      }
+
+      setCanCapture(true);
+      setIsCheckingAccess(false);
+    };
+
+    void verify();
+    return () => {
+      cancelled = true;
+    };
+  }, [denyAndLeave, qrUserId, sessionToken]);
 
   const appendImages = (assets: ImagePicker.ImagePickerAsset[]) => {
     setImages((prev) => {
@@ -44,6 +86,8 @@ export default function ConfirmDeliveryCaptureScreen() {
   };
 
   const takePicture = async () => {
+    if (!canCapture) return;
+
     const remainSlots = MAX_IMAGES - images.length;
     if (remainSlots <= 0) {
       Alert.alert("Đã đủ ảnh", `Bạn chỉ có thể gửi tối đa ${MAX_IMAGES} ảnh.`);
@@ -72,7 +116,13 @@ export default function ConfirmDeliveryCaptureScreen() {
   };
 
   const submitImages = async () => {
-    if (!sessionToken) return;
+    if (!sessionToken || !canCapture) return;
+
+    const access = await assertConfirmDeliveryQrOwner(qrUserId);
+    if (!access.ok) {
+      Alert.alert("Không thể gửi ảnh", access.message);
+      return;
+    }
 
     if (images.length === 0) {
       Alert.alert(
@@ -105,7 +155,7 @@ export default function ConfirmDeliveryCaptureScreen() {
     }
   };
 
-  if (!sessionToken) {
+  if (isCheckingAccess || !canCapture) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#B59DFF" />

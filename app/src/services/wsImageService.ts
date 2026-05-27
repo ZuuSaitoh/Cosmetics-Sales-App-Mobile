@@ -32,12 +32,18 @@ async function postWsImageUpload(
 
   const origin = normalizeApiOrigin(apiBase);
   const accessToken = await getAppAccessToken();
+  if (!accessToken) {
+    throw Object.assign(new Error("NOT_LOGGED_IN"), {
+      response: {
+        status: 401,
+        data: { message: "Vui lòng đăng nhập app để gửi ảnh." },
+      },
+    });
+  }
   const headers: Record<string, string> = {
     "Content-Type": "multipart/form-data",
+    Authorization: `Bearer ${accessToken}`,
   };
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-  }
 
   if (apiBase?.trim()) {
     return axios.post(`${origin}/ws-image/upload`, formData, {

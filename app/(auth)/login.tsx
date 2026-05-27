@@ -76,11 +76,15 @@ export default function LoginScreen() {
         const decoded: any = jwtDecode(accessToken);
         const roles = decoded.roles || [];
 
-        const resumedPending =
-          (await resumePendingQrLoginAfterLogin()) ||
-          (await resumePendingConfirmDeliveryAfterLogin());
+        if (await resumePendingQrLoginAfterLogin()) {
+          return;
+        }
 
-        if (resumedPending) {
+        const confirmResume = await resumePendingConfirmDeliveryAfterLogin();
+        if (confirmResume) {
+          if (!confirmResume.ok) {
+            Alert.alert("Không thể tiếp tục", confirmResume.message);
+          }
           return;
         }
 

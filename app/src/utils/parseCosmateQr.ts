@@ -4,6 +4,8 @@ export type CosmateQrPayload =
       token: string;
       apiBase?: string;
       orderId?: string;
+      /** ID tài khoản web lúc tạo QR — mobile phải khớp JWT app. */
+      userId?: string;
     }
   | { type: "qr-login"; sessionId: string; apiBase?: string };
 
@@ -47,12 +49,14 @@ export function parseCosmateQr(raw: string): CosmateQrPayload | null {
   if (path.includes("confirm-delivery")) {
     const token = readQrSessionId(url);
     const orderId = url.searchParams.get("orderId")?.trim();
+    const userId = url.searchParams.get("userId")?.trim();
     return token
       ? {
           type: "confirm-delivery",
           token,
           apiBase,
           orderId: orderId || undefined,
+          userId: userId || undefined,
         }
       : null;
   }

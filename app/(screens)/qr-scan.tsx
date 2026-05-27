@@ -1,30 +1,54 @@
 import {
-    navigateToConfirmDeliveryCapture,
-    savePendingConfirmDeliveryToken,
+  openConfirmDeliveryFromQr,
+  savePendingConfirmDelivery,
 } from "@/src/utils/confirmDeliveryNavigation";
 import { parseCosmateQr } from "@/src/utils/parseCosmateQr";
+import { getAppAccessToken } from "@/src/utils/appAccessToken";
 import {
-    navigateToQrLoginApprove,
-    savePendingQrLogin,
+  navigateToQrLoginApprove,
+  savePendingQrLogin,
 } from "@/src/utils/qrLoginNavigation";
+import { alertOnce } from "@/src/utils/alertOnce";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CameraView } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
 import {
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function QrScanScreen() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const hasHandledScanRef = useRef(false);
+  const [scannerEnabled, setScannerEnabled] = useState(true);
+  const processingRef = useRef(false);
+  const alertGuardRef = useRef(false);
+  const lastInvalidRawRef = useRef<string | null>(null);
+
+  const lockScanner = useCallback(() => {
+    setScannerEnabled(false);
+  }, []);
+
+  const showScanIssue = useCallback(
+    (title: string, message: string, goBack = true) => {
+      lockScanner();
+      alertOnce(alertGuardRef, title, message, () => {
+        if (goBack) {
+          router.back();
+        } else {
+          setScannerEnabled(true);
+          processingRef.current = false;
+          lastInvalidRawRef.current = null;
+        }
+      });
+    },
+    [lockScanner],
+  );
 
   const requestPermission = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -39,29 +63,53 @@ export default function QrScanScreen() {
   }, [requestPermission]);
 
   const handleBarcodeScanned = async ({ data }: { data: string }) => {
-    if (hasHandledScanRef.current) return;
+    if (!scannerEnabled || processingRef.current) return;
 
     const payload = parseCosmateQr(data);
     if (!payload) {
-      Alert.alert(
+      if (lastInvalidRawRef.current === data) return;
+      lastInvalidRawRef.current = data;
+      showScanIssue(
         "Mã QR không hợp lệ",
         "Vui lòng quét mã QR trên màn hình máy tính (đăng nhập hoặc xác nhận nhận hàng).",
+        true,
       );
       return;
     }
 
-    hasHandledScanRef.current = true;
+    processingRef.current = true;
+    lockScanner();
 
     try {
-      const authToken = await AsyncStorage.getItem("cosmate_token");
+      const authToken = await getAppAccessToken();
 
       if (payload.type === "confirm-delivery") {
+        if (!payload.userId) {
+          showScanIssue(
+            "Mã QR không hợp lệ",
+            "Mã xác nhận nhận hàng thiếu userId. Vui lòng tạo mã QR mới trên web.",
+          );
+          return;
+        }
+
+        const navParams = {
+          token: payload.token,
+          apiBase: payload.apiBase,
+          userId: payload.userId,
+          orderId: payload.orderId,
+        };
+
         if (!authToken) {
-          await savePendingConfirmDeliveryToken(payload.token, payload.apiBase);
+          await savePendingConfirmDelivery(navParams);
           router.replace("/(auth)/login");
           return;
         }
-        navigateToConfirmDeliveryCapture(payload.token, payload.apiBase);
+
+        const result = await openConfirmDeliveryFromQr(navParams);
+        if (!result.ok) {
+          showScanIssue("Không thể tiếp tục", result.message);
+          return;
+        }
         return;
       }
 
@@ -75,8 +123,9 @@ export default function QrScanScreen() {
       }
       navigateToQrLoginApprove(payload.sessionId, payload.apiBase);
     } catch {
-      hasHandledScanRef.current = false;
-      Alert.alert("Lỗi", "Không thể xử lý mã QR. Vui lòng thử lại.");
+      showScanIssue("Lỗi", "Không thể xử lý mã QR. Vui lòng thử lại.");
+    } finally {
+      processingRef.current = false;
     }
   };
 
@@ -86,7 +135,9 @@ export default function QrScanScreen() {
         <CameraView
           style={StyleSheet.absoluteFillObject}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-          onBarcodeScanned={handleBarcodeScanned}
+          onBarcodeScanned={
+            scannerEnabled ? handleBarcodeScanned : undefined
+          }
         />
       ) : (
         <View style={styles.permissionFallback}>
