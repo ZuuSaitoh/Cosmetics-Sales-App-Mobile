@@ -114,25 +114,29 @@ export default function UserNotificationsScreen() {
     const isItemRead = item.isRead || item.read || false; 
 
     return (
-      <TouchableOpacity 
+      <View 
         style={[
           styles.notifCard,
           !isItemRead && styles.unreadCard,
           markingReadId === item.id && { opacity: 0.7 },
         ]} 
-        activeOpacity={0.7}
-        onPress={() => handleMarkAsRead(item.id, isItemRead)}
-        disabled={markingReadId === item.id}
       >
-        <View style={styles.iconContainer}>
-          <Ionicons name={isItemRead ? "notifications-outline" : "notifications"} size={24} color={isItemRead ? "#A0A0A0" : "#B59DFF"} />
-        </View>
-        
-        <View style={styles.textContainer}>
-          <Text style={[styles.title, !isItemRead && styles.unreadText]}>{item.title || "Thông báo hệ thống"}</Text>
-          <Text style={styles.message} numberOfLines={2}>{item.message || item.content || item.body}</Text>
-          <Text style={styles.time}>{item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : 'Vừa xong'}</Text>
-        </View>
+        <TouchableOpacity 
+          style={styles.notifCardContent}
+          activeOpacity={0.7}
+          onPress={() => handleMarkAsRead(item.id, isItemRead)}
+          disabled={markingReadId === item.id}
+        >
+          <View style={styles.iconContainer}>
+            <Ionicons name={isItemRead ? "notifications-outline" : "notifications"} size={24} color={isItemRead ? "#A0A0A0" : "#B59DFF"} />
+          </View>
+          
+          <View style={styles.textContainer}>
+            <Text style={[styles.title, !isItemRead && styles.unreadText]}>{item.title || "Thông báo hệ thống"}</Text>
+            <Text style={styles.message} numberOfLines={2}>{item.message || item.content || item.body}</Text>
+            <Text style={styles.time}>{item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : 'Vừa xong'}</Text>
+          </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.deleteBtn, deletingId === item.id && { opacity: 0.5 }]}
@@ -145,7 +149,7 @@ export default function UserNotificationsScreen() {
             <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
           )}
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -196,7 +200,8 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#4A3B6B' },
   markAllBtn: { padding: 5 },
   listContainer: { padding: 15, paddingBottom: 50 },
-  notifCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, padding: 15, marginBottom: 12, elevation: 1, alignItems: 'center' },
+  notifCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, paddingRight: 5, marginBottom: 12, elevation: 1, alignItems: 'center' },
+  notifCardContent: { flex: 1, flexDirection: 'row', padding: 15, alignItems: 'center' },
   unreadCard: { backgroundColor: '#F4F0FF', borderColor: '#E0D7FF', borderWidth: 1 }, 
   iconContainer: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   textContainer: { flex: 1 },
