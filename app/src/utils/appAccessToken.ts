@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { jwtDecode } from "jwt-decode";
 
 export const COSMATE_TOKEN_KEY = "cosmate_token";
 
@@ -71,6 +72,40 @@ export async function saveAppAccessToken(token: string): Promise<void> {
     throw new Error("INVALID_ACCESS_TOKEN");
   }
   await AsyncStorage.setItem(COSMATE_TOKEN_KEY, normalized);
+}
+
+type JwtPayload = {
+  sub?: string | number;
+  roles?: string[] | string;
+};
+
+export function getAppRolesFromToken(token: string): string[] {
+  try {
+    const decoded = jwtDecode<JwtPayload>(token);
+    const raw = decoded.roles;
+    if (Array.isArray(raw)) {
+      return raw.map((r) => String(r).trim()).filter(Boolean);
+    }
+    if (typeof raw === "string" && raw.trim()) {
+      return raw
+        .split(",")
+        .map((r) => r.trim())
+        .filter(Boolean);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getAppRoles(): Promise<string[]> {
+  const token = await getAppAccessToken();
+  if (!token) return [];
+  return getAppRolesFromToken(token);
+}
+
+export function isProviderRentalRole(roles: string[]): boolean {
+  return roles.includes("PROVIDER_RENTAL");
 }
 
 export function maskBearerForLog(token: string): string {

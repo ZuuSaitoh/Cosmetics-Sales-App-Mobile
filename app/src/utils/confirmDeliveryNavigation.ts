@@ -1,7 +1,13 @@
 import { PENDING_CONFIRM_DELIVERY_TOKEN_KEY } from "@/src/constants/confirmDelivery";
+import {
+  getAppRoles,
+  isProviderRentalRole,
+} from "@/src/utils/appAccessToken";
 import { assertConfirmDeliveryQrOwner } from "@/src/utils/confirmDeliveryAccess";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+
+export type ConfirmDeliveryPickerMode = "camera" | "library";
 
 const PENDING_CONFIRM_DELIVERY_PAYLOAD_KEY =
   "cosmate_pending_confirm_delivery_payload";
@@ -11,7 +17,23 @@ export type ConfirmDeliveryNavParams = {
   apiBase?: string;
   userId: string;
   orderId?: string;
+  pickerMode?: ConfirmDeliveryPickerMode;
 };
+
+export async function resolveConfirmDeliveryPickerMode(
+  params: ConfirmDeliveryNavParams,
+): Promise<ConfirmDeliveryPickerMode> {
+  if (params.pickerMode === "library" || params.pickerMode === "camera") {
+    return params.pickerMode;
+  }
+
+  const roles = await getAppRoles();
+  if (isProviderRentalRole(roles)) {
+    return "library";
+  }
+
+  return "camera";
+}
 
 type PendingConfirmDeliveryPayload = ConfirmDeliveryNavParams;
 
@@ -36,6 +58,7 @@ async function readPendingConfirmDelivery(): Promise<PendingConfirmDeliveryPaylo
           userId: parsed.userId.trim(),
           apiBase: parsed.apiBase?.trim() || undefined,
           orderId: parsed.orderId?.trim() || undefined,
+          pickerMode: parsed.pickerMode,
         };
       }
     } catch {
@@ -85,7 +108,7 @@ export async function resumePendingConfirmDeliveryAfterLogin(): Promise<ConfirmD
     return { ok: false, message: access.message };
   }
 
-  navigateToConfirmDeliveryCapture(pending);
+  await navigateToConfirmDeliveryCapture(pending);
   return { ok: true };
 }
 
@@ -97,18 +120,21 @@ export async function openConfirmDeliveryFromQr(
     return { ok: false, message: access.message };
   }
 
-  navigateToConfirmDeliveryCapture(params);
+  await navigateToConfirmDeliveryCapture(params);
   return { ok: true };
 }
 
-export function navigateToConfirmDeliveryCapture(
+export async function navigateToConfirmDeliveryCapture(
   params: ConfirmDeliveryNavParams,
-): void {
+): Promise<void> {
+  const pickerMode = await resolveConfirmDeliveryPickerMode(params);
+
   router.replace({
     pathname: "/(screens)/confirm-delivery-capture" as any,
     params: {
       token: params.token,
       userId: params.userId,
+      pickerMode,
       ...(params.apiBase ? { apiBase: params.apiBase } : {}),
       ...(params.orderId ? { orderId: params.orderId } : {}),
     },

@@ -1,12 +1,16 @@
+export type ConfirmDeliveryQrPayload = {
+  type: "confirm-delivery";
+  token: string;
+  apiBase?: string;
+  orderId?: string;
+  /** ID tài khoản web lúc tạo QR — mobile phải khớp JWT app. */
+  userId?: string;
+  /** Web provider rental: chọn ảnh thư viện thay vì chụp camera. */
+  pickerMode?: "camera" | "library";
+};
+
 export type CosmateQrPayload =
-  | {
-      type: "confirm-delivery";
-      token: string;
-      apiBase?: string;
-      orderId?: string;
-      /** ID tài khoản web lúc tạo QR — mobile phải khớp JWT app. */
-      userId?: string;
-    }
+  | ConfirmDeliveryQrPayload
   | { type: "qr-login"; sessionId: string; apiBase?: string };
 
 function normalizeQrUrl(raw: string): URL | null {
@@ -46,10 +50,27 @@ export function parseCosmateQr(raw: string): CosmateQrPayload | null {
   const path = url.pathname.toLowerCase();
   const apiBase = readApiBase(url);
 
-  if (path.includes("confirm-delivery")) {
+  const isConfirmDelivery =
+    path.includes("confirm-delivery") ||
+    path.includes("provider-upload") ||
+    path.includes("provider-rental");
+
+  if (isConfirmDelivery) {
     const token = readQrSessionId(url);
     const orderId = url.searchParams.get("orderId")?.trim();
     const userId = url.searchParams.get("userId")?.trim();
+    const uploadMode = url.searchParams.get("uploadMode")?.trim().toLowerCase();
+    const role = url.searchParams.get("role")?.trim().toUpperCase();
+
+    const pickerMode: ConfirmDeliveryQrPayload["pickerMode"] =
+      uploadMode === "library" ||
+      role === "PROVIDER_RENTAL" ||
+      path.includes("provider")
+        ? "library"
+        : uploadMode === "camera"
+          ? "camera"
+          : undefined;
+
     return token
       ? {
           type: "confirm-delivery",
@@ -57,6 +78,7 @@ export function parseCosmateQr(raw: string): CosmateQrPayload | null {
           apiBase,
           orderId: orderId || undefined,
           userId: userId || undefined,
+          pickerMode,
         }
       : null;
   }

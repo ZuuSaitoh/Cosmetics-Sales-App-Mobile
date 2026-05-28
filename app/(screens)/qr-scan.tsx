@@ -71,7 +71,7 @@ export default function QrScanScreen() {
       lastInvalidRawRef.current = data;
       showScanIssue(
         "Mã QR không hợp lệ",
-        "Vui lòng quét mã QR trên màn hình máy tính (đăng nhập hoặc xác nhận nhận hàng).",
+        "Vui lòng quét mã QR trên màn hình máy tính (đăng nhập hoặc gửi ảnh minh chứng).",
         true,
       );
       return;
@@ -87,7 +87,7 @@ export default function QrScanScreen() {
         if (!payload.userId) {
           showScanIssue(
             "Mã QR không hợp lệ",
-            "Mã xác nhận nhận hàng thiếu userId. Vui lòng tạo mã QR mới trên web.",
+            "Mã gửi ảnh minh chứng thiếu userId. Vui lòng tạo mã QR mới trên web.",
           );
           return;
         }
@@ -97,6 +97,7 @@ export default function QrScanScreen() {
           apiBase: payload.apiBase,
           userId: payload.userId,
           orderId: payload.orderId,
+          pickerMode: payload.pickerMode,
         };
 
         if (!authToken) {
@@ -171,7 +172,7 @@ export default function QrScanScreen() {
       <View style={styles.scanOverlay} pointerEvents="none">
         <View style={styles.scanFrame} />
         <Text style={styles.scannerHint}>
-          Quét mã QR trên máy tính (đăng nhập hoặc xác nhận nhận hàng)
+          Quét mã QR trên máy tính (đăng nhập hoặc gửi ảnh minh chứng)
         </Text>
       </View>
     </View>

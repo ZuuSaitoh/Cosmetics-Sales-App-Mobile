@@ -4,7 +4,7 @@ import { alertOnce } from "@/src/utils/alertOnce";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,14 +20,42 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const MAX_IMAGES = 5;
 
 export default function ConfirmDeliveryCaptureScreen() {
-  const { token, apiBase, userId } = useLocalSearchParams<{
+  const { token, apiBase, userId, pickerMode } = useLocalSearchParams<{
     token?: string;
     apiBase?: string;
     userId?: string;
+    pickerMode?: string;
   }>();
   const sessionToken = typeof token === "string" ? token.trim() : "";
   const qrApiBase = typeof apiBase === "string" ? apiBase.trim() : "";
   const qrUserId = typeof userId === "string" ? userId.trim() : "";
+  const isLibraryMode = pickerMode === "library";
+
+  const copy = useMemo(
+    () =>
+      isLibraryMode
+        ? {
+            title: "Chọn ảnh upload",
+            info: "Chọn ảnh từ thư viện điện thoại. Ảnh sẽ hiển thị realtime trên trang web provider.",
+            emptyLabel: "Chọn ảnh từ thư viện",
+            addLabel: "Thêm ảnh",
+            submitLabel: "Gửi ảnh lên web",
+            success:
+              "Đã gửi ảnh. Kiểm tra trên máy tính và tiếp tục thao tác trên web.",
+            missing: "Vui lòng chọn ít nhất 1 ảnh từ thư viện.",
+          }
+        : {
+            title: "Ảnh minh chứng",
+            info: "Chụp ảnh tình trạng đồ khi nhận hoặc trả. Sau khi gửi, hãy bấm xác nhận trên máy tính để hoàn tất.",
+            emptyLabel: "Bấm để chụp ảnh",
+            addLabel: "Thêm ảnh",
+            submitLabel: "Gửi ảnh lên máy tính",
+            success:
+              "Hãy bấm xác nhận trên máy tính để hoàn tất bước nhận hoặc trả hàng.",
+            missing: "Vui lòng chụp ít nhất 1 ảnh minh chứng.",
+          },
+    [isLibraryMode],
+  );
 
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,7 +78,7 @@ export default function ConfirmDeliveryCaptureScreen() {
 
     const verify = async () => {
       if (!sessionToken) {
-        denyAndLeave("Phiên xác nhận không hợp lệ. Vui lòng quét lại mã QR.");
+        denyAndLeave("Phiên gửi ảnh không hợp lệ. Vui lòng quét lại mã QR.");
         return;
       }
       if (!qrUserId) {
@@ -85,6 +113,37 @@ export default function ConfirmDeliveryCaptureScreen() {
     });
   };
 
+  const pickFromLibrary = async () => {
+    if (!canCapture) return;
+
+    const remainSlots = MAX_IMAGES - images.length;
+    if (remainSlots <= 0) {
+      Alert.alert("Đã đủ ảnh", `Bạn chỉ có thể gửi tối đa ${MAX_IMAGES} ảnh.`);
+      return;
+    }
+
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert(
+        "Cấp quyền",
+        "Vui lòng cho phép truy cập thư viện ảnh để chọn ảnh upload.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: remainSlots > 1,
+      selectionLimit: remainSlots,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      appendImages(result.assets.slice(0, remainSlots));
+    }
+  };
+
   const takePicture = async () => {
     if (!canCapture) return;
 
@@ -96,7 +155,7 @@ export default function ConfirmDeliveryCaptureScreen() {
 
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert("Cấp quyền", "Vui lòng cho phép Camera để chụp ảnh xác nhận.");
+      Alert.alert("Cấp quyền", "Vui lòng cho phép Camera để chụp ảnh minh chứng.");
       return;
     }
 
@@ -110,6 +169,8 @@ export default function ConfirmDeliveryCaptureScreen() {
       appendImages(result.assets.slice(0, remainSlots));
     }
   };
+
+  const onPickImages = isLibraryMode ? pickFromLibrary : takePicture;
 
   const removeImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
@@ -125,10 +186,7 @@ export default function ConfirmDeliveryCaptureScreen() {
     }
 
     if (images.length === 0) {
-      Alert.alert(
-        "Thiếu ảnh",
-        "Vui lòng chụp ít nhất 1 ảnh xác nhận nhận hàng.",
-      );
+      Alert.alert("Thiếu ảnh", copy.missing);
       return;
     }
 
@@ -140,11 +198,9 @@ export default function ConfirmDeliveryCaptureScreen() {
         qrApiBase || undefined,
       );
 
-      Alert.alert(
-        "Đã gửi ảnh",
-        "Vui lòng bấm 「Xác nhận đã nhận hàng」 trên máy tính để hoàn tất.",
-        [{ text: "OK", onPress: () => router.back() }],
-      );
+      Alert.alert("Đã gửi ảnh", copy.success, [
+        { text: "OK", onPress: () => router.back() },
+      ]);
     } catch (error: any) {
       const errorMsg =
         error.response?.data?.message ||
@@ -169,28 +225,35 @@ export default function ConfirmDeliveryCaptureScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#4A3B6B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ảnh xác nhận nhận hàng</Text>
+        <Text style={styles.headerTitle}>{copy.title}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.infoBox}>
-          <Ionicons name="desktop-outline" size={22} color="#B59DFF" />
-          <Text style={styles.infoText}>
-            Chụp ảnh tình trạng đồ khi nhận. Sau khi gửi, hãy bấm xác nhận trên
-            máy tính để hoàn tất đơn hàng.
-          </Text>
+          <Ionicons
+            name={isLibraryMode ? "images-outline" : "desktop-outline"}
+            size={22}
+            color="#B59DFF"
+          />
+          <Text style={styles.infoText}>{copy.info}</Text>
         </View>
 
         <View style={styles.imageSectionHeader}>
-          <Text style={styles.label}>Ảnh minh chứng (1–5 ảnh)</Text>
-          <Text style={styles.counter}>{images.length}/{MAX_IMAGES}</Text>
+          <Text style={styles.label}>Ảnh (1–5)</Text>
+          <Text style={styles.counter}>
+            {images.length}/{MAX_IMAGES}
+          </Text>
         </View>
 
         {images.length === 0 ? (
-          <TouchableOpacity style={styles.imageBox} onPress={takePicture}>
-            <Ionicons name="camera" size={40} color="#B59DFF" />
-            <Text style={styles.imageBoxText}>Bấm để chụp ảnh</Text>
+          <TouchableOpacity style={styles.imageBox} onPress={onPickImages}>
+            <Ionicons
+              name={isLibraryMode ? "images" : "camera"}
+              size={40}
+              color="#B59DFF"
+            />
+            <Text style={styles.imageBoxText}>{copy.emptyLabel}</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.imageGrid}>
@@ -206,9 +269,9 @@ export default function ConfirmDeliveryCaptureScreen() {
               </View>
             ))}
             {images.length < MAX_IMAGES ? (
-              <TouchableOpacity style={styles.addMoreCell} onPress={takePicture}>
+              <TouchableOpacity style={styles.addMoreCell} onPress={onPickImages}>
                 <Ionicons name="add" size={24} color="#8E7AB5" />
-                <Text style={styles.addMoreText}>Thêm ảnh</Text>
+                <Text style={styles.addMoreText}>{copy.addLabel}</Text>
               </TouchableOpacity>
             ) : null}
           </View>
@@ -222,7 +285,7 @@ export default function ConfirmDeliveryCaptureScreen() {
           {isSubmitting ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.submitBtnText}>Gửi ảnh lên máy tính</Text>
+            <Text style={styles.submitBtnText}>{copy.submitLabel}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

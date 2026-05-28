@@ -45,7 +45,7 @@ export async function assertConfirmDeliveryQrOwner(
   if (appUserId == null) {
     return {
       ok: false,
-      message: "Vui lòng đăng nhập app trước khi quét mã xác nhận nhận hàng.",
+      message: "Vui lòng đăng nhập app trước khi quét mã gửi ảnh minh chứng.",
     };
   }
 
