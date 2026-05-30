@@ -2,10 +2,13 @@ import { API_BASE_URL } from "@/src/api/axiosClient";
 import { providerService } from "@/src/services/providerService";
 import { serviceControllerService } from "@/src/services/serviceControllerService";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   SafeAreaView,
@@ -15,10 +18,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { chatService } from "@/src/services/chatService";
 
 // Định nghĩa Interface cho Provider
 interface ProviderDetail {
   id: number;
+  userId: number;
   shopName: string | null;
   avatarUrl: string | null;
   coverImageUrl: string | null;
@@ -48,7 +53,54 @@ export default function ProviderProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [services, setServices] = useState<ProviderServiceItem[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
+  const [openingChat, setOpeningChat] = useState(false);
   const apiHost = API_BASE_URL.replace(/\/api$/, "");
+
+  const handleContactProvider = async () => {
+    if (openingChat) return;
+    try {
+      setOpeningChat(true);
+      const token = await AsyncStorage.getItem("cosmate_token");
+      if (!token) {
+        router.push("/(auth)/login");
+        return;
+      }
+      const decoded: any = jwtDecode(token);
+      const currentUserId = Number(decoded.userId || decoded.sub || decoded.id);
+      if (!currentUserId) {
+        Alert.alert("Lỗi", "Không xác định được tài khoản của bạn.");
+        return;
+      }
+      const providerUserId = Number(provider?.userId);
+      const providerName = provider?.shopName || "Provider";
+      const providerAvatar = provider?.avatarUrl || "";
+      if (!providerUserId) {
+        Alert.alert("Lỗi", "Không tìm thấy tài khoản provider.");
+        return;
+      }
+
+      const chatRes = await chatService.getOrCreateRoom(currentUserId, providerUserId);
+      const roomId = chatRes.data?.result?.id ?? chatRes.data?.id;
+      if (!roomId) {
+        Alert.alert("Lỗi", "Không thể tạo phòng chat.");
+        return;
+      }
+
+      router.push({
+        pathname: "/chat/[roomId]",
+        params: {
+          roomId: String(roomId),
+          partnerId: String(providerUserId),
+          partnerName: providerName,
+          partnerAvatar: providerAvatar,
+        },
+      } as any);
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể mở chat. Vui lòng thử lại.");
+    } finally {
+      setOpeningChat(false);
+    }
+  };
 
   const fetchProviderServices = useCallback(async (pid: number) => {
     try {
@@ -227,6 +279,24 @@ export default function ProviderProfileScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Nút nhắn tin liên hệ nhà cung cấp (bỏ nút đặt lịch theo yêu cầu) */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={[styles.fullChatBtn, openingChat && { opacity: 0.7 }]}
+          onPress={handleContactProvider}
+          disabled={openingChat}
+        >
+          {openingChat ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+              <Text style={styles.fullChatBtnText}>Nhắn tin</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -351,4 +421,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   bookBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  fullChatBtn: {
+    flex: 1,
+    flexDirection: "row",
+    backgroundColor: "#B59DFF",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    height: 48,
+  },
+  fullChatBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });

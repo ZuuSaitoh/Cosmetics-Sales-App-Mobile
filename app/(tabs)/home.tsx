@@ -338,7 +338,7 @@ export default function UserHomeScreen() {
             {item.name}
           </Text>
           <Text style={styles.priceText}>
-            {formatPrice(item.pricePerDay)}
+            {formatPrice(item.pricePerDay || 0)}
             <Text style={styles.perDay}>/ngày</Text>
           </Text>
         </View>
