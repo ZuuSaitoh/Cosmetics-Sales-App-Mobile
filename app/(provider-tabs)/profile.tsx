@@ -20,7 +20,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axiosClient from "../src/api/axiosClient";
+import axiosClient from "@/src/api/axiosClient";
 import { providerService } from "@/src/services/providerService";
 import { userService } from "@/src/services/userService";
 import { walletService } from "@/src/services/walletService";
