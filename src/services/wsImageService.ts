@@ -3,16 +3,26 @@ import { Platform } from "react-native";
 import { normalizeApiOrigin, rootAxiosClient } from "../api/axiosClient";
 import { getAppAccessToken } from "../utils/appAccessToken";
 
-function appendImageToFormData(
+function appendMediaToFormData(
   formData: FormData,
-  imageUri: string,
+  mediaUri: string,
   index: number,
+  mimeType?: string,
 ) {
   const localUri =
-    Platform.OS === "ios" ? imageUri.replace("file://", "") : imageUri;
+    Platform.OS === "ios" ? mediaUri.replace("file://", "") : mediaUri;
   const filename = localUri.split("/").pop() || `confirm-${index + 1}.jpg`;
-  const match = /\.(\w+)$/.exec(filename);
-  const type = match ? `image/${match[1]}` : "image/jpeg";
+  
+  let type = mimeType;
+  if (!type) {
+    const match = /\.(\w+)$/.exec(filename);
+    const ext = match ? match[1].toLowerCase() : "";
+    if (["mp4", "mov", "m4v", "3gp", "avi", "quicktime"].includes(ext)) {
+      type = `video/${ext === "mov" ? "quicktime" : ext}`;
+    } else {
+      type = match ? `image/${match[1]}` : "image/jpeg";
+    }
+  }
 
   formData.append("file", {
     uri: localUri,
@@ -23,12 +33,13 @@ function appendImageToFormData(
 
 async function postWsImageUpload(
   sessionId: string,
-  imageUri: string,
+  mediaUri: string,
   index: number,
   apiBase?: string,
+  mimeType?: string,
 ) {
   const formData = new FormData();
-  appendImageToFormData(formData, imageUri, index);
+  appendMediaToFormData(formData, mediaUri, index, mimeType);
 
   const origin = normalizeApiOrigin(apiBase);
   const accessToken = await getAppAccessToken();
@@ -60,21 +71,27 @@ async function postWsImageUpload(
 
 export const wsImageService = {
   /** sessionId = session token từ QR (confirm-delivery?token=...) */
-  uploadImage: (sessionId: string, imageUri: string, apiBase?: string, index = 0) =>
-    postWsImageUpload(sessionId, imageUri, index, apiBase),
+  uploadImage: (
+    sessionId: string,
+    mediaUri: string,
+    apiBase?: string,
+    index = 0,
+    mimeType?: string,
+  ) => postWsImageUpload(sessionId, mediaUri, index, apiBase, mimeType),
 
-  /** Upload 1–5 ảnh; mỗi ảnh một request (field `file` đơn). */
+  /** Upload 1–5 ảnh/video; mỗi file một request (field `file` đơn). */
   uploadConfirmDeliveryImages: async (
     sessionId: string,
-    imageUris: string[],
+    assets: { uri: string; mimeType?: string }[],
     apiBase?: string,
   ): Promise<void> => {
-    for (let i = 0; i < imageUris.length; i++) {
+    for (let i = 0; i < assets.length; i++) {
       const res = await wsImageService.uploadImage(
         sessionId,
-        imageUris[i],
+        assets[i].uri,
         apiBase,
         i,
+        assets[i].mimeType,
       );
       if (res.data?.code !== undefined && res.data.code !== 0) {
         throw Object.assign(new Error(res.data.message || "Upload thất bại"), {

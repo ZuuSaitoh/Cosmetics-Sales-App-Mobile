@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,8 +17,16 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Video, ResizeMode } from "expo-av";
 
 const MAX_IMAGES = 5;
+
+function formatDuration(durationMs: number) {
+  const seconds = Math.floor(durationMs / 1000);
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+}
 
 export default function ConfirmDeliveryCaptureScreen() {
   const { token, apiBase, userId, pickerMode } = useLocalSearchParams<{
@@ -35,29 +44,33 @@ export default function ConfirmDeliveryCaptureScreen() {
     () =>
       isLibraryMode
         ? {
-            title: "Chọn ảnh upload",
-            info: "Chọn ảnh từ thư viện điện thoại. Ảnh sẽ hiển thị realtime trên trang web provider.",
-            emptyLabel: "Chọn ảnh từ thư viện",
-            addLabel: "Thêm ảnh",
-            submitLabel: "Gửi ảnh lên web",
+            title: "Chọn minh chứng upload",
+            info: "Chọn ảnh/video từ thư viện điện thoại. Minh chứng sẽ hiển thị realtime trên trang web provider.",
+            emptyLabel: "Chọn ảnh/video từ thư viện",
+            addLabel: "Thêm file",
+            submitLabel: "Gửi minh chứng lên web",
             success:
-              "Đã gửi ảnh. Kiểm tra trên máy tính và tiếp tục thao tác trên web.",
-            missing: "Vui lòng chọn ít nhất 1 ảnh từ thư viện.",
+              "Đã gửi minh chứng. Kiểm tra trên máy tính và tiếp tục thao tác trên web.",
+            missing: "Vui lòng chọn ít nhất 1 ảnh/video từ thư viện.",
           }
         : {
-            title: "Ảnh minh chứng",
-            info: "Chụp ảnh tình trạng đồ khi nhận hoặc trả. Sau khi gửi, hãy bấm xác nhận trên máy tính để hoàn tất.",
-            emptyLabel: "Bấm để chụp ảnh",
-            addLabel: "Thêm ảnh",
-            submitLabel: "Gửi ảnh lên máy tính",
+            title: "Minh chứng giao nhận",
+            info: "Chụp ảnh hoặc quay video tình trạng đồ khi nhận hoặc trả. Sau khi gửi, hãy bấm xác nhận trên máy tính để hoàn tất.",
+            emptyLabel: "Bấm để chụp ảnh / quay video",
+            addLabel: "Thêm file",
+            submitLabel: "Gửi minh chứng lên máy tính",
             success:
               "Hãy bấm xác nhận trên máy tính để hoàn tất bước nhận hoặc trả hàng.",
-            missing: "Vui lòng chụp ít nhất 1 ảnh minh chứng.",
+            missing: "Vui lòng chụp hoặc quay video ít nhất 1 minh chứng.",
           },
     [isLibraryMode],
   );
 
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [previewMedia, setPreviewMedia] = useState<{
+    uri: string;
+    type: "image" | "video";
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [canCapture, setCanCapture] = useState(false);
@@ -118,7 +131,7 @@ export default function ConfirmDeliveryCaptureScreen() {
 
     const remainSlots = MAX_IMAGES - images.length;
     if (remainSlots <= 0) {
-      Alert.alert("Đã đủ ảnh", `Bạn chỉ có thể gửi tối đa ${MAX_IMAGES} ảnh.`);
+      Alert.alert("Đã đủ minh chứng", `Bạn chỉ có thể gửi tối đa ${MAX_IMAGES} file.`);
       return;
     }
 
@@ -127,13 +140,13 @@ export default function ConfirmDeliveryCaptureScreen() {
     if (!permissionResult.granted) {
       Alert.alert(
         "Cấp quyền",
-        "Vui lòng cho phép truy cập thư viện ảnh để chọn ảnh upload.",
+        "Vui lòng cho phép truy cập thư viện để chọn ảnh/video upload.",
       );
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ["images", "videos"],
       allowsMultipleSelection: remainSlots > 1,
       selectionLimit: remainSlots,
       quality: 0.8,
@@ -149,20 +162,21 @@ export default function ConfirmDeliveryCaptureScreen() {
 
     const remainSlots = MAX_IMAGES - images.length;
     if (remainSlots <= 0) {
-      Alert.alert("Đã đủ ảnh", `Bạn chỉ có thể gửi tối đa ${MAX_IMAGES} ảnh.`);
+      Alert.alert("Đã đủ minh chứng", `Bạn chỉ có thể gửi tối đa ${MAX_IMAGES} file.`);
       return;
     }
 
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert("Cấp quyền", "Vui lòng cho phép Camera để chụp ảnh minh chứng.");
+      Alert.alert("Cấp quyền", "Vui lòng cho phép Camera để chụp ảnh/quay video minh chứng.");
       return;
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
+      mediaTypes: ["images", "videos"],
+      allowsEditing: false,
       quality: 0.7,
+      videoMaxDuration: 60,
     });
 
     if (!result.canceled) {
@@ -181,12 +195,12 @@ export default function ConfirmDeliveryCaptureScreen() {
 
     const access = await assertConfirmDeliveryQrOwner(qrUserId);
     if (!access.ok) {
-      Alert.alert("Không thể gửi ảnh", access.message);
+      Alert.alert("Không thể gửi", access.message);
       return;
     }
 
     if (images.length === 0) {
-      Alert.alert("Thiếu ảnh", copy.missing);
+      Alert.alert("Thiếu minh chứng", copy.missing);
       return;
     }
 
@@ -194,17 +208,20 @@ export default function ConfirmDeliveryCaptureScreen() {
     try {
       await wsImageService.uploadConfirmDeliveryImages(
         sessionToken,
-        images.map((img) => img.uri),
+        images.map((img) => ({
+          uri: img.uri,
+          mimeType: img.mimeType,
+        })),
         qrApiBase || undefined,
       );
 
-      Alert.alert("Đã gửi ảnh", copy.success, [
+      Alert.alert("Đã gửi thành công", copy.success, [
         { text: "OK", onPress: () => router.back() },
       ]);
     } catch (error: any) {
       const errorMsg =
         error.response?.data?.message ||
-        "Không thể gửi ảnh. Kiểm tra kết nối hoặc phiên QR đã hết hạn.";
+        "Không thể gửi minh chứng. Kiểm tra kết nối hoặc phiên QR đã hết hạn.";
       Alert.alert("Lỗi", errorMsg);
     } finally {
       setIsSubmitting(false);
@@ -240,7 +257,7 @@ export default function ConfirmDeliveryCaptureScreen() {
         </View>
 
         <View style={styles.imageSectionHeader}>
-          <Text style={styles.label}>Ảnh (1–5)</Text>
+          <Text style={styles.label}>Minh chứng (1–5)</Text>
           <Text style={styles.counter}>
             {images.length}/{MAX_IMAGES}
           </Text>
@@ -249,7 +266,7 @@ export default function ConfirmDeliveryCaptureScreen() {
         {images.length === 0 ? (
           <TouchableOpacity style={styles.imageBox} onPress={onPickImages}>
             <Ionicons
-              name={isLibraryMode ? "images" : "camera"}
+              name={isLibraryMode ? "images" : "videocam"}
               size={40}
               color="#B59DFF"
             />
@@ -257,17 +274,43 @@ export default function ConfirmDeliveryCaptureScreen() {
           </TouchableOpacity>
         ) : (
           <View style={styles.imageGrid}>
-            {images.map((img, index) => (
-              <View key={`${img.uri}-${index}`} style={styles.imageCell}>
-                <Image source={{ uri: img.uri }} style={styles.imagePreview} />
-                <TouchableOpacity
-                  style={styles.removeImageBtn}
-                  onPress={() => removeImage(index)}
-                >
-                  <Ionicons name="close" size={14} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            ))}
+            {images.map((img, index) => {
+              const isVideo = img.type === "video";
+              return (
+                <View key={`${img.uri}-${index}`} style={styles.imageCell}>
+                  <TouchableOpacity
+                    style={styles.cellPressable}
+                    onPress={() =>
+                      setPreviewMedia({
+                        uri: img.uri,
+                        type: isVideo ? "video" : "image",
+                      })
+                    }
+                  >
+                    {isVideo ? (
+                      <View style={styles.videoPlaceholder}>
+                        <Ionicons name="videocam" size={28} color="#B59DFF" />
+                        {img.duration ? (
+                          <Text style={styles.durationText}>
+                            {formatDuration(img.duration)}
+                          </Text>
+                        ) : (
+                          <Text style={styles.durationText}>Video</Text>
+                        )}
+                      </View>
+                    ) : (
+                      <Image source={{ uri: img.uri }} style={styles.imagePreview} />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.removeImageBtn}
+                    onPress={() => removeImage(index)}
+                  >
+                    <Ionicons name="close" size={14} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
             {images.length < MAX_IMAGES ? (
               <TouchableOpacity style={styles.addMoreCell} onPress={onPickImages}>
                 <Ionicons name="add" size={24} color="#8E7AB5" />
@@ -289,6 +332,50 @@ export default function ConfirmDeliveryCaptureScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Media Preview Modal */}
+      <Modal
+        visible={!!previewMedia}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={() => setPreviewMedia(null)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setPreviewMedia(null)}
+              style={styles.closeModalBtn}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {previewMedia?.type === "video" ? "Xem video minh chứng" : "Xem ảnh minh chứng"}
+            </Text>
+            <View style={{ width: 44 }} />
+          </View>
+          <View style={styles.modalContent}>
+            {previewMedia?.type === "video" ? (
+              <Video
+                source={{ uri: previewMedia.uri }}
+                rate={1.0}
+                volume={1.0}
+                isMuted={false}
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay={true}
+                useNativeControls
+                style={styles.modalVideo}
+              />
+            ) : (
+              previewMedia?.uri && (
+                <Image
+                  source={{ uri: previewMedia.uri }}
+                  style={styles.modalImage}
+                />
+              )
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -357,6 +444,19 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   imagePreview: { width: "100%", height: "100%", resizeMode: "cover" },
+  videoPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#FAF9FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  durationText: {
+    fontSize: 10,
+    color: "#8E7AB5",
+    marginTop: 4,
+    fontWeight: "600",
+  },
   removeImageBtn: {
     position: "absolute",
     top: 4,
@@ -389,4 +489,48 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.7 },
   submitBtnText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  cellPressable: {
+    width: "100%",
+    height: "100%",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1a1a1a",
+    backgroundColor: "#000",
+  },
+  closeModalBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  modalContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+  modalVideo: {
+    width: "100%",
+    height: "100%",
+  },
+  modalImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "contain",
+  },
 });
